@@ -16,10 +16,10 @@ const props = defineProps<{
 const submenus = {
   cardMenu: [
     { path: '/Ultra', text: '小米 SU7 Ultra', icon: 'Models' },
-    { path: '/Supra', text: '丰田 SUPRA', icon: 'Models' },
+    { path: '/Supra', text: '丰田 GR SUPRA', icon: 'GR' },
     { path: '/Brz', text: '斯巴鲁 BRZ', icon: 'Models' },
     { path: '/Gtr', text: '尼桑 GT-R', icon: 'Models' },
-    { path: '/Gtr', text: '道奇 CHALLENGER SRT® HELLCAT', icon: 'Models' }
+    { path: '/Hellcat', text: '道奇 CHALLENGER SRT® HELLCAT', icon: 'Models' }
   ] as SubmenuItem[],
   serviceMenu: [
     { path: '/Maintenance', text: '保养检查', icon: 'Maintenance' },
@@ -118,7 +118,7 @@ onBeforeUnmount(() => {
                   @click="onClose"
                   class="mobile-submenu-link"
               >
-                <svg-icon v-if="sublink.icon" :name="sublink.icon" :width="20" height="20" />
+                <svg-icon v-if="sublink.icon" :name="sublink.icon" :width="24" height="24" />
                 <span>{{ sublink.text }}</span>
               </router-link>
             </div>
@@ -138,7 +138,7 @@ onBeforeUnmount(() => {
                   @click="onClose"
                   class="mobile-submenu-link"
               >
-                <svg-icon v-if="sublink.icon" :name="sublink.icon" :width="20" height="20" />
+                <svg-icon v-if="sublink.icon" :name="sublink.icon" :width="24" height="24" />
                 <span>{{ sublink.text }}</span>
               </router-link>
             </div>

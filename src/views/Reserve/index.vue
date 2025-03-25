@@ -259,46 +259,39 @@ interface ReservationForm {
 const carModels = ref<CarModel[]>([
   {
     id: 1,
-    name: '豪华轿车 A8',
-    price: '￥299,999 起',
+    name: '小米 SU7 Ultra',
+    price: '￥599,999 起',
     description: '豪华商务座驾，卓越驾驶体验',
-    image: '/models/model-x.jpg'
+    image: '/models/Ultra/ultra.jpg'
   },
   {
     id: 2,
-    name: '运动轿跑 RS7',
-    price: '758,000元起',
+    name: 'TOYOTA SUPRA',
+    price: '558,000元起',
     description: '激情与优雅的完美结合',
-    image: '/images/cars/coupe-rs7.jpg'
+    image: '/models/Supra/supra.jpg'
   },
   {
     id: 3,
-    name: '豪华SUV Q7',
-    price: '558,000元起',
-    description: '宽敞内部空间，全地形适应性强',
-    image: '/images/cars/suv-q7.jpg'
+    name: 'NISSAN GT-R',
+    price: '858,000元起',
+    description: '激情与优雅的完美结合',
+    image: '/models/Gtr/gtr.jpg'
   },
   {
     id: 4,
-    name: '丰田 SUPRA',
+    name: 'SUBARU BRZ',
     price: '498,000元起',
-    description: '零排放环保科技，智能驾驶辅助',
-    image: '/models/supra.jpg'
+    description: '激情与优雅的完美结合',
+    image: '/models/Brz/brz.jpg'
   },
   {
     id: 5,
-    name: '丰田 SUPRA',
-    price: '498,000元起',
-    description: '零排放环保科技，智能驾驶辅助',
-    image: '/models/supra.jpg'
+    name: 'DODGE CHALLENGER SRT® HELLCAT',
+    price: '998,000元起',
+    description: '激情与优雅的完美结合',
+    image: '/models/Dodge/dodge.jpg'
   },
-  {
-    id: 6,
-    name: '丰田 SUPRA',
-    price: '498,000元起',
-    description: '零排放环保科技，智能驾驶辅助',
-    image: '/models/supra.jpg'
-  }
 ]);
 
 // 可用时间

@@ -16,6 +16,13 @@ import Finance from "@/views/Service/finance/index.vue";
 import Maintenance from "@/views/Service/maintenance/index.vue";
 import Repair from "@/views/Service/repair/index.vue";
 
+//车型
+import Ultra from "@/views/Models/Ultra/index.vue";
+import Supra from "@/views/Models/Supra/index.vue";
+import Brz  from "@/views/Models/Brz/index.vue";
+import Gtr from "@/views/Models/Gtr/index.vue";
+import Hellcat from "@/views/Models/Dodge/index.vue";
+
 const routes = [
     {
         path: '/',
@@ -67,6 +74,7 @@ const routes = [
         component: Customer
     },
 
+
     //  服务
     {
         path: '/AfterSales',
@@ -88,7 +96,35 @@ const routes = [
         path: '/Repair',
         name: 'Repair',
         component: Repair
-    }
+    },
+
+    //车型
+    {
+        path: '/Ultra',
+        name: 'Ultra',
+        component: Ultra
+    },
+    {
+        path: '/Supra',
+        name: 'Supra',
+        component: Supra
+    },
+    {
+        path: '/Brz',
+        name: 'Brz',
+        component: Brz
+    },
+    {
+        path: '/Gtr',
+        name: 'Gtr',
+        component: Gtr
+    },
+    {
+        path: '/Hellcat',
+        name: 'Hellcat',
+        component: Hellcat
+    },
+
 ]
 
 const router = createRouter({

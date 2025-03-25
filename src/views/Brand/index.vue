@@ -1,106 +1,7 @@
-<template>
-  <div class="brand-page">
-    <!-- 添加视差背景 -->
-    <div class="parallax-hero">
-      <div class="hero-content">
-      </div>
-    </div>
-
-    <!-- 品牌历史时间轴 -->
-    <section class="history reveal-section">
-      <div class="section-container">
-        <h2 class="reveal-item">品牌历程</h2>
-        <div class="timeline">
-          <div class="timeline-item reveal-item"
-               v-for="(milestone, index) in milestones"
-               :key="milestone.year"
-               :style="{ transitionDelay: index * 0.2 + 's' }">
-            <div class="timeline-content">
-              <div class="year">{{ milestone.year }}</div>
-              <div class="content">
-                <h3>{{ milestone.title }}</h3>
-                <p>{{ milestone.description }}</p>
-                <div class="image-wrapper reveal-item" @mouseover="zoomImage" @mouseleave="unzoomImage">
-                  <img v-if="milestone.image" :src="milestone.image" :alt="milestone.title">
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 工厂参观 -->
-    <section class="factory-tour reveal-section">
-      <div class="section-container">
-        <h2 class="reveal-item">智能工厂</h2>
-        <div class="factory-content">
-          <div class="factory-video reveal-item">
-            <video controls poster="/brand/ultra.png">
-              <source src="/videos/home2.mp4" type="video/mp4">
-            </video>
-          </div>
-          <div class="factory-info reveal-item">
-            <h3>世界级智能制造基地</h3>
-            <p>采用业界领先的智能制造技术，打造高品质汽车产品。</p>
-            <ul class="factory-features">
-              <li class="reveal-item" v-for="(feature, index) in factoryFeatures"
-                  :key="index"
-                  :style="{ transitionDelay: index * 0.1 + 's' }">
-                <i :class="feature.icon"></i>
-                <span>{{ feature.text }}</span>
-              </li>
-            </ul>
-            <button class="tour-btn reveal-item" @click="startVirtualTour">
-              开启虚拟工厂之旅
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 可持续发展 -->
-    <section class="sustainability reveal-section">
-      <div class="section-container">
-        <h2 class="reveal-item">可持续发展</h2>
-        <div class="sustainability-grid">
-          <div class="sustainability-card reveal-item"
-               v-for="(card, index) in sustainabilityCards"
-               :key="card.title"
-               :style="{ transitionDelay: index * 0.15 + 's' }">
-            <div class="card-icon">
-              <i :class="card.icon"></i>
-            </div>
-            <h3>{{ card.title }}</h3>
-            <p>{{ card.description }}</p>
-            <div class="progress-bar">
-              <div class="progress" :style="{ width: card.progress + '%' }"></div>
-              <span>{{ card.progress }}% 完成</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 虚拟工厂参观弹窗 -->
-    <transition name="modal">
-      <div class="virtual-tour-modal" v-if="showVirtualTour" @click.self="closeVirtualTour">
-        <div class="modal-content">
-          <button class="close-btn" @click="closeVirtualTour">
-            <i class="fas fa-times"></i>
-          </button>
-          <div class="tour-container">
-            <div class="tour-placeholder">
-              VR工厂展示
-            </div>
-          </div>
-        </div>
-      </div>
-    </transition>
-  </div>
-</template>
-
 <script>
+import { gsap } from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import Lenis from '@studio-freight/lenis'
 export default {
   name: 'Brand',
   data () {
@@ -211,6 +112,110 @@ export default {
   }
 }
 </script>
+
+<template>
+  <div class="brand-page">
+    <!-- 添加视差背景 -->
+    <div class="parallax-hero">
+      <div class="hero-content">
+      </div>
+    </div>
+
+    <!-- 品牌历史时间轴 -->
+    <section class="history reveal-section">
+      <div class="section-container">
+        <h2 class="reveal-item">品牌历程</h2>
+        <div class="timeline">
+          <div class="timeline-item reveal-item"
+               v-for="(milestone, index) in milestones"
+               :key="milestone.year"
+               :style="{ transitionDelay: index * 0.2 + 's' }">
+            <div class="timeline-content">
+              <div class="year">{{ milestone.year }}</div>
+              <div class="content">
+                <h3>{{ milestone.title }}</h3>
+                <p>{{ milestone.description }}</p>
+                <div class="image-wrapper reveal-item" @mouseover="zoomImage" @mouseleave="unzoomImage">
+                  <img v-if="milestone.image" :src="milestone.image" :alt="milestone.title">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 工厂参观 -->
+    <section class="factory-tour reveal-section">
+      <div class="section-container">
+        <h2 class="reveal-item">智能工厂</h2>
+        <div class="factory-content">
+          <div class="factory-video reveal-item">
+            <video controls poster="/brand/ultra.png">
+              <source src="/videos/home2.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="factory-info reveal-item">
+            <h3>世界级智能制造基地</h3>
+            <p>采用业界领先的智能制造技术，打造高品质汽车产品。</p>
+            <ul class="factory-features">
+              <li class="reveal-item" v-for="(feature, index) in factoryFeatures"
+                  :key="index"
+                  :style="{ transitionDelay: index * 0.1 + 's' }">
+                <i :class="feature.icon"></i>
+                <span>{{ feature.text }}</span>
+              </li>
+            </ul>
+            <button class="tour-btn reveal-item" @click="startVirtualTour">
+              开启虚拟工厂之旅
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 可持续发展 -->
+    <section class="sustainability reveal-section">
+      <div class="section-container">
+        <h2 class="reveal-item">可持续发展</h2>
+        <div class="sustainability-grid">
+          <div class="sustainability-card reveal-item"
+               v-for="(card, index) in sustainabilityCards"
+               :key="card.title"
+               :style="{ transitionDelay: index * 0.15 + 's' }">
+            <div class="card-icon">
+              <i :class="card.icon"></i>
+            </div>
+            <h3>{{ card.title }}</h3>
+            <p>{{ card.description }}</p>
+            <div class="progress-bar">
+              <div class="progress" :style="{ width: card.progress + '%' }"></div>
+              <span>{{ card.progress }}% 完成</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 虚拟工厂参观弹窗 -->
+    <transition name="modal">
+      <div class="virtual-tour-modal" v-if="showVirtualTour" @click.self="closeVirtualTour">
+        <div class="modal-content">
+          <button class="close-btn" @click="closeVirtualTour">
+            <i class="fas fa-times"></i>
+          </button>
+          <div class="tour-container">
+            <div class="tour-placeholder">
+              VR工厂展示
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+  </div>
+</template>
+
+
 
 <style scoped>
 .brand-page {

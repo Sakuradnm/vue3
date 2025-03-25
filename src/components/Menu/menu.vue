@@ -9,10 +9,10 @@ const mainLinks = [
   { path: '/Home', text: '首 页' },
   { path: '/Models',text: '车 型', submenu: [
       { path: '/Ultra', text: '小米 SU7 Ultra' },
-      { path: '/Supra', text: 'TOYOTA SUPRA' },
+      { path: '/Supra', text: 'TOYOTA GR SUPRA' },
       { path: '/Brz', text: 'SUBARU BRZ' },
       { path: '/Gtr', text: 'NISSAN GT-R' },
-      { path: '/Gtr', text: 'DODGE CHALLENGER SRT® HELLCAT' },
+      { path: '/Hellcat', text: 'DODGE CHALLENGER SRT® HELLCAT' },
     ]
   },
   { text: '服 务', submenu: [
