@@ -1,0 +1,25 @@
+body, html {
+    padding: 0;
+    margin: 0;
+    overflow-x: hidden;
+}
+:root {
+    --color-neutral-900: #1a1a1a;
+    --color-light: #ffffff;
+    --container-padding: 2rem;
+    --section-padding: 4rem;
+}
+
+body {
+    background-color: var(--color-neutral-900);
+    color: var(--color-light);
+    margin: 0;
+    overflow-x: hidden;
+}
+
+@font-face {
+    font-family: 'PP Neue Corp Wide';
+    src: url('//brand/PPNeueCorp-WideUltrabold.woff2') format('woff2');
+    font-weight: 800;
+    font-style: normal;
+}
