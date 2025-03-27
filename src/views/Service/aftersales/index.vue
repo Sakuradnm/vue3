@@ -436,6 +436,8 @@ const initMap = () => {
 <style scoped>
 /* 基础样式 */
 * {
+  color: #1a1a1a;
+  background-color: white;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -619,11 +621,13 @@ body {
 }
 
 .contact-label {
+  background-color: transparent;
   font-weight: 500;
   margin-bottom: 4px;
 }
 
 .contact-number {
+  background-color: transparent;
   font-size: 24px;
   font-weight: 700;
   color: #0066cc;

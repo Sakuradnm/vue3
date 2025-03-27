@@ -61,7 +61,7 @@
 <style scoped>
 /* 页脚样式 */
 .footer {
-  background-color: #1a1a1a;
+  background-color: #010a0e;
   color: white;
   padding: 2rem 0;
   display: flex;
@@ -71,6 +71,7 @@
 
 /* 4个社交图标 */
 .social-top {
+  background-color: transparent;
   display: flex;
   justify-content: center;
   gap: 10rem;

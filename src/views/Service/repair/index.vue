@@ -309,6 +309,7 @@ onMounted(() => {
 <style scoped>
 .maintenance-page {
   color: #333;
+  background-color: white;
 }
 
 .hero-banner {
