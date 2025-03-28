@@ -1,0 +1,534 @@
+/* 基础样式 */
+.car-page {
+    color: rgba(255, 255, 255, 0.78);
+    background-color: white;
+}
+.grid {
+    margin: 0 auto 1rem;
+    width: 90%;
+    height: 1px;
+    border-radius: 2px;
+    transform: translateY(-50%);
+}
+/************************************************************
+ * 视频主页
+ ************************************************************/
+.car-hero {
+    height: 100vh;
+}
+.hero-video {
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+}
+.hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: linear-gradient(to top, rgb(1, 10, 14), transparent, rgb(1, 10, 14));
+}
+.hero-content {
+    text-align: center;
+    color: white;
+    z-index: 1;
+}
+.hero-content h1 {
+    font-size: 4rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+.hero-subtitle {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* 主页选项 */
+.hero-actions {
+    position: relative;
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+}
+.cta-button {
+    padding: 1rem 2rem;
+    border-radius: 30px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+}
+.cta-button.primary {
+    background: rgba(255, 255, 255, 0.47);
+    color: white;
+}
+.cta-button.secondary {
+    background: transparent;
+    color: white;
+    border: 2px solid white;
+}
+.cta-button:hover {
+    border: 2px solid rgba(255, 255, 255, 0.37);
+    background: rgba(221, 221, 221, 0.4);
+}
+
+/************************************************************
+ * 外观框架基础设计
+ ************************************************************/
+.appearance-overview {
+    padding: 3rem;
+    height: auto;
+    margin: 0;
+    position: relative;
+    background-color: black;
+}
+.appearance-title {
+    color: white;
+    display: block;
+    text-align: center;
+    position: relative;
+    margin: 1rem;
+    h1 {
+        width: 100%;
+        position: relative;
+        text-shadow: -2px 0 2px hsl(0, 0%, 100%),0 2px 2px hsla(198, 87%, 3%, 0.44), 2px 0 10px hsl(198, 87%, 3%);
+        font-size: 3rem;
+    }
+    p {
+        margin: 0 auto;
+        width: 100%;
+        position: relative;
+        display: inline-block;
+        font-size: 2rem;
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            transform: translateY(-50%);
+            width: 4rem;
+            height: 4px;
+            background: rgba(255, 0, 0, 0.8);
+            box-shadow: 0 0 2px hsl(0, 0%, 100%),
+            0 2px 2px hsl(198, 87%, 3%),
+            2px 7px 10px hsla(358, 100%, 50%, 0.4);
+            border-radius: 2px;
+        }
+    }
+}
+.grid-card-footer {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2;
+}
+
+/************************************************************
+ * 外观 / 轮胎和轮毂设计
+ ************************************************************/
+.appearance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 2fr));
+    column-gap: 10rem;
+    gap: 5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem 3rem;
+}
+.grid-card {
+    border-radius: 10px;
+}
+.grid-image-wrapper {
+    width: 100%;
+    height: 300px;
+    position: relative;
+    border-radius: 10px;
+}
+.grid-image-wrapper img {
+    border-radius: 10px;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+.grid-content-wrapper {
+    padding: 1rem;
+    position: relative;
+}
+.grid-text-card {
+    padding: 0 1rem;
+    height: 160px;
+    text-shadow: 0 0 2px hsla(0, 0%, 100%, 0.62),0 0 2px hsl(198, 87%, 3%), 0 0 2px hsla(0, 0%, 100%, 0);
+    h3 {
+        color: white;
+        font-size: 1.3rem;
+    }
+    p {
+        margin: 0.5rem auto;
+        font-size: 0.9rem;
+    }
+}
+
+/************************************************************
+ * 座椅 / 驾驶舱设计
+ ************************************************************/
+.appearance-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+.block-card {
+    display: flex;
+    gap: 2rem;
+    min-height: 400px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+}
+
+/* 下部分布局（左图片右文字） */
+.block-card:nth-child(2) {
+    flex-direction: row;
+}
+.block-image-wrapper {
+    width: 100%;
+    height: 300px;
+    position: relative;
+    border-radius: 10px;
+}
+.block-image-wrapper img {
+    border-radius: 10px;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+.block-content-wrapper {
+    flex: 1;
+    min-width: 45%;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    border-radius: 8px;
+}
+.block-text-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    text-shadow: 0 0 2px hsla(0, 0%, 100%, 0.62),0 0 2px hsl(198, 87%, 3%), 0 0 2px hsla(0, 0%, 100%, 0);
+    h3 {
+        font-size: 1.5rem;
+        color: #fff;
+    }
+    p {
+        margin: 0.5rem auto;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.9);
+    }
+}
+.block-card-footer {
+    margin-top: auto;
+    padding-top: 1.5rem;
+}
+
+
+/************************************************************
+ * 车型展示
+ ************************************************************/
+.gtr-models {
+    position: relative;
+    padding: 4rem;
+    margin: 0 auto;
+    background-image: linear-gradient(to bottom, rgb(1, 10, 14), rgb(255, 255, 255));
+}
+.gtr-models-title {
+    text-align: center;
+    font-size: 2.5rem;
+    margin-bottom: 3rem;
+    h1 {
+        text-shadow: -2px 0 2px hsl(0, 0%, 100%),0 2px 2px hsla(198, 87%, 3%, 0.44), 2px 0 10px hsl(198, 87%, 3%);
+        font-size: 3rem;
+    }
+    p {
+        font-size: 1.5rem;
+    }
+}
+.models-container {
+    padding: 1rem;
+    display: flex;
+    gap: 2rem;
+    max-width: 1200px;
+    height: auto;
+    margin: 0 auto;
+    border-radius: 10px;
+    position: relative;
+    background-color: white;
+}
+.model-card {
+    border-radius: 10px;
+
+    display: block;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    background: white;
+    height: 100%;
+    width: 100%;
+    position: relative;
+    transition: transform 0.3s ease;
+    overflow: visible;
+    padding: 1rem 0;
+}
+.model-image {
+    width: 100%;
+    max-width: 400px;
+    height: 220px;
+    object-fit: contain;
+    margin: 0 auto;
+    display: block;
+
+}
+/* 模型信息 */
+.model-info {
+    padding: 0 2rem;
+    position: static;
+}
+.model-info h1 {
+    color: black;
+    font-size: 2.2rem;
+    top: 0;
+    margin-bottom: 1rem;
+}
+.price {
+    font-size: 2rem;
+    color: #010a0e;
+    font-weight: 700;
+}
+.price-note {
+    font-size: 0.8rem;
+    color: rgb(113, 34, 22);
+    margin: 0 auto 1rem;
+}
+.specs p {
+    color: #444;
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    position: relative;
+}
+
+/* 选项 */
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+}
+.detail-link, .build-link {
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px 16px;
+    border-radius: 20px;
+    backdrop-filter: blur(5px);
+    color: #010a0e;
+    text-decoration: none;
+    position: relative;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+}
+.build-link {
+    background: rgb(131, 131, 124);
+    color: white;
+}
+
+/* 箭头动画 */
+.detail-link:hover .arrow,
+.build-link:hover .arrow {
+    transform: translateX(5px);
+}
+.arrow {
+    margin-left: 0.5rem;
+    transition: transform 0.3s ease;
+}
+
+
+/************************************************************
+ * 客户个性化选项
+ ************************************************************/
+.customization {
+    padding: 4rem 0;
+    background-image: linear-gradient(to top, rgb(1, 10, 14), rgb(255, 255, 255));
+}
+.customization h2 {
+    text-align: center;
+    font-size: 2.5rem;
+    margin-bottom: 3rem;
+}
+.customization-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+.custom-option {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+}
+.custom-option img {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+.custom-option:hover img {
+
+    transform: scale(1.1);
+}
+.option-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2rem;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    color: white;
+}
+.option-overlay h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+.modal-content img {
+    height: auto;
+    border-radius: 5px;
+    margin: 1rem 0;
+    max-width: 100%;
+}
+
+
+
+@media (max-width: 768px) {
+    /* 主页视频框架 */
+    .hero-content h1 {
+        font-size: 2.5rem;
+    }
+    .hero-subtitle {
+        font-size: 1.2rem;
+    }
+    .hero-actions {
+        flex-direction: column;
+    }
+    .cta-button {
+        width: 100%;
+    }
+    .grid-image-wrapper {
+        height: 300px;
+    }
+
+    /* 外观 / 轮胎和轮毂设计 */
+    .appearance-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+
+    /* 座椅 / 驾驶舱设计 */
+    .block-card {
+        flex-direction: column !important;
+    }
+    .grid1 {
+        margin: 0 auto 1rem;
+        width: 60%;
+        height: 1px;
+        border-radius: 2px;
+        transform: translateY(-50%);
+    }
+    .block-card:nth-child(2) .block-image-wrapper {
+        order: 0;
+    }
+    .block-image-wrapper {
+        min-height: 300px;
+        height: 100px;
+    }
+    .block-content-wrapper,
+    .block-image-wrapper {
+        min-width: 100%;
+    }
+
+    /* 车型展示 */
+    .gtr-models {
+        padding: 1rem;
+        background-image: linear-gradient(to bottom, rgb(1, 10, 14), #fff);
+    }
+    .models-container {
+        flex-direction: column;
+        height: auto;
+        padding: 1rem;
+        gap: 3rem;
+    }
+    .grid2 {
+        margin: 0 auto 1rem;
+        width: 60%;
+        height: 1px;
+        border-radius: 2px;
+        transform: translateY(-50%);
+    }
+    .model-card {
+        padding: 0;
+        overflow: hidden;
+        height: auto;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .model-image {
+        height: 180px;
+        max-width: none;
+        width: 100vw;
+        margin-left: -1rem;
+        margin-right: -1rem;
+    }
+    .model-info {
+        padding: 0;
+
+        h1 {
+            font-size: 1.8rem;
+            text-align: center;
+        }
+    }
+
+    .price {
+        font-size: 1.5rem;
+        text-align: center;
+    }
+
+    .specs {
+        p {
+            font-size: 0.85rem;
+            text-align: center;
+        }
+    }
+
+    .action-buttons {
+        flex-direction: column;
+        gap: 1rem;
+        margin-top: 1.5rem;
+
+        a {
+            justify-content: center;
+            padding: 12px 24px;
+        }
+    }
+    /* 增加点击热区优化 */
+    .detail-link, .build-link {
+        min-height: 44px;
+    }
+}

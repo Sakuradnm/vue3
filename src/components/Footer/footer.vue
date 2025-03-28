@@ -181,7 +181,7 @@ p {
 
 @media (max-width: 768px) {
   .social-top {
-    gap: 3rem;
+    gap: 5rem;
     flex-wrap: wrap;
   }
 

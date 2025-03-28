@@ -1,241 +1,250 @@
-<script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { ElMessage } from 'element-plus'
+<script lang="ts">
+import { defineComponent, ref, reactive } from 'vue'
 
 interface UltraModel {
   name: string
-  shortDescription: string
-  fullDescription: string
+  engine: string
   image: string
   price: number
-  horsepower: number
-  acceleration: string
-  topSpeed: number
-  torque: number
-  range: number
-  chargingTime: string
+  torque: string
+  horsepower: string
+  weight: number
 }
 
 interface CustomizationOption {
-  title: string
-  description: string
-  image: string
+  title: string;
+  description: string;
+  image: string;
 }
-
-const selectedModel = ref<UltraModel | null>(null)
-const performanceSection = ref<HTMLElement | null>(null)
-const loading = ref(false)
 
 const ultraModels = reactive<UltraModel[]>([
   {
-    name: 'Ultra Standard',
-    shortDescription: '智能电动先锋',
-    fullDescription: '搭载最新一代电动驱动系统，完美平衡性能与续航，带来极致驾驶体验。',
-    image: '/models/Ultra/standard.jpg',
-    price: 458000,
-    horsepower: 350,
-    acceleration: '0-60 mph in 4.2 seconds',
-    topSpeed: 155,
-    torque: 420,
-    range: 450,
-    chargingTime: '30分钟充电80%'
+    name: 'Ultra Vantage',
+    engine: 'V8 4.0L 双涡轮增压',
+    image: '/models/Ultra/ultra-vantage.jpg',
+    price: 1280000,
+    torque: '685 Nm @ 2000-5000 rpm',
+    horsepower: '535 HP (402 kW)',
+    weight: 1630
   },
   {
-    name: 'Ultra Performance',
-    shortDescription: '极致性能体验',
-    fullDescription: '双电机全轮驱动系统，带来无与伦比的加速性能和操控体验。',
-    image: '/models/Ultra/per.jpg',
-    price: 528000,
-    horsepower: 450,
-    acceleration: '0-60 mph in 3.8 seconds',
-    topSpeed: 170,
-    torque: 550,
-    range: 420,
-    chargingTime: '30分钟充电80%'
+    name: 'Ultra Nebula',
+    engine: 'V12 6.5L 自然吸气',
+    image: '/models/Ultra/ultra-nebula.jpg',
+    price: 2580000,
+    torque: '720 Nm @ 5500 rpm',
+    horsepower: '765 HP (574 kW)',
+    weight: 1695
   },
-  {
-    name: 'Ultra Luxury',
-    shortDescription: '豪华智能座驾',
-    fullDescription: '顶级内饰材质，智能驾驶辅助系统，带来极致舒适与科技体验。',
-    image: '/models/Ultra/luxury.jpg',
-    price: 588000,
-    horsepower: 450,
-    acceleration: '0-60 mph in 3.8 seconds',
-    topSpeed: 170,
-    torque: 550,
-    range: 420,
-    chargingTime: '30分钟充电80%'
-  }
 ])
 
-const customizationOptions = reactive<CustomizationOption[]>([
-  {
-    title: '外观套件',
-    description: '运动套件、碳纤维装饰',
-    image: '/models/Ultra/exterior.jpg'
-  },
-  {
-    title: '内饰定制',
-    description: '高级真皮、智能座舱',
-    image: '/models/Ultra/interior.jpg'
-  },
-  {
-    title: '性能升级',
-    description: '赛道模式、运动悬挂',
-    image: '/models/Ultra/performance.jpg'
+export default defineComponent({
+  name: 'UltraPage',
+  setup() {
+    const selectedModel = ref<UltraModel | null>(null)
+    const appearanceSection = ref<HTMLElement | null>(null)
+
+    const customizationOptions = reactive<CustomizationOption[]>([
+      {
+        title: '空气动力学',
+        description: '主动式尾翼系统，三级可调扩散器，碳纤维前唇',
+        image: '/models/Ultra/aero.jpg'
+      },
+      {
+        title: '性能套件',
+        description: '赛道级悬挂调校，陶瓷复合制动系统，钛合金排气',
+        image: '/models/Ultra/performance.jpg'
+      },
+      {
+        title: '奢华内饰',
+        description: '半苯胺真皮座椅，航空铝饰板，全息投影仪表',
+        image: '/models/Ultra/interior.jpg'
+      }
+    ])
+
+    const scrollToModels = () => {
+      if (appearanceSection.value) {
+        appearanceSection.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+
+    const selectModel = (model: UltraModel) => {
+      selectedModel.value = model
+    }
+
+    const closeModal = () => {
+      selectedModel.value = null
+      document.body.style.overflow = 'auto'
+    }
+
+    const openReserveModal = () => {
+      alert('预定系统即将上线!')
+    }
+
+    const initiateReservation = () => {
+      if (selectedModel.value) {
+        alert(`预定 ${selectedModel.value.name}`)
+      }
+    }
+
+    return {
+      ultraModels,
+      customizationOptions,
+      selectedModel,
+      appearanceSection,
+      scrollToModels,
+      selectModel,
+      closeModal,
+      openReserveModal,
+      initiateReservation
+    }
   }
-])
-
-const scrollToModels = () => {
-  performanceSection.value?.scrollIntoView({ behavior: 'smooth' })
-}
-
-const selectModel = (model: UltraModel) => {
-  selectedModel.value = model
-}
-
-const closeModal = () => {
-  selectedModel.value = null
-}
-
-const openReserveModal = () => {
-  ElMessage.info('预约系统即将上线！')
-}
-
-const initiateReservation = async () => {
-  if (!selectedModel.value) return
-
-  loading.value = true
-  try {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    ElMessage.success(`预约 ${selectedModel.value.name} 成功！`)
-    closeModal()
-  } catch (error) {
-    ElMessage.error('预约失败，请稍后重试')
-  } finally {
-    loading.value = false
-  }
-}
+})
 </script>
 
 <template>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <div class="ultra-page">
     <!-- 视频主页 -->
-    <section class="ultra-hero">
+    <div class="ultra-hero">
       <video autoplay loop muted playsinline class="hero-video">
         <source src="/videos/ultra.mp4" type="video/mp4">
       </video>
       <div class="hero-overlay">
         <div class="hero-content">
-          <h1>SU7 Ultra</h1>
-          <p class="hero-subtitle">未来出行方式</p>
+          <h1>ULTRA HYPER SERIES</h1>
+          <p class="hero-subtitle">Redefining Automotive Excellence</p>
           <div class="hero-actions">
-            <button @click="scrollToModels" class="cta-button primary">探索车型</button>
-            <button @click="openReserveModal" class="cta-button secondary">立即预约</button>
+            <button @click="scrollToModels" class="cta-button primary">探索极致</button>
+            <button @click="openReserveModal" class="cta-button secondary">尊享预定</button>
           </div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <!-- 性能展示 -->
-    <section class="performance-overview" ref="performanceSection">
-      <div class="performance-grid">
-        <div class="performance-card">
-          <div class="performance-icon">
-            <i class="icon-speedometer"></i>
+    <!-- 科技展示 -->
+    <div class="tech-overview">
+      <div class="grid" style="background-color: #00b4ff;"></div>
+      <div class="tech-title">
+        <h1>Aerodynamic Mastery</h1>
+        <p>空气动力学 / 轻量化科技</p>
+      </div>
+      <div class="tech-grid">
+        <div class="grid-card">
+          <div class="grid-image-wrapper">
+            <img src="" alt="空气动力学">
           </div>
-          <h3>加速性能</h3>
-          <p>0-60 mph 4.2秒</p>
+          <div class="grid-content-wrapper">
+            <div class="grid-text-card">
+              <h3>主动流体力学系统</h3>
+              <p>搭载48组可调式气动翼片，实时根据车速、转向角度和G值自动调整，配合底部主动扩散器实现近乎零升力的完美气动平衡。</p>
+            </div>
+            <div class="grid-card-footer">
+              <router-link to="#" style="color: white;">技术详解 ▶</router-link>
+            </div>
+          </div>
         </div>
-        <div class="performance-card">
-          <div class="performance-icon">
-            <i class="icon-engine"></i>
+        <div class="grid-card">
+          <div class="grid-image-wrapper">
+            <img src="" alt="轻量化">
           </div>
-          <h3>动力输出</h3>
-          <p>350 HP</p>
-        </div>
-        <div class="performance-card">
-          <div class="performance-icon">
-            <i class="icon-battery"></i>
+          <div class="grid-content-wrapper">
+            <div class="grid-text-card">
+              <h3>全碳纤维单体壳</h3>
+              <p>采用航空级T1100碳纤维材质，配合3D编织技术打造的一体式座舱结构，实现1580kg的超轻整备质量，抗扭刚度达到42,000Nm/deg。</p>
+            </div>
+            <div class="grid-card-footer">
+              <router-link to="#" style="color: white;">材料科学 ▶</router-link>
+            </div>
           </div>
-          <h3>续航里程</h3>
-          <p>450 km</p>
-        </div>
-        <div class="performance-card">
-          <div class="performance-icon">
-            <i class="icon-charging"></i>
-          </div>
-          <h3>充电时间</h3>
-          <p>30分钟80%</p>
         </div>
       </div>
-    </section>
+
+      <!-- 动力系统 -->
+      <div class="tech-title">
+        <p style="margin-top: 2rem">动力核心 / 传动科技</p>
+      </div>
+      <div class="tech-block">
+        <div class="block-card">
+          <div class="block-content-wrapper">
+            <div class="block-text-card">
+              <h3>混合动力单元</h3>
+              <p>前置4.0L V8双涡轮增压发动机与后轴800V电机组成混合动力系统，综合输出功率达1220马力。配备F1衍生的ERS能量回收系统，可在全力加速时提供额外200马力的boost模式。</p>
+              <p>8速双离合变速箱采用碳纤维同步环，换挡速度缩短至80毫秒，配合电子限滑差速器实现精准扭矩分配。</p>
+            </div>
+            <div class="block-card-footer">
+              <router-link to="#" style="color: white;">动力详解 ▶</router-link>
+            </div>
+          </div>
+          <div class="block-image-wrapper">
+            <img src="" alt="动力系统">
+          </div>
+        </div>
+        <div class="grid1" style="background-color: #00b4ff;"></div>
+        <div class="block-card">
+          <div class="block-image-wrapper">
+            <img src="" alt="数字座舱">
+          </div>
+          <div class="block-content-wrapper">
+            <div class="block-text-card">
+              <h3>全息交互座舱</h3>
+              <p>1. 驾驶模式选择：提供街道、运动、赛道、飘移四种预设模式<br>
+                2. 全息HUD：将导航、性能参数投射至前风挡<br>
+                3. 生物识别：通过方向盘传感器实时监测驾驶员状态<br>
+                4. 智能助手：AI副驾可自动调整车辆设置</p>
+            </div>
+            <div class="block-card-footer">
+              <router-link to="#" style="color: white;">交互科技 ▶</router-link>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid" style="background-color: #00b4ff;"></div>
+    </div>
 
     <!-- 车型展示 -->
-    <section class="ultra-models">
-      <h2>ULTRA 车型系列</h2>
+    <div class="ultra-models" ref="appearanceSection">
+      <div class="models-title">
+        <h1>ULTRA 车系</h1>
+        <p>两种巅峰配置</p>
+      </div>
       <div class="models-container">
         <div
-          v-for="(model, index) in ultraModels"
-          :key="index"
-          class="model-card"
-          @click="selectModel(model)"
+            class="model-card"
+            v-for="(model, index) in ultraModels"
+            :key="index"
         >
-          <img :src="model.image" :alt="model.name">
+          <div class="grid2" style="background-color: #001a26;"></div>
+          <img class="model-image" :src="model.image" :alt="model.name">
           <div class="model-info">
-            <h3>{{ model.name }}</h3>
-            <p>{{ model.shortDescription }}</p>
-            <span class="model-price">起价 ¥{{ model.price.toLocaleString() }}</span>
+            <h1>{{ model.name }}</h1>
+            <div class="price-container">
+              <div class="price">¥{{ model.price.toLocaleString() }}</div>
+              <div class="price-note">起售价（含基础配置）</div>
+            </div>
+            <div class="specs">
+              <p>整备质量：{{ model.weight }}kg</p>
+              <p>动力单元：{{ model.engine }}</p>
+              <p>最大马力：{{ model.horsepower }}</p>
+              <p>峰值扭矩：{{ model.torque }}</p>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <router-link to="#" class="detail-link">技术参数<span class="arrow">▶</span></router-link>
+            <router-link to="#" class="build-link">高级定制<span class="arrow">▶</span></router-link>
           </div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <!-- Technical Specifications -->
-    <section class="technical-specs">
-      <div class="specs-content">
-        <div class="specs-text">
-          <h2>工程精粹</h2>
-          <p>ULTRA完美诠释了未来出行方式。搭载最新一代电动驱动系统，带来无与伦比的驾驶体验。</p>
-        </div>
-        <div class="specs-details">
-          <div class="spec-group">
-            <h3>动力系统</h3>
-            <ul>
-              <li>双电机全轮驱动</li>
-              <li>高能量密度电池</li>
-              <li>智能能量管理</li>
-            </ul>
-          </div>
-          <div class="spec-group">
-            <h3>智能系统</h3>
-            <ul>
-              <li>自动驾驶辅助</li>
-              <li>智能语音控制</li>
-              <li>OTA远程升级</li>
-            </ul>
-          </div>
-          <div class="spec-group">
-            <h3>驾驶模式</h3>
-            <ul>
-              <li>运动模式</li>
-              <li>节能模式</li>
-              <li>舒适模式</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Customization Options -->
-    <section class="customization">
-      <h2>个性化定制</h2>
+    <!-- 定制服务 -->
+    <div class="customization">
+      <h2>BESPOKE 高级定制</h2>
       <div class="customization-grid">
         <div
-          v-for="(option, index) in customizationOptions"
-          :key="index"
-          class="custom-option"
+            v-for="(option, index) in customizationOptions"
+            :key="index"
+            class="custom-option"
         >
           <img :src="option.image" :alt="option.title">
           <div class="option-overlay">
@@ -244,429 +253,101 @@ const initiateReservation = async () => {
           </div>
         </div>
       </div>
-    </section>
-
-    <!-- Modal for Model Details -->
-    <div v-if="selectedModel" class="modal model-modal">
-      <div class="modal-content">
-        <span @click="closeModal" class="close-btn">&times;</span>
-        <h2>{{ selectedModel.name }}</h2>
-        <img :src="selectedModel.image" :alt="selectedModel.name">
-        <div class="model-details">
-          <p>{{ selectedModel.fullDescription }}</p>
-          <div class="model-specs">
-            <div class="spec">
-              <strong>价格:</strong> ¥{{ selectedModel.price.toLocaleString() }}
-            </div>
-            <div class="spec">
-              <strong>马力:</strong> {{ selectedModel.horsepower }} HP
-            </div>
-            <div class="spec">
-              <strong>扭矩:</strong> {{ selectedModel.torque }} lb-ft
-            </div>
-            <div class="spec">
-              <strong>加速:</strong> {{ selectedModel.acceleration }}
-            </div>
-            <div class="spec">
-              <strong>最高时速:</strong> {{ selectedModel.topSpeed }} mph
-            </div>
-            <div class="spec">
-              <strong>续航里程:</strong> {{ selectedModel.range }} km
-            </div>
-            <div class="spec">
-              <strong>充电时间:</strong> {{ selectedModel.chargingTime }}
-            </div>
-          </div>
-          <button
-            @click="initiateReservation"
-            class="reserve-btn"
-            :disabled="loading"
-          >
-            {{ loading ? '预约中...' : '预约此车型' }}
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .ultra-page {
-  color: #333;
+  color: rgba(255, 255, 255, 0.9);
+  background: #001a26;
 }
 
+/* 动态渐变背景 */
 .ultra-hero {
-  height: 100vh;
-  position: relative;
-  overflow: hidden;
-}
-
-.hero-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.hero-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.hero-content {
-  text-align: center;
-  color: white;
-  z-index: 1;
-}
-
-.hero-content h1 {
-  font-size: 4rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.hero-subtitle {
-  font-size: 2rem;
-  margin-bottom: 2rem;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.hero-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-}
-
-.cta-button {
-  padding: 1rem 2rem;
-  border-radius: 30px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border: none;
+  background: linear-gradient(135deg, #001a26 0%, #003d5c 100%);
 }
 
 .cta-button.primary {
-  background: #00a0e9;
-  color: white;
+  background: rgba(0, 180, 255, 0.9);
+  box-shadow: 0 0 15px rgba(0, 180, 255, 0.4);
 }
-
 .cta-button.secondary {
-  background: transparent;
-  color: white;
-  border: 2px solid white;
+  border: 2px solid #00b4ff;
+  color: #00b4ff;
 }
-
 .cta-button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
-.performance-overview {
-  padding: 4rem 0;
-  background: #f5f5f5;
-}
-
-.performance-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-.performance-card {
-  background: white;
-  padding: 2rem;
-  border-radius: 10px;
-  text-align: center;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease;
-}
-
-.performance-card:hover {
-  transform: translateY(-5px);
-}
-
-.performance-icon {
-  font-size: 2.5rem;
-  color: #00a0e9;
-  margin-bottom: 1rem;
-}
-
-.performance-card h3 {
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.ultra-models {
-  padding: 4rem 0;
-}
-
-.ultra-models h2 {
-  text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 3rem;
+  background: rgba(0, 180, 255, 0.7);
 }
 
 .models-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
+  background: linear-gradient(to right, #001a26, #002837);
+  border: 1px solid rgba(0, 180, 255, 0.2);
 }
 
-.model-card {
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: transform 0.3s ease;
+.model-info h1 {
+  color: #00b4ff;
+  text-shadow: 0 0 10px rgba(0, 180, 255, 0.3);
 }
 
+.price {
+  color: #00b4ff;
+  font-size: 2.2rem;
+}
+
+.specs p {
+  color: #8ab4c8;
+}
+
+/* 科技感边框效果 */
+.grid-card, .block-card {
+  border: 1px solid rgba(0, 180, 255, 0.3);
+  background: rgba(0, 40, 60, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+/* 动态投影 */
 .model-card:hover {
-  transform: translateY(-5px);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.2);
 }
 
-.model-card img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-}
-
-.model-info {
-  padding: 1.5rem;
-}
-
-.model-info h3 {
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.model-price {
-  display: block;
-  font-size: 1.2rem;
-  color: #00a0e9;
-  margin-top: 1rem;
-}
-
-.technical-specs {
-  padding: 4rem 0;
-  background: #f5f5f5;
-}
-
-.specs-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-.specs-text {
-  text-align: center;
-  margin-bottom: 3rem;
-}
-
-.specs-text h2 {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-}
-
-.specs-details {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 2rem;
-}
-
-.spec-group {
-  background: white;
-  padding: 2rem;
-  border-radius: 10px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-}
-
-.spec-group h3 {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  color: #00a0e9;
-}
-
-.spec-group ul {
-  list-style: none;
-  padding: 0;
-}
-
-.spec-group li {
-  margin-bottom: 0.5rem;
-  padding-left: 1.5rem;
-  position: relative;
-}
-
-.spec-group li:before {
-  content: "•";
-  color: #00a0e9;
-  position: absolute;
-  left: 0;
-}
-
-.customization {
-  padding: 4rem 0;
-}
-
-.customization h2 {
-  text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 3rem;
-}
-
-.customization-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-.custom-option {
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.custom-option img {
-  width: 100%;
-  height: 250px;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.custom-option:hover img {
-  transform: scale(1.1);
-}
-
-.option-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 2rem;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-  color: white;
-}
-
-.option-overlay h3 {
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  padding: 2rem;
-  border-radius: 10px;
-  max-width: 800px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-}
-
-.close-btn {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  font-size: 2rem;
-  cursor: pointer;
-  color: #666;
-}
-
-.modal-content img {
-  width: 100%;
-  height: auto;
-  border-radius: 5px;
-  margin: 1rem 0;
-}
-
-.model-details {
-  margin-top: 2rem;
-}
-
-.model-specs {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin: 1rem 0;
-}
-
-.reserve-btn {
-  background: #00a0e9;
-  color: white;
-  padding: 1rem 2rem;
-  border: none;
-  border-radius: 30px;
-  font-size: 1.1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-top: 1rem;
-  width: 100%;
-}
-
-.reserve-btn:hover:not(:disabled) {
-  background: #0088cc;
-  transform: translateY(-3px);
-}
-
-.reserve-btn:disabled {
-  background: #cccccc;
-  cursor: not-allowed;
-}
-
+/* 响应式优化 */
 @media (max-width: 768px) {
   .hero-content h1 {
-    font-size: 2.5rem;
+    font-size: 2.8rem;
   }
 
-  .hero-subtitle {
-    font-size: 1.5rem;
+  .model-image {
+    height: 200px;
   }
 
-  .hero-actions {
-    flex-direction: column;
+  .price {
+    font-size: 1.8rem;
   }
 
-  .cta-button {
-    width: 100%;
+  .specs p {
+    font-size: 0.9rem;
   }
 
-  .performance-grid,
-  .models-container,
-  .customization-grid {
-    grid-template-columns: 1fr;
+  .action-buttons a {
+    padding: 10px 20px;
   }
+}
+
+/* 新增光晕效果 */
+@keyframes halo {
+  0% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+  100% { opacity: 0.3; }
+}
+
+.models-title h1::after {
+  content: "";
+  position: absolute;
+  width: 120%;
+  height: 20px;
+  background: radial-gradient(circle, rgba(0,180,255,0.4) 0%, transparent 70%);
+  filter: blur(15px);
+  animation: halo 3s ease-in-out infinite;
 }
 </style>
