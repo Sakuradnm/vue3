@@ -44,9 +44,9 @@ const agreeAndReturn = (): void => {
 };
 
 // 打开协议弹窗
-const openModal = (): void => {
-  showAgreementModal.value = true;
-};
+// const openModal = (): void => {
+//   showAgreementModal.value = true;
+// };
 
 // 关闭协议弹窗
 const closeModal = (): void => {

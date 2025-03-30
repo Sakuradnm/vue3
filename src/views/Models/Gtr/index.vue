@@ -309,8 +309,8 @@ export default defineComponent({
     <!-- Models Section -->
     <div class="gtr-models">
       <div class="gtr-models-title" ref="appearanceSection">
-        <h1>选择您的GT-R</h1>
-        <p>两种卓越车型，彰显不同个性</p>
+        <h1>Choose Your GT-R</h1>
+        <p>Engineering Excellence in Two Forms</p>
       </div>
       <div class="models-container">
         <div
@@ -343,7 +343,7 @@ export default defineComponent({
 
     <!-- Customization Section -->
     <div class="customization">
-      <h2>定制您的GT-R</h2>
+      <h2>Customize Your GT-R</h2>
       <div class="customization-grid">
         <div
             v-for="(option, index) in customizationOptions"
@@ -362,7 +362,7 @@ export default defineComponent({
 </template>
 
 <style scoped>
-@import "@/styles/models.css";
+@import "../../../styles/models.css";
 
 /* GTR特定样式 - 灰色为主，黑色为主题 */
 .car-page {
@@ -406,11 +406,7 @@ export default defineComponent({
 }
 
 .gallery-header {
-  background: linear-gradient(
-      to bottom,
-      rgb(0, 0, 0) 40%,
-      rgb(30, 30, 30) 100%
-  );
+  background: black;
   color: rgba(230, 230, 230, 0.9);
   text-shadow: -5px 4px 4px hsla(0, 0%, 40%, 0.45),
   7px 2px 8px hsla(0, 0%, 30%, 0.61),
@@ -456,8 +452,11 @@ export default defineComponent({
   background: linear-gradient(to right, rgba(70, 70, 70, 0.1), transparent);
 }
 
+.models-container {
+  background: rgba(255, 255, 255, 0.28);
+}
 .gtr-models {
-  background-image: linear-gradient(to bottom, rgb(20, 20, 20), rgb(230, 230, 230));
+  background: black;
 }
 
 .gtr-models-title h1 {
@@ -467,11 +466,11 @@ export default defineComponent({
 }
 
 .model-card {
-  background: white;
+  background: rgba(100, 104, 111, 0.27);
 }
 
 .detail-link:hover {
-  color: rgba(80, 80, 80, 0.71);
+  color: rgba(255, 255, 255, 0.59);
 }
 
 .build-link {
@@ -486,7 +485,7 @@ export default defineComponent({
 }
 
 .customization {
-  background-image: linear-gradient(to top, rgb(20, 20, 20), rgb(230, 230, 230));
+  background: rgb(1, 10, 14);
 }
 
 .customization h2 {

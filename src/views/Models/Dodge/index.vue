@@ -367,7 +367,7 @@ export default defineComponent({
 </template>
 
 <style scoped>
-@import "@/styles/models.css";
+@import "../../../styles/models.css";
 
 .hellcat-theme {
   --hellcat-red: #8B0000;
@@ -458,7 +458,7 @@ export default defineComponent({
 }
 
 .models-container {
-  background-color: rgb(10, 0, 0);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .models-container::before {
@@ -466,7 +466,7 @@ export default defineComponent({
 }
 
 .model-card {
-  background: rgb(10, 0, 0);
+  background: rgba(10, 0, 0, 0.22);
 }
 
 .model-info h1,
@@ -484,7 +484,7 @@ export default defineComponent({
 
 .detail-link, .build-link {
   color: #ffffff;
-  background: rgba(80, 0, 0, 0.5);
+  background: rgba(80, 0, 0, 0);
 }
 
 .build-link {

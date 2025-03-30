@@ -96,7 +96,6 @@ const policySections: PolicySection[] = [
       <p>请您妥善保护自己的个人信息，仅在必要的情形下向他人提供。</p>
       <p>如您发现个人信息泄密，请您立即联络本应用客服，以便本应用采取相应措施。</p>
     </div>
-
   </div>
 </template>
 
@@ -106,6 +105,7 @@ const policySections: PolicySection[] = [
   margin: 72px auto 0 auto;
   padding: 20px;
   color: #333;
+  background: white;
 }
 .policy-title {
   font-size: 28px;

@@ -50,7 +50,7 @@ export default {
     const messagesSeen = ref(true)
     // AI 响应的加载状态
     const isLoading = ref(false)
-    
+
     // FAQ items
     const faqItems = reactive<FaqItem[]>([
       {
@@ -84,7 +84,7 @@ export default {
         expanded: false
       }
     ])
-    
+
     // Contact options
     const contactOptions = reactive<ContactOption[]>([
       {
@@ -112,7 +112,7 @@ export default {
         link: '/community'
       }
     ])
-    
+
     // Chat messages
     const chatMessages = reactive<ChatMessage[]>([
       {
@@ -122,33 +122,33 @@ export default {
         timestamp: formatTime(new Date())
       }
     ])
-    
+
     // Filtered FAQ items based on search
     const filteredFaqItems = () => {
       if (!searchQuery.value) return faqItems
-      return faqItems.filter(item => 
-        item.question.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
+      return faqItems.filter(item =>
+        item.question.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
         item.answer.toLowerCase().includes(searchQuery.value.toLowerCase())
       )
     }
-    
+
     // Format time for chat messages
     function formatTime(date: Date): string {
       const hours = date.getHours().toString().padStart(2, '0')
       const minutes = date.getMinutes().toString().padStart(2, '0')
       return `${hours}:${minutes}`
     }
-    
+
     // Toggle FAQ item expansion
     const toggleFaq = (id: number) => {
       expandedFaqId.value = expandedFaqId.value === id ? null : id
     }
-    
+
     // Switch between sections
     const switchSection = (section: string) => {
       activeSection.value = section
     }
-    
+
     // Toggle chatbox visibility
     const toggleChatbox = () => {
       showChatbox.value = !showChatbox.value
@@ -161,11 +161,11 @@ export default {
         }, 300)
       }
     }
-    
+
     // Send a chat message
     const sendMessage = () => {
       if (!chatInput.value.trim()) return
-      
+
       // Add user message
       chatMessages.push({
         id: chatMessages.length + 1,
@@ -173,17 +173,15 @@ export default {
         isUser: true,
         timestamp: formatTime(new Date())
       })
-      
-      const userQuery = chatInput.value
-      chatInput.value = ''
-      
+
+
       // Simulate AI thinking
       isLoading.value = true
-      
+
       // Simulate response delay
       setTimeout(() => {
         isLoading.value = false
-        
+
         // Add AI response
         const responses = [
           '感谢您的提问，我正在查询相关信息...',
@@ -192,16 +190,16 @@ export default {
           '您可以在"个人中心"找到相关设置。',
           '需要更多帮助吗？您可以拨打我们的客服热线400-888-8888。'
         ]
-        
+
         const randomResponse = responses[Math.floor(Math.random() * responses.length)]
-        
+
         chatMessages.push({
           id: chatMessages.length + 1,
           content: randomResponse,
           isUser: false,
           timestamp: formatTime(new Date())
         })
-        
+
         // Auto scroll to bottom
         setTimeout(() => {
           const chatContainer = document.querySelector('.chat-messages')
@@ -211,7 +209,7 @@ export default {
         }, 100)
       }, 1500)
     }
-    
+
     // Submit feedback form
     const feedbackForm = reactive<FeedbackForm>({
       name: '',
@@ -225,7 +223,7 @@ export default {
       const input = event.target as HTMLInputElement
       feedbackForm.attachment = input.files?.[0] ?? null
     }
-    
+
     const submitFeedback = () => {
       //文件类型验证
       if (feedbackForm.attachment) {
@@ -250,11 +248,11 @@ export default {
       feedbackForm.topic = '功能建议'
       feedbackForm.message = ''
       feedbackForm.attachment = null
-      
+
       // Show success message
       alert('感谢您的反馈，我们会尽快处理！')
     }
-    
+
     // Auto scroll chat to bottom on mount
     onMounted(() => {
       const chatContainer = document.querySelector('.chat-messages')
@@ -262,7 +260,7 @@ export default {
         chatContainer.scrollTop = chatContainer.scrollHeight
       }
     })
-    
+
     return {
       activeSection,
       searchQuery,
@@ -293,36 +291,36 @@ export default {
   <video class="bg-video" autoplay loop muted playsinline>
     <source src="/videos/home1.mp4" type="video/mp4">
   </video>
-  
+
   <!-- 客服中心容器 -->
   <div class="customer-service-container">
     <div class="content-wrapper">
-      <!-- 
+      <!--
       -- 左 侧 导 航 ---------------------------------------------------------
       -->
       <div class="sidebar">
         <h2 class="sidebar-title">客服中心</h2>
         <div class="nav-links">
-          <a 
-            :class="['nav-item', activeSection === 'faq' ? 'active' : '']" 
+          <a
+            :class="['nav-item', activeSection === 'faq' ? 'active' : '']"
             @click="switchSection('faq')"
           >
             常见问题
           </a>
-          <a 
-            :class="['nav-item', activeSection === 'contact' ? 'active' : '']" 
+          <a
+            :class="['nav-item', activeSection === 'contact' ? 'active' : '']"
             @click="switchSection('contact')"
           >
             联系我们
           </a>
-          <a 
-            :class="['nav-item', activeSection === 'feedback' ? 'active' : '']" 
+          <a
+            :class="['nav-item', activeSection === 'feedback' ? 'active' : '']"
             @click="switchSection('feedback')"
           >
             意见反馈
           </a>
-          <a 
-            :class="['nav-item', activeSection === 'support' ? 'active' : '']" 
+          <a
+            :class="['nav-item', activeSection === 'support' ? 'active' : '']"
             @click="switchSection('support')"
           >
             技术支持
@@ -333,32 +331,32 @@ export default {
         </div>
       </div>
 
-      <!-- 
+      <!--
       -- 主 要 内 容 区 ---------------------------------------------------------
       -->
       <div class="main-content">
         <!-- FAQ 部分 -->
         <div v-if="activeSection === 'faq'" class="faq-section">
           <h2>常见问题</h2>
-          
+
           <!-- 搜索框 -->
           <div class="search-container">
-            <input 
-              type="text" 
-              v-model="searchQuery" 
-              placeholder="搜索问题..." 
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="搜索问题..."
               class="search-input"
             >
             <button class="search-button">
               <span>搜索</span>
             </button>
           </div>
-          
+
           <!-- FAQ 列表 -->
           <div class="faq-list">
-            <div 
-              v-for="item in filteredFaqItems()" 
-              :key="item.id" 
+            <div
+              v-for="item in filteredFaqItems()"
+              :key="item.id"
               class="faq-item"
               :class="{ 'expanded': expandedFaqId === item.id }"
             >
@@ -366,33 +364,33 @@ export default {
                 <h3>{{ item.question }}</h3>
                 <span class="toggle-icon">{{ expandedFaqId === item.id ? '−' : '+' }}</span>
               </div>
-              <div 
-                class="faq-answer" 
+              <div
+                class="faq-answer"
                 :class="{ 'show': expandedFaqId === item.id }"
               >
                 <p>{{ item.answer }}</p>
               </div>
             </div>
-            
+
             <div v-if="filteredFaqItems().length === 0" class="no-results">
               <p>没有找到匹配的问题，请尝试其他关键词。</p>
             </div>
           </div>
-          
+
           <div class="help-cta">
             <p>没有找到您需要的答案？</p>
             <button class="contact-button" @click="switchSection('contact')">联系客服</button>
           </div>
         </div>
-        
+
         <!-- 联系我们部分 -->
         <div v-if="activeSection === 'contact'" class="contact-section">
           <h2>联系我们</h2>
-          
+
           <div class="contact-options">
-            <div 
-              v-for="option in contactOptions" 
-              :key="option.name" 
+            <div
+              v-for="option in contactOptions"
+              :key="option.name"
               class="contact-card"
             >
               <div class="contact-icon">
@@ -403,44 +401,44 @@ export default {
               <a :href="option.link" class="contact-link">立即联系</a>
             </div>
           </div>
-          
+
           <div class="company-info">
             <h3>公司地址</h3>
             <p>中国上海市浦东新区张江高科技园区博云路2号601室</p>
-            
+
             <h3>工作时间</h3>
             <p>周一至周五: 9:00 - 18:00</p>
             <p>周末及节假日: 10:00 - 16:00 (仅提供在线客服)</p>
           </div>
         </div>
-        
+
         <!-- 意见反馈部分 -->
         <div v-if="activeSection === 'feedback'" class="feedback-section">
           <h2>意见反馈</h2>
-          
+
           <form @submit.prevent="submitFeedback" class="feedback-form">
             <div class="form-group">
               <label for="name">您的姓名</label>
-              <input 
-                type="text" 
-                id="name" 
-                v-model="feedbackForm.name" 
+              <input
+                type="text"
+                id="name"
+                v-model="feedbackForm.name"
                 placeholder="请输入您的姓名"
                 required
               >
             </div>
-            
+
             <div class="form-group">
               <label for="email">联系邮箱</label>
-              <input 
-                type="email" 
-                id="email" 
-                v-model="feedbackForm.email" 
+              <input
+                type="email"
+                id="email"
+                v-model="feedbackForm.email"
                 placeholder="请输入您的邮箱"
                 required
               >
             </div>
-            
+
             <div class="form-group">
               <label for="topic">反馈主题</label>
               <select id="topic" v-model="feedbackForm.topic">
@@ -450,63 +448,63 @@ export default {
                 <option>其他</option>
               </select>
             </div>
-            
+
             <div class="form-group">
               <label for="message">详细描述</label>
-              <textarea 
-                id="message" 
-                v-model="feedbackForm.message" 
+              <textarea
+                id="message"
+                v-model="feedbackForm.message"
                 placeholder="请详细描述您的意见或遇到的问题..."
                 rows="5"
                 required
               ></textarea>
             </div>
-            
+
             <div class="form-group">
               <label for="attachment">附件（可选）</label>
-              <input 
-                type="file" 
-                id="attachment" 
+              <input
+                type="file"
+                id="attachment"
                 accept=".jpg,.jpeg,.png,.pdf"
                 @change="handleFileChange"
                 >
               <small>支持图片、PDF等格式文件，大小不超过5MB</small>
             </div>
-            
+
             <button type="submit" class="submit-btn">提交反馈</button>
           </form>
         </div>
-        
+
         <!-- 技术支持部分 -->
         <div v-if="activeSection === 'support'" class="support-section">
           <h2>技术支持</h2>
-          
+
           <div class="support-options">
             <div class="support-card">
               <h3>自助文档</h3>
               <p>浏览我们的技术文档，获取产品使用指南与教程</p>
               <a href="#" class="support-link">查看文档</a>
             </div>
-            
+
             <div class="support-card">
               <h3>常见故障</h3>
               <p>查看常见技术问题的解决方案</p>
               <a href="#" class="support-link">故障排查</a>
             </div>
-            
+
             <div class="support-card">
               <h3>视频教程</h3>
               <p>观看产品功能使用的详细教学视频</p>
               <a href="#" class="support-link">查看视频</a>
             </div>
-            
+
             <div class="support-card">
               <h3>技术工单</h3>
               <p>提交技术支持工单，获取专业解答</p>
               <a href="#" class="support-link">提交工单</a>
             </div>
           </div>
-          
+
           <div class="system-status">
             <h3>系统状态</h3>
             <div class="status-list">
@@ -531,20 +529,20 @@ export default {
         </div>
       </div>
     </div>
-    
-    <!-- 
+
+    <!--
     -- 浮 动 客 服 按 钮 ---------------------------------------------------------
     -->
-    <div 
-      v-if="showFloatingButton" 
-      class="floating-chat-button" 
+    <div
+      v-if="showFloatingButton"
+      class="floating-chat-button"
       @click="toggleChatbox"
     >
       <svg-icon name="chat" :width="24" height="24"/>
       <span v-if="!messagesSeen" class="notification-badge"></span>
     </div>
-    
-    <!-- 
+
+    <!--
     -- 聊 天 窗 口 ---------------------------------------------------------
     -->
     <div class="chatbox" :class="{ 'open': showChatbox }">
@@ -552,29 +550,29 @@ export default {
         <h3>在线客服</h3>
         <button class="close-button" @click="toggleChatbox">×</button>
       </div>
-      
+
       <div class="chat-messages">
-        <div 
-          v-for="message in chatMessages" 
-          :key="message.id" 
+        <div
+          v-for="message in chatMessages"
+          :key="message.id"
           :class="['message', message.isUser ? 'user-message' : 'bot-message']"
         >
           <div class="message-content">{{ message.content }}</div>
           <div class="message-time">{{ message.timestamp }}</div>
         </div>
-        
+
         <div v-if="isLoading" class="typing-indicator">
           <span></span>
           <span></span>
           <span></span>
         </div>
       </div>
-      
+
       <div class="chatbox-input">
-        <input 
-          type="text" 
-          v-model="chatInput" 
-          placeholder="请输入您的问题..." 
+        <input
+          type="text"
+          v-model="chatInput"
+          placeholder="请输入您的问题..."
           @keyup.enter="sendMessage"
         >
         <button @click="sendMessage">发送</button>
@@ -886,8 +884,8 @@ export default {
   margin-bottom: 0.5rem;
 }
 
-.form-group input, 
-.form-group select, 
+.form-group input,
+.form-group select,
 .form-group textarea {
   width: 100%;
   padding: 1rem;

@@ -1,5 +1,6 @@
 //引入全局样式
 import './styles/global.css'
+
 //路由
 import { createApp } from 'vue'
 import App from './App.vue'

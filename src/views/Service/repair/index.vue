@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 
 interface MaintenanceItem {
   id: number
@@ -18,9 +17,7 @@ interface MaintenancePackage {
   recommended: boolean
 }
 
-const router = useRouter()
-const activeTab = ref(0)
-const carModel = ref('')
+
 const showBookingForm = ref(false)
 const formSubmitted = ref(false)
 

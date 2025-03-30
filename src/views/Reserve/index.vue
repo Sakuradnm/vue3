@@ -7,7 +7,7 @@
       <h2>选择您的车型</h2>
       <div class="car-list">
         <div
-          v-for="(car, index) in carModels"
+          v-for="(car, _) in carModels"
           :key="car.id"
           class="car-item"
           :class="{ 'active': selectedCar === car.id }"
@@ -476,6 +476,7 @@ onMounted(() => {
   padding: 2rem 1rem;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color: #333;
+  background: white;
 }
 
 .reserve-title {
@@ -834,7 +835,6 @@ textarea:focus {
 .success-icon {
   font-size: 3rem;
   color: #4CAF50;
-  margin-bottom: 1rem;
   height: 80px;
   width: 80px;
   background-color: rgba(76, 175, 80, 0.1);

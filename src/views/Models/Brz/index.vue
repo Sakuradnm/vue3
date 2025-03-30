@@ -363,7 +363,7 @@ export default defineComponent({
 </template>
 
 <style scoped>
-@import "@/styles/models.css";
+@import "../../../styles/models.css";
 /* 内饰框架 */
 .interior-frame {
   background: #000000;

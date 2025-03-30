@@ -175,7 +175,7 @@ export default {
     </section>
 
     <!-- 可持续发展 -->
-    <section class="sustainability reveal-section">
+    <section class="sustainability-page">
       <div class="section-container">
         <h2 class="reveal-item">可持续发展</h2>
         <div class="sustainability-grid">
@@ -219,7 +219,7 @@ export default {
 
 <style scoped>
 .brand-page {
-  background-image: linear-gradient(to bottom, rgba(1, 10, 14, 0.7), transparent);
+  background-image: linear-gradient(to top, rgb(0, 0, 0), transparent);
   padding-top: 72px;
 }
 
@@ -265,6 +265,7 @@ export default {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1rem;
+  color: #ffffff;
 }
 section {
   margin-bottom: 6rem;
@@ -279,6 +280,7 @@ h2 {
 .timeline {
   position: relative;
   padding: 2rem 0;
+
 }
 
 .timeline::before {
@@ -288,28 +290,32 @@ h2 {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #007bff;
+  background: #2fff00;
   transform: translateX(-50%);
 }
 
 .timeline-item {
   margin-bottom: 4rem;
   position: relative;
+
 }
 
 .timeline-item:nth-child(odd) .timeline-content {
   margin-left: 50%;
   padding-left: 3rem;
+  background-color: rgba(255, 255, 255, 0.09);
 }
 
 .timeline-item:nth-child(even) .timeline-content {
   margin-right: 50%;
   padding-right: 3rem;
   text-align: right;
+  background-color: rgba(255, 255, 255, 0.09);
 }
 
 .timeline-content {
   position: relative;
+
 }
 
 .timeline-content::before {
@@ -317,7 +323,7 @@ h2 {
   position: absolute;
   width: 20px;
   height: 20px;
-  background: #007bff;
+  background: rgb(47, 255, 0);
   border-radius: 50%;
   top: 0;
 }
@@ -333,8 +339,9 @@ h2 {
 .year {
   font-size: 2rem;
   font-weight: 700;
-  color: #007bff;
+  color: rgba(47, 255, 0, 0.7);
   margin-bottom: 1rem;
+
 }
 
 .timeline-content img {
@@ -378,12 +385,12 @@ h2 {
 }
 .factory-features i {
   font-size: 2rem;
-  color: #007bff;
+  color: rgba(47, 255, 0, 0.75);
   margin-bottom: 0.5rem;
 }
 .tour-btn {
   padding: 1rem 2rem;
-  background: #007bff;
+  background: rgba(47, 255, 0, 0.67);
   color: white;
   border: none;
   border-radius: 4px;
@@ -392,7 +399,7 @@ h2 {
   transition: background-color 0.3s ease;
 }
 .tour-btn:hover {
-  background: #0056b3;
+  background: rgba(12, 179, 0, 0.7);
 }
 
 /************************************************************
@@ -404,11 +411,16 @@ h2 {
   gap: 2rem;
 }
 .sustainability-card {
-  background: white;
+  background: rgba(73, 236, 8, 0.1);
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   text-align: center;
+}
+.sustainability-page{
+  background: #000000;
+  height: 50vh;
+  margin-bottom: 0;
 }
 .card-icon {
   font-size: 3rem;

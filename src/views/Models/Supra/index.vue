@@ -329,7 +329,7 @@ export default defineComponent({
             <h1>{{ model.name }}</h1>
             <div class="price-container">
               <div class="price">${{ model.price.toLocaleString() }}</div>
-              <div class="price-note">Starting MSRP*</div>
+              <div class="price-note">建议零售价*</div>
             </div>
             <div class="specs">
               <p>车重：{{ model.weight }}kg</p>
@@ -367,7 +367,7 @@ export default defineComponent({
 </template>
 
 <style scoped>
-@import "@/styles/models.css";
+@import "../../../styles/models.css";
 
 .supra-theme {
   --supra-red: #e50000;
@@ -484,7 +484,6 @@ export default defineComponent({
 
 .detail-link, .build-link {
   color: #ffffff;
-  background: rgba(80, 0, 0, 0.5);
 }
 
 .build-link {

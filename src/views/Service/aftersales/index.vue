@@ -114,20 +114,19 @@ const toggleAccordion = (index: number) => {
 }
 
 // 模拟初始化地图的函数，实际应用中会使用真实的地图API
-const initMap = () => {
-  console.log('地图初始化')
-}
+// const initMap = () => {
+//   console.log('地图初始化')
+// }
 </script>
 
 <template>
   <div class="aftersales-page">
     <!-- 顶部横幅 -->
-    <section class="hero-banner">
-      <div class="hero-content">
-        <h1>一站式售后服务</h1>
-        <p>全方位守护您的用车体验</p>
-        <button class="primary-btn" @click="showContactForm = true">联系我们</button>
-      </div>
+    <section class="hero-content">
+      <h1>一站式售后服务</h1>
+      <p>全方位守护您的用车体验</p>
+      <button class="primary-btn" @click="showContactForm = true">联系我们
+      </button>
     </section>
 
     <!-- 服务类别标签页 -->
@@ -512,22 +511,26 @@ body {
 }
 
 /* 顶部横幅 */
-.hero-banner {
-  background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('/brand/ultra.png');
+.hero-content {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.52), rgba(255, 255, 255, 0)), url('/brand/ultra.png');
   background-size: cover;
   background-position: center;
-  color: white;
   padding: 120px 0;
   text-align: center;
 }
 
 .hero-content h1 {
+  color: white;
+  text-shadow: 0 2px 4px rgb(122, 255, 241);
+  background-color: transparent;
   font-size: 48px;
   font-weight: 700;
   margin-bottom: 16px;
 }
 
 .hero-content p {
+  background-color:transparent;
+  color: white;
   font-size: 20px;
   margin-bottom: 24px;
 }

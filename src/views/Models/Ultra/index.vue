@@ -78,12 +78,12 @@ export default defineComponent({
       {
         title: '跑车外观',
         description: '空气动力学设计与碳纤维元素融合，动感姿态展现电动超跑魅力。',
-        image: '/models/Ultra/Appearance.jpg'
+        image: '/models/Ultra/appearance.jpg'
       },
       {
         title: '豪华内饰',
         description: '环保材质与奢华工艺完美结合，营造舒适与科技并存的驾驶舱体验。',
-        image: '/models/Ultra/Trim.jpg'
+        image: '/models/Ultra/trim.jpg'
       },
       {
         title: '驾驶模式',
@@ -362,7 +362,7 @@ export default defineComponent({
 </template>
 
 <style scoped>
-@import "@/styles/models.css";
+@import "../../../styles/models.css";
 /* 重写样式，以黄色为主题 */
 .interior-frame {
   background: #000000;
