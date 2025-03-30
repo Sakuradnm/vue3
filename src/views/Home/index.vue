@@ -214,7 +214,7 @@ export default {
   padding: 5rem 0;
   color: #ffffff;
   text-align: center;
-  background-color: rgba(1, 10, 14);
+  background-image: linear-gradient(to top, rgb(0, 0, 0), rgb(1, 10, 14));
   text-shadow:  0 0 2px hsl(198, 87%, 3%),0 0 2px hsl(0, 0%, 100%), 0 0 2px hsl(198, 87%, 3%);
 }
 

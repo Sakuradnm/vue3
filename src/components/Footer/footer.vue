@@ -61,7 +61,7 @@
 <style scoped>
 /* 页脚样式 */
 .footer {
-  background-color: #010a0e;
+  background-color: #000000;
   color: white;
   padding: 2rem 0;
   display: flex;
