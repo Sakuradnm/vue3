@@ -15,11 +15,11 @@ const props = defineProps<{
 
 const submenus = {
   cardMenu: [
-    { path: '/Ultra', text: '小米 SU7 Ultra', icon: 'Models' },
-    { path: '/Supra', text: '丰田 GR SUPRA', icon: 'GR' },
     { path: '/Brz', text: '斯巴鲁 BRZ', icon: 'Models' },
+    { path: '/Hellcat', text: '道奇 CHALLENGER SRT® HELLCAT', icon: 'Models' },
+    { path: '/Supra', text: '丰田 GR SUPRA', icon: 'GR' },
     { path: '/Gtr', text: '尼桑 GT-R', icon: 'Models' },
-    { path: '/Hellcat', text: '道奇 CHALLENGER SRT® HELLCAT', icon: 'Models' }
+    { path: '/Ultra', text: '小米 SU7 Ultra', icon: 'Models' },
   ] as SubmenuItem[],
   serviceMenu: [
     { path: '/Maintenance', text: '保养检查', icon: 'Maintenance' },
