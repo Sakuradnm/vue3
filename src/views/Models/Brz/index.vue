@@ -147,7 +147,7 @@ export default defineComponent({
       <div class="hero-overlay">
         <div class="hero-content">
           <h1>SUBARU BRZ</h1>
-          <p class="hero-subtitle">纯粹驾驶乐趣</p>
+          <p class="hero-subtitle">——Pure driving pleasure——</p>
           <div class="hero-actions">
             <button @click="scrollToModels" class="cta-button primary">探索车型</button>
             <button @click="openReserveModal" class="cta-button secondary">立即预约</button>

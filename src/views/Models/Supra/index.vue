@@ -20,50 +20,49 @@ interface CustomizationOption {
 
 const contentList = reactive([
   {
-    title: 'Specifications',
-    text: `*规格和设备如有变更，恕不另行通知。
-                *3D 图像由计算机生成。实际颜色可能有所不同。
-                *特殊油漆颜色或保护膜可能会影响车辆定价。
-                *一些照片是合成图像。
-                *制造商和经销商选项仅供参考。
-                *价格为估算价格，不构成销售报价。
-                *价格为制造商建议的零售价，截至 2024 年 3 月，东京地区。
-                *不包括税费、保险费、销售费和附加选项。`
+    title: 'Heritage Reborn',
+    x: '-4%',
+    y: '25%',
+    text: `GR Supra 以现代工程和卓越设计传承了丰田传奇跑车血统。
+    第五代 Supra 与宝马合作开发，在动力、操控和风格之间实现了完美平衡，
+    在向其标志性前辈致敬的同时，为性能设定了新的基准。`
   },
   {
-    title: 'Heritage',
-    text: `GR Supra 延续了丰田标志性跑车的传奇血统。
-                它是与宝马合作开发的，代表了
-                日本和德国汽车工程的巅峰。GR Supra 将尖端技术
-                与纯粹的驾驶体验相结合，是性能
-                和精度的证明。`
+    title: 'Track Precision',
+    x: '51%',
+    y: '10%',
+    text: `GR Supra 的设计融合了赛车基因，拥有完美平衡的底盘、自适应悬架
+    和低重心，可实现出色的操控性。以驾驶员为中心的驾驶舱提供直观的控制
+    和一流的舒适度，而先进的空气动力学设计则可确保高速行驶时的稳定性和效率。`
   },
   {
-    title: 'Track Package',
-    text: `2024赛季，TOYOTA GAZOO Racing（TGR）将连续第六个赛季夺得制造商冠军。
-    2025 年，该车队将继续使用两辆 GR010 HYBRID 赛车参赛，该赛车配备了在 WEC 比赛中不断发展的赛车混合动力系统。
-    车手阵容将继续由拥有WEC胜利、世界锦标赛等丰富经验的天才车手组成，并将继续为“以赛车运动为起点制造更好的汽车”和“追求赛车运动的吸引力和可持续的赛车活动”做出贡献。`
+    title: 'Pure Performance',
+    x: '0%',
+    y: '-5%',
+    text: `雕塑般的引擎盖下是一台强大的涡轮增压发动机，可提供令人振奋的加速和令人难忘的驾驶体验。
+    通过丰田 GAZOO Racing 的精确调校，GR Supra 的响应式动力系统
+    和完美的重量分布在驾驶员和机器之间创造了和谐的连接。`
   }
 ])
 
 const supraModels = reactive<SupraModel[]>([
   {
     name: 'GR Supra 2.0',
-    engine: '2.0L B48 Inline-4 Turbo',
+    engine: '2.0L Twin-Scroll Turbocharged Inline-4',
     image: '/models/Supra/Supra-2.0.jpg',
-    price: 54900,
+    price: 43540,
     torque: '295 lb-ft (400 Nm) at 1,550-4,400 rpm',
     horsepower: '255 HP (190 kW) at 5,000-6,500 rpm',
-    weight: 1541
+    weight: 1520
   },
   {
     name: 'GR Supra 3.0',
-    engine: '3.0L B58 Inline-6 Turbo',
+    engine: '3.0L Twin-Scroll Turbocharged Inline-6',
     image: '/models/Supra/Supra-3.0.jpg',
-    price: 72460,
-    torque: '365 lb-ft (495 Nm) at 1,700-4,500 rpm',
+    price: 52500,
+    torque: '368 lb-ft (499 Nm) at 1,800-5,000 rpm',
     horsepower: '382 HP (285 kW) at 5,800-6,500 rpm',
-    weight: 1611
+    weight: 1570
   },
 ])
 
@@ -75,19 +74,19 @@ export default defineComponent({
 
     const customizationOptions = reactive<CustomizationOption[]>([
       {
-        title: 'Exterior',
-        description: '雕刻的空气动力学设计，具有精确的线条和运动姿态。',
-        image: '/models/Supra/Exterior.jpg'
+        title: '外观',
+        description: '低趴流线型车身设计，融合经典与现代美学。',
+        image: '/models/Supra/appearance.jpg'
       },
       {
-        title: 'Interior',
-        description: '以驾驶员为中心的驾驶舱采用优质材料和先进技术。',
-        image: '/models/Supra/Interior.jpg'
+        title: '内饰',
+        description: '驾驶者导向的座舱设计，提供最佳的操控体验与豪华感。',
+        image: '/models/Supra/interior.jpg'
       },
       {
-        title: 'Performance',
-        description: '采用尖端性能技术，旨在带来纯粹的驾驶乐趣。',
-        image: '/models/Supra/Performance.jpg'
+        title: '性能',
+        description: '由GAZOO Racing调校的底盘与引擎，提供出色的动力与操控性能。',
+        image: '/models/Supra/performance.jpg'
       }
     ])
 
@@ -95,7 +94,7 @@ export default defineComponent({
       if (appearanceSection.value) {
         appearanceSection.value.scrollIntoView({
           behavior: 'smooth',
-          block: 'start' // 添加精确滚动定位
+          block: 'start'
         })
       }
     }
@@ -106,17 +105,14 @@ export default defineComponent({
 
     const closeModal = () => {
       selectedModel.value = null
-      document.body.style.overflow = 'auto' // 解除滚动锁定
-
+      document.body.style.overflow = 'auto'
     }
 
     const openReserveModal = () => {
-      // 预订逻辑的占位符
       alert('Reservation system coming soon!')
     }
 
     const initiateReservation = () => {
-      // 添加类型检查
       if (selectedModel.value) {
         alert(`Reserving ${selectedModel.value.name}`)
       }
@@ -139,7 +135,7 @@ export default defineComponent({
 </script>
 
 <template>
-  <div class="car-page">
+  <div class="car-page supra-theme">
     <!-- 视频主页 -->
     <div class="car-hero">
       <video autoplay loop muted playsinline class="hero-video">
@@ -148,7 +144,7 @@ export default defineComponent({
       <div class="hero-overlay">
         <div class="hero-content">
           <h1>TOYOTA GR SUPRA</h1>
-          <p class="hero-subtitle">Pure Driving Excitement</p>
+          <p class="hero-subtitle">——BORN FROM RACING——</p>
           <div class="hero-actions">
             <button @click="scrollToModels" class="cta-button primary">探索车型</button>
             <button @click="openReserveModal" class="cta-button secondary">立即预约</button>
@@ -159,111 +155,158 @@ export default defineComponent({
 
     <!-- 标题区域 -->
     <div class="gallery-header">
-      Gallery Presentation
-      <p>——————Discover the GR Supra Legacy</p>
+      The Supra Legacy
+      <p>——————探索GR Supra视觉图鉴</p>
     </div>
 
-    <!-- 汽车展示 -->
-    <div class="car-overview">
-      <div class="overview-box" v-for="(_, index) in 3" :key="index">
-        <div class="overview-card">
-          <div class="photos-content">
-            <img :src="`/models/Supra/show${index + 1}.jpg`" :alt="`supra-overview-${index + 1}`">
-            <div class="text-box"
-                 :style="{
-              left: contentList[index].x,
-              top: contentList[index].y
-            }">
-              <h1>{{ contentList[index].title }}</h1>
-              <p>{{ contentList[index].text }}</p>
-            </div>
-          </div>
+    <!-- 汽车展示1 + 内饰框架1 -->
+    <div class="car-showcase">
+      <div class="photos-content">
+        <img src="/models/Supra/show1.jpg">
+        <div class="text-box" :style="{ left: contentList[0].x, top: contentList[0].y }">
+          <h1>{{ contentList[0].title }}</h1>
+          <p>{{ contentList[0].text }}</p>
         </div>
       </div>
     </div>
 
-    <!-- 外观概览 -->
-    <div class="appearance-overview">
-      <div class="grid" style="background-color: rgb(255,255,255);"></div>
-      <div class="appearance-title">
-        <h1>Appearance and Design</h1>
-        <p>外观/空气动力学</p>
-      </div>
-      <div class="appearance-grid">
-        <div class="grid-card">
-          <div class="grid-image-wrapper">
-            <img src="/models/Supra/Appearance.jpg" alt="appearance and design">
+    <!-- 内饰框架1 -->
+    <div class="content-frame interior-frame">
+      <div class="interior-container">
+        <!-- 副部件：顶部标题区 -->
+        <div class="sub-section header-section">
+          <h2>DRIVER-FOCUSED COCKPIT</h2>
+          <p class="subtitle">————PRECISION MEETS COMFORT</p>
+        </div>
+
+        <!-- 主部件：内容区 -->
+        <div class="main-section">
+          <div class="image-column">
+            <img src="/models/Supra/1.jpg" alt="Supra Interior">
           </div>
-          <div class="grid-content-wrapper">
-            <div class="grid-text-card">
-              <h3>车轮性能</h3>
-              <p>轻质锻造合金轮毂旨在减轻非悬挂重量
-                并改善操控性。它们包裹在高性能轮胎中，提供
-                出色的抓地力，并有助于 Supra 的动态驾驶特性。</p>
+          <div class="content-column">
+            <div class="content-block">
+              <h3>赛车风格的设计</h3>
+              <p>GR Supra 的驾驶舱采用不对称中央控制台、赛车风格的座椅和
+                完美定位的控件，将驾驶员包裹在内。每个元素都旨在在驾驶员和机器之间建立直观的联系。
+              </p>
             </div>
-            <div class="grid-card-footer">
-              <router-link to="#">详细内容 ▶</router-link>
+            <div class="content-block">
+              <h3>精湛工艺</h3>
+              <p>整个车厢内，Alcantara 和皮革表面与碳纤维装饰相得益彰。数字模拟仪表盘
+                一目了然地提供重要信息，而平视显示器则让您在激情驾驶时始终关注路况。
+              </p>
             </div>
           </div>
         </div>
-        <div class="grid-card">
-          <div class="grid-image-wrapper">
-            <img src="/models/Supra/show1.jpg" alt="appearance and design">
+
+        <!-- 副部件：底部说明区 -->
+        <div class="sub-section footer-section">
+          <p>符合人体工程学的优化控制装置确保高性能驾驶过程中每个功能都触手可及。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 汽车展示2 + 内饰框架2 -->
+    <div class="car-showcase">
+      <div class="photos-content">
+        <img src="/models/Supra/show2.jpg" alt="supra-overview-2">
+        <div class="text-box" :style="{ left: contentList[1].x, top: contentList[1].y }">
+          <h1>{{ contentList[1].title }}</h1>
+          <p>{{ contentList[1].text }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 内饰框架2 -->
+    <div class="content-frame interior-frame">
+      <div class="interior-container reverse-layout">
+        <!-- 副部件：顶部标题区 -->
+        <div class="sub-section header-section">
+          <h2>先进技术</h2>
+          <p class="subtitle">————INNOVATION FOR PERFORMANCE</p>
+        </div>
+
+        <!-- 主部件：内容区（镜像布局） -->
+        <div class="main-section">
+          <div class="image-column">
+            <img src="/models/Supra/2.jpg" alt="Supra Technology">
           </div>
-          <div class="grid-content-wrapper">
-            <div class="grid-text-card">
-              <h3>空气动力学设计</h3>
-              <p>GR Supra 的外观经过精心雕琢，堪称空气动力学工程的杰作。
-                每条曲线和线条都旨在提高性能、减少阻力并营造出引人注目的视觉效果。</p>
+          <div class="content-column">
+            <div class="content-block">
+              <h3>智能驾驶系统</h3>
+              <p>GR Supra 配备先进的驾驶辅助系统，可提高安全性和性能。自适应可变悬架
+                可根据路况和驾驶风格不断调整阻尼力，以优化操控性和乘坐舒适度。</p>
             </div>
-            <div class="grid-card-footer">
-              <router-link to="#">详细内容 ▶</router-link>
+            <div class="content-block">
+              <h3>可定制的驾驶模式</h3>
+              <p>在普通模式和运动模式之间进行选择，即可立即改变 Supra 的性格。运动模式可提高油门响应速度、
+                加强转向手感，并增强排气音，带来更具吸引力的驾驶体验。</p>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 内饰部分 -->
-      <div class="appearance-title">
-        <p style="margin-top: 2rem">内饰/驾驶舱</p>
+        <!-- 副部件：底部说明区 -->
+        <div class="sub-section footer-section">
+          <p>配备 Toyota Supra Command 的 8.8 英寸触摸屏提供无缝连接和车辆控制。</p>
+        </div>
       </div>
-      <div class="appearance-block">
-        <div class="block-card">
-          <div class="block-content-wrapper">
-            <div class="block-text-card">
-              <h3>以驾驶员为中心的驾驶舱</h3>
-              <p>内饰经过精心设计，旨在为驾驶员和机器之间创造完美的连接。
-                优质材料、符合人体工程学的布局和先进的技术相结合，带来身临其境的驾驶体验。</p>
-              <p>主要特点包括：
-                - 真皮方向盘
-                - 数字仪表盘
-                - 增强侧向支撑的运动型座椅
-                - 直观的信息娱乐系统</p>
+    </div>
+
+    <!-- 汽车展示3 + 外观框架 -->
+    <div class="car-showcase">
+      <div class="photos-content">
+        <img src="/models/Supra/show3.jpg" alt="supra-overview-3">
+        <div class="text-box" :style="{ left: contentList[2].x, top: contentList[2].y }">
+          <h1>{{ contentList[2].title }}</h1>
+          <p>{{ contentList[2].text }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 外观框架 -->
+    <div class="content-frame exterior-frame">
+      <div class="exterior-container">
+        <!-- 顶部标题 -->
+        <div class="sub-section header-section">
+          <h2>卓越的空气动力学性能</h2>
+          <p class="subtitle">————FORM FOLLOWS FUNCTION</p>
+        </div>
+
+        <!-- 双列布局 -->
+        <div class="grid-cols-2">
+          <!-- 左列：上图下文 -->
+          <div class="card">
+            <div class="card-top">
+              <img src="/models/Supra/3.jpg">
             </div>
-            <div class="block-card-footer">
-              <router-link to="#">详细内容 ▶</router-link>
+            <div class="card-bottom">
+              <h3>精密工程</h3>
+              <p>GR Supra 的雕塑车身旨在优化气流，配有功能性通风口和进气口，可减少升力并改善冷却效果。
+                双气泡车顶在增强头部空间和空气动力学效率的同时，也向赛车传统致敬。
+              </p>
             </div>
           </div>
-          <div class="block-image-wrapper">
-            <img src="/models/Supra/cockpit.jpg" alt="interior design">
+
+          <!-- 右列：文下图 -->
+          <div class="card reverse">
+            <div class="card-bottom">
+              <img src="/models/Supra/4.jpg">
+            </div>
+            <div class="card-top">
+              <h3>标志性设计</h3>
+                <p>独特的六镜头 LED 大灯勾勒出霸气的前脸，而一体式后扰流板和宽阔的车身则营造出一种威风凛凛的气势。
+                  Supra 的轮廓一眼就能辨认出来，将经典的比例与现代空气动力学原理相结合。
+                </p>
+            </div>
           </div>
         </div>
 
-        <div class="block-card">
-          <div class="block-image-wrapper">
-            <img src="/models/Supra/command.jpg" alt="interior design">
-          </div>
-          <div class="block-content-wrapper">
-            <div class="block-text-card">
-              <h3>Supra Command</h3>
-              <p>Supra 控制拨盘让您可以访问 GR Supra 的主要多媒体功能。
-                其触摸式表面让您可以用手指输入导航系统的地址并放大和缩小地图。选择功能就像旋转和按下拨盘一样简单。</p>
-            </div>
-            <div class="block-card-footer">
-              <router-link to="#">详细内容 ▶</router-link>
-            </div>
-          </div>
-
+        <!-- 底部说明 -->
+        <div class="sub-section footer-section">
+          <p>锻造的 19 英寸合金轮毂搭配高性能轮胎，提供最佳抓地力和醒目的美感.
+          </p>
         </div>
       </div>
     </div>
@@ -271,8 +314,8 @@ export default defineComponent({
     <!-- Models Section -->
     <div class="gtr-models">
       <div class="gtr-models-title" ref="appearanceSection">
-        <h1>Discover Your Supra</h1>
-        <p>2 Unique Grades to Choose From</p>
+        <h1>Choose Your GR Supra</h1>
+        <p>Engineering Excellence in Two Forms</p>
       </div>
       <div class="models-container">
         <div
@@ -280,13 +323,13 @@ export default defineComponent({
             v-for="(model, index) in supraModels"
             :key="index"
         >
-          <div class="grid2" style="background-color: rgb(1,10,14);"></div>
+          <div class="grid2" style="background-color: rgb(80, 0, 0);"></div>
           <img class="model-image" :src="model.image" :alt="model.name">
           <div class="model-info">
             <h1>{{ model.name }}</h1>
             <div class="price-container">
               <div class="price">${{ model.price.toLocaleString() }}</div>
-              <div class="price-note">建议零售价*</div>
+              <div class="price-note">Starting MSRP*</div>
             </div>
             <div class="specs">
               <p>车重：{{ model.weight }}kg</p>
@@ -296,7 +339,7 @@ export default defineComponent({
             </div>
           </div>
           <div class="action-buttons">
-            <router-link to="#" class="detail-link">产看更多<span class="arrow">▶</span></router-link>
+            <router-link to="#" class="detail-link">Details<span class="arrow">▶</span></router-link>
             <router-link to="#" class="build-link">Build It <span class="arrow">▶</span></router-link>
           </div>
         </div>
@@ -305,7 +348,7 @@ export default defineComponent({
 
     <!-- Customization Section -->
     <div class="customization">
-      <h2>Personalize Your GR Supra</h2>
+      <h2>Customize Your GR Supra</h2>
       <div class="customization-grid">
         <div
             v-for="(option, index) in customizationOptions"
@@ -326,4 +369,146 @@ export default defineComponent({
 <style scoped>
 @import "@/styles/models.css";
 
+.supra-theme {
+  --supra-red: #e50000;
+  --supra-dark-red: #9b0000;
+  --supra-light-red: #ff3232;
+  --supra-accent: #ff0000;
+}
+
+/* Hero adjustments */
+.hero-content h1 {
+  text-shadow: 5px 5px 2px var(--supra-dark-red),
+  5px 0 2px hsla(0, 100%, 50%, 0.47),
+  0 0 50px hsla(0, 100%, 40%, 0.99);
+}
+
+.hero-subtitle {
+  text-shadow: 5px 5px 2px var(--supra-dark-red),
+  5px 0 2px hsla(0, 100%, 50%, 0.47),
+  0 0 50px hsla(0, 100%, 40%, 0.99);
+}
+
+.cta-button.primary {
+  background: rgba(229, 0, 0, 0.47);
+}
+
+.cta-button.secondary {
+  color: var(--supra-light-red);
+}
+
+/* Header adjustments */
+.gallery-header {
+  text-shadow: -5px 4px 4px hsla(0, 95%, 37%, 0.45),
+  7px 2px 8px hsla(0, 66%, 34%, 0.61),
+  2px 0 50px hsl(0, 100%, 45%);
+}
+
+.gallery-header p {
+  text-shadow: 0 0 2px hsl(0, 0%, 100%),
+  0 2px 2px hsla(0, 100%, 51%, 0.82),
+  2px 0 5px hsl(0, 76%, 32%);
+}
+
+/* Section headers */
+.header-section h2 {
+  text-shadow: 5px 5px 2px var(--supra-dark-red),
+  5px 0 2px hsla(0, 100%, 50%, 0.47),
+  0 0 50px hsla(0, 100%, 45%, 0.99);
+}
+
+.header-section .subtitle {
+  color: rgba(255, 0, 0, 0.8);
+}
+
+/* Interior frame */
+.interior-frame {
+  background: #000000;
+}
+
+.interior-frame img {
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(255, 0, 0, 0.3);
+}
+
+/* Content blocks */
+.content-block {
+  background: rgba(70, 0, 0, 0.18);
+  border: 1px solid rgba(255, 0, 0, 0.24);
+}
+
+/* Card styling */
+.card-top {
+  background: linear-gradient(to left, rgba(255, 0, 0, 0.08), transparent);
+}
+
+.card-bottom {
+  background: linear-gradient(to right, rgba(255, 0, 0, 0.08), transparent);
+}
+
+/* Models section */
+.gtr-models {
+  background-image: linear-gradient(to bottom, rgb(0, 0, 0), rgb(50, 0, 0));
+}
+
+.gtr-models-title h1 {
+  text-shadow: 5px 5px 2px var(--supra-dark-red),
+  5px 0 2px hsla(0, 100%, 50%, 0.47),
+  0 0 50px hsla(0, 100%, 45%, 0.41);
+}
+
+.models-container {
+  background-color: rgb(10, 0, 0);
+}
+
+.models-container::before {
+  background: rgb(80, 0, 0);
+}
+
+.model-card {
+  background: rgb(10, 0, 0);
+}
+
+.model-info h1,
+.price {
+  color: #ffffff;
+}
+
+.price-note {
+  color: rgb(255, 150, 150);
+}
+
+.specs p {
+  color: #cccccc;
+}
+
+.detail-link, .build-link {
+  color: #ffffff;
+  background: rgba(80, 0, 0, 0.5);
+}
+
+.build-link {
+  border: 2px solid rgba(255, 0, 0, 0.54);
+  background: rgba(120, 0, 0, 0.29);
+}
+
+.detail-link:hover {
+  color: rgba(255, 150, 150, 0.71);
+}
+
+.build-link:hover {
+  border: 2px solid rgba(255, 0, 0, 0.47);
+  background: rgba(150, 0, 0, 0.58);
+}
+
+/* Customization section */
+.customization {
+  background-image: linear-gradient(to top, rgb(0, 0, 0), rgb(50, 0, 0));
+}
+
+.customization h2 {
+  text-shadow: 5px 5px 2px var(--supra-dark-red),
+  5px 0 2px hsla(0, 100%, 50%, 0.47),
+  0 0 50px hsla(0, 100%, 40%, 0.4);
+}
 </style>

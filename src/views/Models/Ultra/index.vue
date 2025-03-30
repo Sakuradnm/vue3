@@ -1,7 +1,8 @@
 <script lang="ts">
 import { defineComponent, ref, reactive } from 'vue'
 
-interface UltraModel {
+// Define interfaces for type safety
+interface SU7Model {
   name: string
   engine: string
   image: string
@@ -9,6 +10,7 @@ interface UltraModel {
   torque: string
   horsepower: string
   weight: number
+  range: string
 }
 
 interface CustomizationOption {
@@ -17,80 +19,76 @@ interface CustomizationOption {
   image: string;
 }
 
-const ultraModels = reactive<UltraModel[]>([
+const contentList = reactive([
   {
-    name: 'Ultra Vantage',
-    engine: 'V8 4.0L 双涡轮增压',
-    image: '/models/Ultra/ultra-vantage.jpg',
-    price: 1280000,
-    torque: '685 Nm @ 2000-5000 rpm',
-    horsepower: '535 HP (402 kW)',
-    weight: 1630
+    title: '极速性能',
+    x: '-4%',
+    y: '25%',
+    text: `SU7 ULTRA 配备强大的双电机全轮驱动系统，可提供 1,075 马力和令人惊叹的 0-100 km/h 2.78 秒加速能力，
+    超越特斯拉 Model S Plaid。为了实现更精确的高速稳定性，SU7 ULTRA 采用了主动式空气动力学系统和自适应悬挂，
+    结合碳纤维车身部件，打造出赛道级别的操控体验。`
   },
   {
-    name: 'Ultra Nebula',
-    engine: 'V12 6.5L 自然吸气',
-    image: '/models/Ultra/ultra-nebula.jpg',
-    price: 2580000,
-    torque: '720 Nm @ 5500 rpm',
-    horsepower: '765 HP (574 kW)',
-    weight: 1695
+    title: '创新科技',
+    x: '51%',
+    y: '10%',
+    text: `2025 SU7 ULTRA 搭载最新一代自动驾驶系统，通过高性能计算芯片和超过 20 个传感器，提供 L3 级别自动驾驶功能。
+    独特的无线充电技术和全息触控显示屏带来了科技与奢华的完美融合，让驾驶者体验未来出行方式。`
+  },
+  {
+    title: '豪华体验',
+    x: '0%',
+    y: '-5%',
+    text: `SU7 ULTRA 采用最高级别的内饰材质和工艺，带来豪华轿跑的顶级舒适感受。
+    座舱采用环保可持续材质，搭配 21 扬声器高保真音响系统，提供剧院级的声音体验。
+    同时，标配的主动降噪系统创造出一个宁静的驾乘环境，即使高速行驶也能保持车内的宁静感。`
+  }
+])
+
+const su7Models = reactive<SU7Model[]>([
+  {
+    name: 'SU7 ULTRA Performance',
+    engine: '双电机全轮驱动',
+    image: '/models/Ultra/Ultra-Performance.jpg',
+    price: 549900,
+    torque: '1,040 Nm',
+    horsepower: '1,075 HP (800 kW)',
+    weight: 2160,
+    range: '800 km (CLTC)'
+  },
+  {
+    name: 'SU7 ULTRA Max Range',
+    engine: '双电机全轮驱动',
+    image: '/models/Ultra/SU7-Ultra-Max.jpg',
+    price: 588800,
+    torque: '950 Nm',
+    horsepower: '915 HP (675 kW)',
+    weight: 2210,
+    range: '1,000 km (CLTC)'
   },
 ])
 
 export default defineComponent({
-  name: 'UltraPage',
+  name: 'SU7UltraPage',
   setup() {
-    const selectedModel = ref<UltraModel | null>(null)
+    const selectedModel = ref<SU7Model | null>(null)
     const appearanceSection = ref<HTMLElement | null>(null)
-
-    const contentList = reactive([
-      {
-        title: 'Specifications',
-        x: '45%',
-        y: '5%',
-        text: `*规格和设备如有变更，恕不另行通知。
-        *3D 图像由计算机生成。实际颜色可能有所不同。
-        *特殊油漆颜色或保护膜可能会影响车辆定价。
-        *一些照片是合成图像。
-        *制造商和经销商选项仅供参考。
-        *价格为估算价格，不构成销售报价。
-        *价格为制造商建议的零售价，截至 2024 年 3 月。
-        *不包括税费、保险费、销售费和附加选项。`
-      },
-      {
-        title: 'Heritage',
-        x: '4%',
-        y: '1%',
-        text: `小米 SU7 Ultra 代表了小米汽车在性能领域的巅峰之作。
-        它融合了最先进的电动技术和创新的设计理念，
-        为驾驶者带来前所未有的驾驶体验。每一处细节都经过精心打造，
-        完美诠释了"科技与艺术的完美结合"。`
-      },
-      {
-        title: 'Track Package',
-        x: '46%',
-        y: '1%',
-        text: `为赛道爱好者量身定制，提升车辆赛道性能。包含倍适登® EVO R for Ultra 绞牙减振器套装、ENDLESS® MA45B高性能制动片
-        21 英寸锻造轮毂及配套的倍耐力®P ZERO™ 第五代高性能轮胎+同规格半热熔轮胎等，专为追求赛道极限驾驶的车手设计。`
-      }
-    ])
 
     const customizationOptions = reactive<CustomizationOption[]>([
       {
-        title: '空气动力学',
-        description: '主动式尾翼系统，三级可调扩散器，碳纤维前唇',
-        image: '/models/Ultra/aero.jpg'
+        title: '跑车外观',
+        description: '空气动力学设计与碳纤维元素融合，动感姿态展现电动超跑魅力。',
+        image: '/models/Ultra/Appearance.jpg'
       },
       {
-        title: '性能套件',
-        description: '赛道级悬挂调校，陶瓷复合制动系统，钛合金排气',
-        image: '/models/Ultra/performance.jpg'
+        title: '豪华内饰',
+        description: '环保材质与奢华工艺完美结合，营造舒适与科技并存的驾驶舱体验。',
+        image: '/models/Ultra/Trim.jpg'
       },
       {
-        title: '奢华内饰',
-        description: '半苯胺真皮座椅，航空铝饰板，全息投影仪表',
-        image: '/models/Ultra/interior.jpg'
+        title: '驾驶模式',
+        description: '多种驾驶模式适应不同路况与驾驶需求，从舒适通勤到激情赛道均可从容应对。',
+        image: '/models/Ultra/Packages.jpg'
       }
     ])
 
@@ -98,36 +96,33 @@ export default defineComponent({
       if (appearanceSection.value) {
         appearanceSection.value.scrollIntoView({
           behavior: 'smooth',
-          block: 'start' // 添加精确滚动定位
+          block: 'start'
         })
       }
     }
 
-    const selectModel = (model: UltraModel) => {
+    const selectModel = (model: SU7Model) => {
       selectedModel.value = model
     }
 
     const closeModal = () => {
       selectedModel.value = null
-      document.body.style.overflow = 'auto' // 解除滚动锁定
-
+      document.body.style.overflow = 'auto'
     }
 
     const openReserveModal = () => {
-      // 预订逻辑的占位符
-      alert('Reservation system coming soon!')
+      alert('预约系统即将推出!')
     }
 
     const initiateReservation = () => {
-      // 添加类型检查
       if (selectedModel.value) {
-        alert(`Reserving ${selectedModel.value.name}`)
+        alert(`正在预订 ${selectedModel.value.name}`)
       }
     }
 
     return {
       contentList,
-      ultraModels,
+      su7Models,
       customizationOptions,
       selectedModel,
       appearanceSection,
@@ -142,7 +137,6 @@ export default defineComponent({
 </script>
 
 <template>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <div class="car-page">
     <!-- 视频主页 -->
     <div class="car-hero">
@@ -151,8 +145,8 @@ export default defineComponent({
       </video>
       <div class="hero-overlay">
         <div class="hero-content">
-          <h1>小米 SU7 ULTRA</h1>
-          <p class="hero-subtitle">重新定义汽车卓越</p>
+          <h1>SU7 ULTRA</h1>
+          <p class="hero-subtitle">——Ultimate electric performance——</p>
           <div class="hero-actions">
             <button @click="scrollToModels" class="cta-button primary">探索车型</button>
             <button @click="openReserveModal" class="cta-button secondary">立即预约</button>
@@ -163,114 +157,150 @@ export default defineComponent({
 
     <!-- 标题区域 -->
     <div class="gallery-header">
-      Gallery Presentation
-      <p>——————Discover the Ultra Legacy</p>
+      Ultra Experience
+      <p>——————探索SU7 ULTRA视觉图鉴</p>
     </div>
 
-    <!-- 汽车展示 -->
-    <div class="car-overview">
-      <div class="overview-box" v-for="(_, index) in 3" :key="index">
-        <div class="overview-card">
-          <div class="photos-content">
-            <img :src="`/models/Ultra/show${index + 1}.jpg`" :alt="`ultra-overview-${index + 1}`">
-            <div class="text-box"
-                 :style="{
-              left: contentList[index].x,
-              top: contentList[index].y
-            }">
-              <h1>{{ contentList[index].title }}</h1>
-              <p>{{ contentList[index].text }}</p>
-            </div>
-          </div>
+    <!-- 汽车展示1 + 内饰框架1 -->
+    <div class="car-showcase">
+      <div class="photos-content">
+        <img src="/models/Ultra/show1.jpg">
+        <div class="text-box" :style="{ left: contentList[0].x, top: contentList[0].y }">
+          <h1>{{ contentList[0].title }}</h1>
+          <p>{{ contentList[0].text }}</p>
         </div>
       </div>
     </div>
 
-    <!-- 外观概览 -->
-    <div class="appearance-overview">
-      <div class="grid" style="background-color: rgb(255,255,255);"></div>
-      <div class="appearance-title">
-        <h1>Appearance and Design</h1>
-        <p>空气动力学 / 巅峰动力</p>
-      </div>
-      <div class="appearance-grid">
-        <div class="grid-card">
-          <div class="grid-image-wrapper">
-            <img src="/models/Ultra/1.jpg" alt="appearance and design">
-          </div>
-          <div class="grid-content-wrapper">
-            <div class="grid-text-card">
-              <h3>空气动力学设计</h3>
-              <p>小米 SU7 Ultra 的外观设计融合了空气动力学原理，
-                通过精心设计的车身线条和主动式空气动力学系统，
-                实现了超低风阻系数，同时保持了极具未来感的视觉效果。</p>
-            </div>
-            <div class="grid-card-footer">
-              <router-link to="#">详细内容 ▶</router-link>
-            </div>
-          </div>
+    <!-- 内饰框架1 -->
+    <div class="content-frame interior-frame">
+      <div class="interior-container">
+        <!-- 副部件：顶部标题区 -->
+        <div class="sub-section header-section">
+          <h2>未来科技驾驶舱</h2>
+          <p class="subtitle">————Next Generation Cockpit</p>
         </div>
-        <div class="grid-card">
-          <div class="grid-image-wrapper">
-            <img src="/models/Ultra/2.jpg" alt="appearance and design">
-          </div>
-          <div class="grid-content-wrapper">
-            <div class="grid-text-card">
-              <h3>巅峰动力性能</h3>
-              <p>搭载与小米SU7 Ultra 原型车一致的超级三电机系统，三电机四驱驱动，爆发出 1548PS 的惊人马力！
-                赛道级高功率电池包专为赛道工况打造， 1330kW 超强峰值放电性能，闭式双腔空气悬架系统，软硬调节区间更大，轻松应对赛道挑战。</p>
-            </div>
-            <div class="grid-card-footer">
-              <router-link to="#">详细内容 ▶</router-link>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- 内饰部分 -->
-      <div class="appearance-title">
-        <p style="margin-top: 2rem">内饰 / 驾驶舱</p>
-      </div>
-      <div class="appearance-block">
-        <div class="block-card">
-          <div class="block-content-wrapper">
-            <div class="block-text-card">
-              <h3>智能座舱</h3>
-              <p>基于小米澎湃OS 的互联互通能力，实现手机、车机、智能家居的深度互动。
-                行业领先的小爱语音大模型，结合全车感知能力，带来更加丰富细腻的智能座舱体验。
-                小米 SU7 Ultra 的内饰设计将科技与豪华完美融合：</p>
-                <p>- 全息投影仪表盘
-                - 智能语音控制系统
-                - 自适应座椅
-                - 环绕式音响系统
-                - 智能氛围灯</p>
-            </div>
-            <div class="block-card-footer">
-              <router-link to="#">详细内容 ▶</router-link>
-            </div>
+        <!-- 主部件：内容区 -->
+        <div class="main-section">
+          <div class="image-column">
+            <img src="/models/Ultra/1.jpg" alt="内饰设计">
           </div>
-          <div class="block-image-wrapper">
-            <img src="/models/Ultra/3.jpg" alt="interior design">
+          <div class="content-column">
+            <div class="content-block">
+              <h3>全息显示技术</h3>
+              <p>ULTRA版本配备16.8英寸曲面OLED触控屏和全息抬头显示系统，所有关键信息直观呈现，
+                让驾驶者能够在不移开视线的情况下获取所需信息，提升行车安全性。</p>
+            </div>
+            <div class="content-block">
+              <h3>豪华功能</h3>
+              <p>SU7 ULTRA内饰采用高级环保材质，配备零重力座椅，提供多达15种按摩模式和通风加热功能。
+                车内集成环境氛围灯系统，可根据驾驶模式和音乐自动调节灯光氛围。</p>
+            </div>
           </div>
         </div>
-        <div class="block-card">
-          <div class="block-image-wrapper">
-            <img src="/models/Ultra/4.jpg" alt="interior design">
+
+        <!-- 副部件：底部说明区 -->
+        <div class="sub-section footer-section">
+          <p>全息触控界面提供直观的操作体验，无需复杂菜单即可控制车辆各项功能</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 汽车展示2 + 内饰框架2 -->
+    <div class="car-showcase">
+      <div class="photos-content">
+        <img src="/models/Ultra/show2.jpg" alt="su7-overview-2">
+        <div class="text-box" :style="{ left: contentList[1].x, top: contentList[1].y }">
+          <h1>{{ contentList[1].title }}</h1>
+          <p>{{ contentList[1].text }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 内饰框架2 -->
+    <div class="content-frame interior-frame">
+      <div class="interior-container reverse-layout">
+        <!-- 副部件：顶部标题区 -->
+        <div class="sub-section header-section">
+          <h2>智能交互系统</h2>
+          <p class="subtitle">————AI-Powered Experience</p>
+        </div>
+
+        <!-- 主部件：内容区（镜像布局） -->
+        <div class="main-section">
+          <div class="image-column">
+            <img src="/models/Ultra/2.jpg" alt="智能交互系统">
           </div>
-          <div class="block-content-wrapper">
-            <div class="block-text-card">
-              <h3>丰富的驾驶模式</h3>
-              <p>专属「小米赛道大师APP」，内置赛道信息和圈速排行，支持全车的丰富的参数调整和显示，
-                强大的圈速数据管理分析能力，帮助赛后分析复盘，进一步提升车手赛道表现。
-                提供多种驾驶模式，包含 5 种街道模式，3 种赛道模式和
-                2 种特殊模式，不同的悬架软硬、动力释放、转向力度等参数匹配，
-                适应不同路况和驾驶需求，从新手到车手均可轻松驾驭。</p>
+          <div class="content-column">
+            <div class="content-block">
+              <h3>人工智能助手</h3>
+              <p>SU7 ULTRA搭载先进的AI语音助手，支持自然语言交互和情境感知，让车辆操控变得更加直观和简单...</p>
             </div>
-            <div class="block-card-footer">
-              <router-link to="#">详细内容 ▶</router-link>
+            <div class="content-block">
+              <h3>个性化设置</h3>
+              <p>车辆能够学习驾驶者的习惯和偏好，自动调整座椅、空调、音乐和驾驶模式，提供真正个性化的驾驶体验...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 副部件：底部说明区 -->
+        <div class="sub-section footer-section">
+          <p>AI系统每次驾驶都会学习和优化，随着使用时间的增加，体验将不断提升</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 汽车展示3 + 外观框架 -->
+    <div class="car-showcase">
+      <div class="photos-content">
+        <img src="/models/Ultra/show3.jpg" alt="su7-overview-3">
+        <div class="text-box" :style="{ left: contentList[2].x, top: contentList[2].y }">
+          <h1>{{ contentList[2].title }}</h1>
+          <p>{{ contentList[2].text }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 外观框架 -->
+    <div class="content-frame exterior-frame">
+      <div class="exterior-container">
+        <!-- 顶部标题 -->
+        <div class="sub-section header-section">
+          <h2>超跑级外观设计</h2>
+          <p class="subtitle">————Supercar Aesthetics</p>
+        </div>
+
+        <!-- 双列布局 -->
+        <div class="grid-cols-2">
+          <!-- 左列：上图下文 -->
+          <div class="card">
+            <div class="card-top">
+              <img src="/models/Ultra/3.jpg">
+            </div>
+            <div class="card-bottom">
+              <h3>性能轮毂设计</h3>
+              <p>21英寸锻造铝合金轮毂采用空气动力学优化设计，减少风阻的同时提升制动系统散热效率。
+                配备高性能米其林PS4 S轮胎，提供卓越的抓地力与操控稳定性，同时保持舒适的日常驾驶体验。</p>
             </div>
           </div>
 
+          <!-- 右列：文下图 -->
+          <div class="card reverse">
+            <div class="card-bottom">
+              <img src="/models/Ultra/4.jpg">
+            </div>
+            <div class="card-top">
+              <h3>主动空气动力学系统</h3>
+              <p>SU7 ULTRA配备可调节后扰流板和主动式进气格栅，能够根据速度和驾驶模式自动调整，优化空气动力学性能。
+                在高速模式下，系统能提供最多35%的下压力增益，大幅提升高速稳定性和弯道表现。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部说明 -->
+        <div class="sub-section footer-section">
+          <p>所有空气动力学组件均经过风洞测试和赛道验证，确保最佳性能</p>
         </div>
       </div>
     </div>
@@ -278,33 +308,34 @@ export default defineComponent({
     <!-- Models Section -->
     <div class="gtr-models">
       <div class="gtr-models-title" ref="appearanceSection">
-        <h1>Discover Your Ultra</h1>
-        <p>两种极致配置</p>
+        <h1>Choose your SU7 ULTRA</h1>
+        <p>Two top performance configurations</p>
       </div>
       <div class="models-container">
         <div
             class="model-card"
-            v-for="(model, index) in ultraModels"
+            v-for="(model, index) in su7Models"
             :key="index"
         >
-          <div class="grid2" style="background-color: rgb(1,10,14);"></div>
+          <div class="grid2" style="background-color: rgb(26, 26, 0);"></div>
           <img class="model-image" :src="model.image" :alt="model.name">
           <div class="model-info">
             <h1>{{ model.name }}</h1>
             <div class="price-container">
-              <div class="price">¥{{ model.price.toLocaleString() }}</div>
+              <div class="price">${{ model.price.toLocaleString() }}</div>
               <div class="price-note">建议零售价*</div>
             </div>
             <div class="specs">
               <p>车重：{{ model.weight }}kg</p>
-              <p>发动机：{{ model.engine }}</p>
-              <p>马力：{{ model.horsepower }}</p>
+              <p>动力系统：{{ model.engine }}</p>
+              <p>功率：{{ model.horsepower }}</p>
               <p>扭矩：{{ model.torque }}</p>
+              <p>续航里程：{{ model.range }}</p>
             </div>
           </div>
           <div class="action-buttons">
-            <router-link to="#" class="detail-link">产看更多<span class="arrow">▶</span></router-link>
-            <router-link to="#" class="build-link">Build It <span class="arrow">▶</span></router-link>
+            <router-link to="#" class="detail-link">查看更多<span class="arrow">▶</span></router-link>
+            <router-link to="#" class="build-link">定制我的车 <span class="arrow">▶</span></router-link>
           </div>
         </div>
       </div>
@@ -312,7 +343,7 @@ export default defineComponent({
 
     <!-- Customization Section -->
     <div class="customization">
-      <h2>Personalize Your Ultra</h2>
+      <h2>个性化您的SU7 ULTRA</h2>
       <div class="customization-grid">
         <div
             v-for="(option, index) in customizationOptions"
@@ -332,5 +363,113 @@ export default defineComponent({
 
 <style scoped>
 @import "@/styles/models.css";
-
+/* 重写样式，以黄色为主题 */
+.interior-frame {
+  background: #000000;
+}
+.interior-frame img {
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(255, 215, 0, 0.3);
+}
+.hero-content h1 {
+  text-shadow: 5px 5px 2px hsl(51, 100%, 40%),
+  5px 0 2px hsla(0, 0%, 100%, 0.47),
+  0 0 50px hsla(51, 100%, 50%, 0.99);
+}
+.hero-subtitle {
+  text-shadow: 5px 5px 2px hsl(51, 100%, 40%),
+  5px 0 2px hsla(0, 0%, 100%, 0.47),
+  0 0 50px hsla(51, 100%, 50%, 0.99);
+}
+.cta-button.primary {
+  background: rgba(255, 215, 0, 0.47);
+  color: #000000;
+  text-shadow: 0 1px 10px hsla(0, 0%, 0%, 0.3);
+  font-weight: bold;
+}
+.cta-button.secondary {
+  color: #ffd700;
+  border: 2px solid #ffd700;
+}
+.gallery-header {
+  text-shadow: -5px 4px 4px hsla(51, 100%, 50%, 0.45),
+  7px 2px 8px hsla(51, 100%, 40%, 0.61),
+  2px 0 50px hsl(51, 100%, 50%);
+}
+.gallery-header p {
+  text-shadow: 0 0 2px hsl(0, 0%, 100%),
+  0 2px 2px hsla(51, 100%, 51%, 0.82),
+  2px 0 5px hsl(51, 100%, 40%);
+}
+.header-section h2 {
+  text-shadow: 5px 5px 2px hsl(51, 100%, 40%),
+  5px 0 2px hsla(0, 0%, 100%, 0.47),
+  0 0 50px hsla(51, 100%, 50%, 0.99);
+}
+.header-section .subtitle {
+  color: rgba(255, 215, 0, 0.8);
+}
+.card-top {
+  background: linear-gradient(to left, rgba(255, 215, 0, 0.08), transparent);
+}
+.card-bottom {
+  background: linear-gradient(to right, rgba(255, 215, 0, 0.08), transparent);
+}
+.gtr-models {
+  background-image: linear-gradient(to bottom, rgb(0, 0, 0), rgb(26, 26, 0));
+}
+.gtr-models-title h1 {
+  text-shadow: 5px 5px 2px hsl(51, 100%, 40%),
+  5px 0 2px hsla(0, 0%, 100%, 0.47),
+  0 0 50px hsla(51, 100%, 50%, 0.41);
+}
+.models-container {
+  background-color: rgb(20, 20, 0);
+}
+.models-container::before {
+  background: rgb(255, 215, 0);
+}
+.model-card {
+  background: rgb(20, 20, 0);
+}
+.model-info h1 {
+  color: #ffd700;
+}
+.price {
+  color: #ffffff;
+}
+.price-note {
+  color: rgb(255, 215, 0);
+}
+.specs p {
+  color: #dddddd;
+}
+.detail-link, .build-link {
+  background: rgba(255, 215, 0, 0.1);
+  color: #ffd700;
+}
+.build-link {
+  border: 2px solid rgba(255, 215, 0, 0.54);
+  background: rgba(26, 26, 0, 0.5);
+}
+.detail-link:hover {
+  color: rgba(255, 215, 0, 0.71);
+}
+.build-link:hover {
+  border: 2px solid rgba(255, 215, 0, 0.8);
+  background: rgba(40, 40, 0, 0.8);
+  color: rgba(255, 215, 0, 1);
+}
+.customization {
+  background-image: linear-gradient(to top, rgb(0, 0, 0), rgb(26, 26, 0));
+}
+.customization h2 {
+  text-shadow: 5px 5px 2px hsl(51, 100%, 40%),
+  5px 0 2px hsla(0, 0%, 100%, 0.47),
+  0 0 50px hsla(51, 100%, 50%, 0.4);
+}
+.content-block {
+  background: rgba(26, 26, 0, 0.3);
+  border: 1px solid rgba(255, 215, 0, 0.24);
+}
 </style>
