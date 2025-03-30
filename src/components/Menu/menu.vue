@@ -10,8 +10,8 @@ const mainLinks = [
   { path: '/Models',text: '车 型', submenu: [
       { path: '/Brz', text: 'SUBARU BRZ' },
       { path: '/Hellcat', text: 'DODGE CHALLENGER SRT® HELLCAT' },
-      { path: '/Gtr', text: 'NISSAN GT-R' },
       { path: '/Supra', text: 'TOYOTA GR SUPRA' },
+      { path: '/Gtr', text: 'NISSAN GT-R' },
       { path: '/Ultra', text: '小米 SU7 Ultra' },
     ]
   },
