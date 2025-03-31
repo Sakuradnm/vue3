@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { mapService } from '@/api/Map/map.ts'
+
 
 interface ServiceCenter {
   id: number
@@ -114,19 +116,42 @@ const toggleAccordion = (index: number) => {
 }
 
 // 模拟初始化地图的函数，实际应用中会使用真实的地图API
-// const initMap = () => {
-//   console.log('地图初始化')
-// }
+// 添加地图相关逻辑
+const mapContainer = ref<HTMLElement | null>(null)
+const isMapLoaded = ref(false)
+
+onMounted(async () => {
+  if (mapContainer.value) {
+    try {
+      await mapService.initMap(mapContainer.value)
+      mapService.addServiceMarkers(serviceCenters.value)
+      isMapLoaded.value = true
+    } catch (error) {
+      console.error('地图加载失败:', error)
+      // 显示错误提示
+    }
+  }
+})
+
+onUnmounted(() => {
+  mapService.destroyMap()
+})
+
 </script>
 
 <template>
   <div class="aftersales-page">
     <!-- 顶部横幅 -->
     <section class="hero-content">
-      <h1>一站式售后服务</h1>
-      <p>全方位守护您的用车体验</p>
-      <button class="primary-btn" @click="showContactForm = true">联系我们
-      </button>
+      <div class="hero-image">
+        <img src="/service/service.jpg" alt="hero-img">
+      </div>
+      <div class="hero-text">
+        <h1>一站式售后服务</h1>
+        <p>全方位守护您的用车体验</p>
+        <button class="primary-btn" @click="showContactForm = true">联系我们
+        </button>
+      </div>
     </section>
 
     <!-- 服务类别标签页 -->
@@ -433,6 +458,44 @@ const toggleAccordion = (index: number) => {
 </template>
 
 <style scoped>
+/* 更新地图容器样式 */
+.centers-map {
+  height: 500px;
+  width: 100%;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+
+
+/* 信息窗口样式 */
+:deep(.amap-info-content) {
+  padding: 12px;
+  min-width: 280px;
+
+  h4 {
+    margin: 0 0 8px;
+    color: #0066cc;
+    font-size: 16px;
+  }
+
+  p {
+    margin: 6px 0;
+    font-size: 14px;
+    color: #666;
+  }
+
+  .service-tags {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+  }
+}
+
+
 /* 基础样式 */
 * {
   color: #1a1a1a;
@@ -512,28 +575,59 @@ body {
 
 /* 顶部横幅 */
 .hero-content {
-  background-image: linear-gradient(rgba(0, 0, 0, 0.52), rgba(255, 255, 255, 0)), url('/brand/ultra.png');
-  background-size: cover;
-  background-position: center;
-  padding: 120px 0;
+  background-image: linear-gradient(rgb(0, 0, 0), transparent);
+  position: relative;
+  min-height: 400px;
+  margin-top: 72px;
+  overflow: hidden;
+}
+.hero-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.hero-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.hero-text {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  padding: 2rem;
+  height: 100%;
+  min-height: 400px;
+  background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.2));
 }
 
-.hero-content h1 {
+.hero-text h1 {
+  font-size: 3rem;
   color: white;
-  text-shadow: 0 2px 4px rgb(122, 255, 241);
-  background-color: transparent;
-  font-size: 48px;
-  font-weight: 700;
-  margin-bottom: 16px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  margin-bottom: 1rem;
+  max-width: 800px;
+  background: transparent;
 }
 
-.hero-content p {
-  background-color:transparent;
+.hero-text p {
+  background: transparent;
+  font-size: 1.25rem;
   color: white;
-  font-size: 20px;
-  margin-bottom: 24px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  margin-bottom: 2rem;
 }
+
 
 /* 标签页样式 */
 .tabs {
@@ -721,7 +815,7 @@ body {
 
 .accordion-header {
   padding: 16px 20px;
-  background-color: #fff;
+  background-color: transparent;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -731,11 +825,13 @@ body {
 .accordion-header h3 {
   font-size: 18px;
   font-weight: 500;
+  background-color: transparent;
 }
 
 .accordion-icon {
   font-size: 24px;
   color: #0066cc;
+  background-color: transparent;
 }
 
 .accordion-content {
@@ -876,8 +972,12 @@ body {
 }
 
 @media (max-width: 768px) {
-  .hero-content h1 {
-    font-size: 36px;
+  .hero-text h1 {
+    font-size: 2rem;
+  }
+
+  .hero-text p {
+    font-size: 1rem;
   }
 
   .tab-nav {

@@ -22,7 +22,7 @@ const contentList = reactive([
   {
     title: 'Specifications',
     x: '-4%',
-    y: '25%',
+    y: '2%',
     text: `BRZ 跑车配备强大的 2.4 升直喷 SUBARU BOXER ®发动机，可提供 228 马力和令人惊叹的 0-60 MPH 加速乐趣，
     为您提供比 Mazda MX-5 Miata 或 Honda Civic Si 更高的标准马力。
     为了实现更精确的控制，Subaru BRZ tS 由 Subaru Tecnica International (STI) 的赛车运动专家设计，
