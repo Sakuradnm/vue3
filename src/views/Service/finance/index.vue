@@ -66,10 +66,13 @@ const closeConsultModal = () => {
   <div class="finance-page">
     <!-- 页面标题 -->
     <section class="hero-section">
-      <div class="hero-content">
-        <h1>金融服务</h1>
-        <p>为您提供全方位的汽车金融服务，轻松实现购车梦想</p>
-      </div>
+        <div class="hero-image">
+          <img src="/service/Finance.jpg" alt="hero-img">
+        </div>
+        <div class="hero-text">
+          <h1>金融服务</h1>
+          <p>为您提供全方位的汽车金融服务，轻松实现购车梦想</p>
+        </div>
     </section>
 
     <!-- 服务列表 -->
@@ -128,35 +131,72 @@ const closeConsultModal = () => {
 </template>
 
 <style scoped>
+* {
+  color: #1a1a1a;
+  background-color: white;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 .finance-page {
-  min-height: 100vh;
-  background-color: #f5f5f5;
+  position: relative;
+  min-height: 400px;
+  margin-top: 72px;
+  overflow: hidden;
 }
 
 .hero-section {
-  height: 400px;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
-              url('/home/performance-bg.jpg') center/cover;
+  background-image: linear-gradient(rgb(0, 0, 0), transparent);
+  position: relative;
+  min-height: 400px;
+  overflow: hidden;
+}
+
+.hero-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.hero-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.hero-text {
+  position: relative;
+  z-index: 2;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: white;
+  padding: 2rem;
+  height: 100%;
+  min-height: 400px;
+  background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.2));
 }
 
-.hero-content {
-  max-width: 800px;
-  padding: 0 20px;
-}
-
-.hero-content h1 {
+.hero-text h1 {
   font-size: 3rem;
+  color: white;
+  text-shadow: 0 1px 4px rgb(1, 10, 14), 0 2px 8px rgb(255, 233, 0), 0 3px 16px rgb(255, 255, 255);
   margin-bottom: 1rem;
+  max-width: 800px;
+  background: transparent;
 }
 
-.hero-content p {
-  font-size: 1.2rem;
-  opacity: 0.9;
+.hero-text p {
+  background: transparent;
+  font-size: 1.25rem;
+  color: white;
+  text-shadow: 0 1px 4px rgb(1, 10, 14), 0 2px 8px rgb(255, 233, 0), 0 3px 16px rgb(255, 255, 255);
+  margin-bottom: 2rem;
 }
 
 .services-section {
@@ -231,9 +271,11 @@ const closeConsultModal = () => {
   font-size: 1.2rem;
   font-weight: bold;
   margin-bottom: 0.5rem;
+  background: transparent;
 }
 
 .term {
+  background: transparent;
   color: #666;
   font-size: 0.9rem;
 }

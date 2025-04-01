@@ -15,17 +15,16 @@ const props = defineProps<{
 
 const submenus = {
   cardMenu: [
-    { path: '/Brz', text: '斯巴鲁 BRZ', icon: 'Models' },
-    { path: '/Hellcat', text: '道奇 CHALLENGER SRT® HELLCAT', icon: 'Models' },
-    { path: '/Gtr', text: '尼桑 GT-R', icon: 'Models' },
-    { path: '/Supra', text: '丰田 GR SUPRA', icon: 'GR' },
-    { path: '/Ultra', text: '小米 SU7 Ultra', icon: 'Models' },
+    { path: '/Brz', text: '斯巴鲁 BRZ', icon: 'Brz' },
+    { path: '/Hellcat', text: '道奇 CHALLENGER SRT® HELLCAT', icon: 'Hellcat' },
+    { path: '/Gtr', text: '尼桑 GT-R', icon: 'GTR' },
+    { path: '/Supra', text: '丰田 GR SUPRA', icon: 'Supra' },
+    { path: '/Ultra', text: '小米 SU7 Ultra', icon: 'Ultra' },
   ] as SubmenuItem[],
   serviceMenu: [
-    { path: '/Maintenance', text: '保养检查', icon: 'Maintenance' },
     { path: '/AfterSales', text: '售后服务', icon: 'AfterSales' },
-    { path: '/Repair', text: '故障维修', icon: 'Repair' },
-    { path: '/Finance', text: '金融服务', icon: 'Finance' }
+    { path: '/Finance', text: '金融服务', icon: 'Finance' },
+    { path: '/Maintenance', text: '保养维修', icon: 'Maintenance' },
   ] as SubmenuItem[]
 }
 
@@ -43,17 +42,29 @@ const toggleMenu = (menuType: keyof typeof submenus) => {
 // 禁用滚动逻辑
 const disableScroll = () => {
   document.body.style.overflow = 'hidden'
+  document.body.style.position = 'fixed';
+  document.body.style.width = '100%';
   document.addEventListener('touchmove', preventTouchScroll, { passive: false })
 }
 
 const enableScroll = () => {
-  document.body.style.overflow = ''
+  document.body.style.overflow = '';
+  document.body.style.position = '';
+  document.body.style.width = '';
   document.removeEventListener('touchmove', preventTouchScroll)
 }
 
 const preventTouchScroll = (e: TouchEvent) => {
-  e.preventDefault()
-}
+  // 获取菜单内容容器
+  const menuContent = document.querySelector('.unmenu-content');
+  // 检查触摸是否发生在菜单内容内部
+  const isInsideMenu = menuContent?.contains(e.target as Node);
+
+  // 只有当触摸发生在菜单外部时才阻止默认行为
+  if (!isInsideMenu) {
+    e.preventDefault();
+  }
+};
 
 // 监听菜单状态变化
 watch(() => props.isOpen, (newVal) => {

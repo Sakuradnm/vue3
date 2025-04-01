@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '@/views/home/index.vue'
-import Users from '@/views/users/index.vue'
-import Models from '@/views/Models/models.vue'
+import Home from '@/views/Home/index.vue'
+import Users from '@/views/Users/index.vue'
 
 import Brand from "@/views/brand/index.vue";
 import Reserve from "@/views/Reserve/index.vue"
@@ -14,7 +13,6 @@ import Customer from "@/views/HelpSection/customer.vue";
 import AfterSales from "@/views/Service/aftersales/index.vue";
 import Finance from "@/views/Service/finance/index.vue";
 import Maintenance from "@/views/Service/maintenance/index.vue";
-import Repair from "@/views/Service/repair/index.vue";
 
 //车型
 import Ultra from "@/views/Models/Ultra/index.vue";
@@ -32,11 +30,6 @@ const routes = [
         path: '/Home',
         name: 'Home',
         component: Home
-    },
-    {
-        path: '/Models',
-        name: 'Models',
-        component: Models
     },
     {
         path: '/Brand',
@@ -91,11 +84,6 @@ const routes = [
         path: '/Maintenance',
         name: 'Maintenance',
         component: Maintenance
-    },
-    {
-        path: '/Repair',
-        name: 'Repair',
-        component: Repair
     },
 
     //车型

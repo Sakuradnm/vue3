@@ -142,9 +142,9 @@ onUnmounted(() => {
 <template>
   <div class="aftersales-page">
     <!-- 顶部横幅 -->
-    <section class="hero-content">
+    <section class="hero-section">
       <div class="hero-image">
-        <img src="/service/service.jpg" alt="hero-img">
+        <img src="/service/AfterSales.jpg" alt="hero-img">
       </div>
       <div class="hero-text">
         <h1>一站式售后服务</h1>
@@ -570,15 +570,22 @@ body {
 }
 
 .bg-light {
-  background-color: #f8f9fa;
+  background-color: rgb(255, 255, 255);
 }
 
-/* 顶部横幅 */
-.hero-content {
-  background-image: linear-gradient(rgb(0, 0, 0), transparent);
+
+
+.aftersales-page {
   position: relative;
   min-height: 400px;
   margin-top: 72px;
+  overflow: hidden;
+}
+/* 顶部横幅 */
+.hero-section {
+  background-image: linear-gradient(rgb(0, 0, 0), transparent);
+  position: relative;
+  min-height: 400px;
   overflow: hidden;
 }
 .hero-image {
@@ -614,7 +621,7 @@ body {
 .hero-text h1 {
   font-size: 3rem;
   color: white;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 4px rgb(1, 10, 14), 0 2px 8px rgb(1, 10, 14), 0 3px 16px rgb(255, 255, 255);
   margin-bottom: 1rem;
   max-width: 800px;
   background: transparent;
@@ -624,7 +631,7 @@ body {
   background: transparent;
   font-size: 1.25rem;
   color: white;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 4px rgb(1, 10, 14), 0 2px 8px rgb(1, 10, 14), 0 3px 16px rgb(255, 255, 255);
   margin-bottom: 2rem;
 }
 
