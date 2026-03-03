@@ -21,8 +21,8 @@ interface CustomizationOption {
 const contentList = reactive([
   {
     title: 'Pure Power',
-    x: '-4%',
-    y: '25%',
+    x: '-2%',
+    y: '-5%',
     text: `道奇 Hellcat 配备 6.2L HEMI® V8 增压发动机，性能出众，
     可产生高达 807 马力和 707 磅英尺的扭矩。体验令人震撼的加速性能，
     超越福特野马 GT500 和雪佛兰科迈罗 ZL1 等竞争对手，使 Hellcat 成为无可争议的
@@ -38,8 +38,8 @@ const contentList = reactive([
   },
   {
     title: 'Track Domination',
-    x: '0%',
-    y: '-5%',
+    x: '50%',
+    y: '35%',
     text: `Hellcat 将精密工程与传奇的 HEMI® 动力相结合，打造出一款适合赛道的
     街车，无论是在直线加速赛道还是在弯道上都同样得心应手。凭借先进的性能技术
     和以驾驶员为中心的功能，2025 Hellcat 为追求极致美式肌肉车的性能爱好者提供了卓越的价值。`
@@ -367,7 +367,7 @@ export default defineComponent({
 </template>
 
 <style scoped>
-@import "@/styles/models.css";
+@import "../../../styles/models.css";
 
 .hellcat-theme {
   --hellcat-red: #8B0000;
@@ -458,7 +458,7 @@ export default defineComponent({
 }
 
 .models-container {
-  background-color: rgb(10, 0, 0);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .models-container::before {
@@ -466,7 +466,7 @@ export default defineComponent({
 }
 
 .model-card {
-  background: rgb(10, 0, 0);
+  background: rgba(10, 0, 0, 0.22);
 }
 
 .model-info h1,
@@ -484,7 +484,7 @@ export default defineComponent({
 
 .detail-link, .build-link {
   color: #ffffff;
-  background: rgba(80, 0, 0, 0.5);
+  background: rgba(80, 0, 0, 0);
 }
 
 .build-link {

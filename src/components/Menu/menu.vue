@@ -18,8 +18,7 @@ const mainLinks = [
   { text: '服 务', submenu: [
       { path: '/AfterSales', text: '售后服务' },
       { path: '/Finance', text: '金融服务' },
-      { path: '/Maintenance', text: '保养检查' },
-      { path: '/Repair', text: '故障维修' },
+      { path: '/Maintenance', text: '保养维修' },
     ]
   },
   { path: '/Brand', text: '品牌故事' },

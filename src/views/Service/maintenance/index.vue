@@ -62,7 +62,10 @@ const closeBookingModal = () => {
   <div class="maintenance-page">
     <!-- 页面标题 -->
     <section class="hero-section">
-      <div class="hero-content">
+      <div class="hero-image">
+        <img src="/service/Maintenance.jpg" alt="hero-img">
+      </div>
+      <div class="hero-text">
         <h1>专业保养服务</h1>
         <p>为您的爱车提供全方位的专业保养服务，确保安全与性能</p>
       </div>
@@ -135,29 +138,57 @@ const closeBookingModal = () => {
 }
 
 .hero-section {
-  height: 400px;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
-              url('/home/performance-bg.jpg') center/cover;
+  position: relative;
+  min-height: 400px;
+  margin-top: 72px;
+  overflow: hidden;
+}
+
+.hero-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.hero-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.hero-text {
+  position: relative;
+  z-index: 2;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: white;
+  padding: 2rem;
+  height: 100%;
+  min-height: 400px;
+  background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.2));
 }
 
-.hero-content {
-  max-width: 800px;
-  padding: 0 20px;
-}
-
-.hero-content h1 {
+.hero-text h1 {
   font-size: 3rem;
+  color: white;
+  text-shadow: 0 1px 4px rgb(1, 10, 14), 0 2px 8px rgb(177, 177, 176), 0 3px 16px rgb(255, 255, 255);
   margin-bottom: 1rem;
+  max-width: 800px;
+  background: transparent;
 }
 
-.hero-content p {
-  font-size: 1.2rem;
-  opacity: 0.9;
+.hero-text p {
+  background: transparent;
+  font-size: 1.25rem;
+  color: white;
+  text-shadow: 0 1px 4px rgb(1, 10, 14), 0 2px 8px rgb(177, 177, 176), 0 3px 16px rgb(255, 255, 255);
+  margin-bottom: 2rem;
 }
 
 .services-section {
