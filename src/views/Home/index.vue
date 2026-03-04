@@ -8,8 +8,8 @@
       <div class="hero-content">
         <h1 style="font-size: 5rem;margin-bottom: 3rem;font-weight: 700;">Take your breath away</h1>
         <p style="max-width: 50em">With one of the most advanced All-Wheel Drive and Vehicle Dynamic Control systems ever used in a road car, you get the feel and response of rear-wheel drive with the confidence of All-Wheel Drive. </p>
-        <router-link to="/Reserve">
-          <button class="cta-button">Explore the GT-R</button>
+        <router-link to="/Users">
+          <button class="cta-button">加入我们</button>
         </router-link>
       </div>
     </section>

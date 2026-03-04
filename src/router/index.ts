@@ -1,9 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
+//菜单选项
 import Home from '@/views/Home/index.vue'
+//菜单-课程
+import Course from "@/views/Course/index.vue"
+import CourseContent from "@/views/Course/Content/Content.vue"
+
+import Upload from "@/views/Upload/index.vue"
+import Forum from "@/views/Forum/index.vue"
+import Brand from "@/views/brand/index.vue";
+import Search from "@/views/Search/index.vue";
 import Users from '@/views/Users/index.vue'
 
-import Brand from "@/views/brand/index.vue";
-import Reserve from "@/views/Reserve/index.vue"
+// 帮助
 import Agreement from "@/views/HelpSection/agreement.vue";
 import Policy from "@/views/HelpSection/policy.vue";
 import Help from "@/views//HelpSection/help.vue";
@@ -42,9 +50,9 @@ const routes = [
         component: Users
     },
     {
-        path: '/Reserve',
-        name: 'Reserve',
-        component: Reserve
+        path: '/Forum',
+        name: 'Forum',
+        component: Forum
     },
     {
         path: '/Agreement',
@@ -111,6 +119,31 @@ const routes = [
         path: '/Hellcat',
         name: 'Hellcat',
         component: Hellcat
+    },
+    {
+        path: '/Search',
+        name: 'Search',
+        component: Search
+    },
+    {
+        path: '/Course',
+        name: 'Course',
+        component: Course
+    },
+    {
+        path: '/course/:id',
+        name: 'CourseDetail',
+        component: CourseContent
+    },
+    {
+        path: '/course/:id/learn',
+        name: 'CourseLearn',
+        component: CourseContent
+    },
+    {
+        path: '/Upload',
+        name: 'Upload',
+        component: Upload
     },
 
 ]

@@ -6,8 +6,8 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from "./router";
 //svg图标
-import 'virtual:svg-icons-register'
 import SvgIcon from '@/components/SvgIcon/index.vue'
+import 'virtual:svg-icons-register'
 
 const app = createApp(App)
 
