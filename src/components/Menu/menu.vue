@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Unmenu from './unmenu.vue'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const isMobileMenuOpen = ref(false)
@@ -9,6 +10,60 @@ const activeIndex = ref(-1)
 const searchQuery = ref('')
 const isSearchFocused = ref(false)
 const showSearchSuggestions = ref(false)
+
+// 用户相关状态
+const isLoggedIn = ref(false)
+const userInfo = ref<any>(null)
+const showUserDropdown = ref(false)
+const unreadNoticeCount = ref(0)
+
+onMounted(() => {
+  checkLoginStatus()
+  loadUnreadNotices()
+  window.addEventListener('storage', handleStorageChange)
+
+  router.beforeEach(() => {
+    checkLoginStatus()
+    loadUnreadNotices()
+  })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', handleStorageChange)
+})
+
+const checkLoginStatus = () => {
+  const storedUserInfo = localStorage.getItem('userInfo')
+  if (storedUserInfo) {
+    userInfo.value = JSON.parse(storedUserInfo)
+    isLoggedIn.value = true
+  } else {
+    isLoggedIn.value = false
+    userInfo.value = null
+  }
+}
+
+const loadUnreadNotices = () => {
+  if (!isLoggedIn.value) {
+    unreadNoticeCount.value = 0
+    return
+  }
+
+  const notices = localStorage.getItem('userNotices')
+  if (notices) {
+    const noticeList = JSON.parse(notices)
+    unreadNoticeCount.value = noticeList.filter((n: any) => !n.isRead).length
+  }
+}
+
+const handleStorageChange = (e: StorageEvent) => {
+  if (e.key === 'userInfo') {
+    checkLoginStatus()
+  }
+  if (e.key === 'userNotices') {
+    loadUnreadNotices()
+  }
+}
 
 const mainLinks = [
   { path: '/Home', text: '首 页' },
@@ -99,6 +154,57 @@ const selectSuggestion = (suggestion: typeof searchSuggestions.value[0]) => {
   executeSearch()
 }
 
+const handleAvatarError = (e: Event) => {
+  const target = e.target as HTMLImageElement
+  target.style.display = 'none'
+}
+
+const goToLogin = () => {
+  router.push('/Users')
+}
+
+const goToProfile = () => {
+  router.push('/PersonalCenter')
+  showUserDropdown.value = false
+}
+
+const goToLibrary = () => {
+  router.push('/PersonalCourse')
+  showUserDropdown.value = false
+}
+
+const goToNotice = () => {
+  router.push('/Notice')
+  showUserDropdown.value = false
+  markAllNoticesAsRead()
+}
+
+const markAllNoticesAsRead = () => {
+  if (!isLoggedIn.value) return
+
+  const notices = localStorage.getItem('userNotices')
+  if (notices) {
+    const noticeList = JSON.parse(notices)
+    noticeList.forEach((n: any) => n.isRead = true)
+    localStorage.setItem('userNotices', JSON.stringify(noticeList))
+    unreadNoticeCount.value = 0
+  }
+}
+
+const handleLogout = () => {
+  localStorage.removeItem('userInfo')
+  localStorage.removeItem('rememberedUsername')
+  isLoggedIn.value = false
+  userInfo.value = null
+  unreadNoticeCount.value = 0
+  showUserDropdown.value = false
+
+  ElMessage.success('已退出登录')
+
+  setTimeout(() => {
+    router.push('/Home')
+  }, 500)
+}
 </script>
 
 <template>
@@ -124,9 +230,9 @@ const selectSuggestion = (suggestion: typeof searchSuggestions.value[0]) => {
             <div v-if="activeIndex === index" class="course-megamenu">
               <div class="megamenu-container">
                 <div
-                  v-for="(category, catIndex) in courseCategories"
-                  :key="catIndex"
-                  class="megamenu-column"
+                    v-for="(category, catIndex) in courseCategories"
+                    :key="catIndex"
+                    class="megamenu-column"
                 >
                   <div class="category-header">
                     <svg-icon :name="category.icon" :width="24" :height="24" />
@@ -134,10 +240,10 @@ const selectSuggestion = (suggestion: typeof searchSuggestions.value[0]) => {
                   </div>
                   <div class="category-courses">
                     <router-link
-                      v-for="(course, courseIndex) in category.courses"
-                      :key="courseIndex"
-                      :to="course.path"
-                      class="course-card"
+                        v-for="(course, courseIndex) in category.courses"
+                        :key="courseIndex"
+                        :to="course.path"
+                        class="course-card"
                     >
                       <div class="course-image">
                         <img :src="course.image" :alt="course.name" @error="$event.target.src='/placeholder.jpg'">
@@ -214,9 +320,82 @@ const selectSuggestion = (suggestion: typeof searchSuggestions.value[0]) => {
       </div>
 
       <div class="desktop-user">
-        <router-link to="/Users">
-          <svg-icon name="user" :width="30" height="30"/>
-        </router-link>
+        <template v-if="isLoggedIn && userInfo">
+          <div
+              class="user-info-wrapper"
+              @mouseenter="showUserDropdown = true"
+              @mouseleave="showUserDropdown = false"
+          >
+            <div class="user-avatar">
+              <img
+                  v-if="userInfo.avatar"
+                  :src="userInfo.avatar"
+                  :alt="userInfo.username"
+                  class="avatar-img"
+                  @error="handleAvatarError"
+              />
+              <div v-else class="avatar-placeholder">
+                {{ userInfo.username?.charAt(0).toUpperCase() }}
+              </div>
+            </div>
+            <span class="username-text">{{ userInfo.username }}</span>
+
+            <div v-if="unreadNoticeCount > 0" class="notice-badge">
+              {{ unreadNoticeCount > 9 ? '9+' : unreadNoticeCount }}
+            </div>
+
+            <transition name="dropdown-fade">
+              <div v-if="showUserDropdown" class="user-dropdown">
+                <div class="dropdown-header">
+                  <div class="dropdown-avatar">
+                    <img
+                        v-if="userInfo.avatar"
+                        :src="userInfo.avatar"
+                        :alt="userInfo.username"
+                        class="avatar-img"
+                        @error="handleAvatarError"
+                    />
+                    <div v-else class="avatar-placeholder">
+                      {{ userInfo.username?.charAt(0).toUpperCase() }}
+                    </div>
+                  </div>
+                  <div class="dropdown-info">
+                    <div class="dropdown-username">{{ userInfo.username }}</div>
+                    <div class="dropdown-level">{{ userInfo.level === 'student' ? '学生' : '教师' }}</div>
+                  </div>
+                </div>
+
+                <div class="dropdown-divider"></div>
+
+                <div class="dropdown-items">
+                  <div class="dropdown-item" @click="goToProfile">
+                    <svg-icon name="user" :width="18" :height="18"/>
+                    <span>个人中心</span>
+                  </div>
+                  <div class="dropdown-item" @click="goToNotice">
+                    <svg-icon name="menu" :width="18" :height="18"/>
+                    <span>我的通知</span>
+                    <div v-if="unreadNoticeCount > 0" class="notice-dot"></div>
+                  </div>
+                  <div class="dropdown-item" @click="goToLibrary">
+                    <svg-icon name="home" :width="18" :height="18"/>
+                    <span>学习库</span>
+                  </div>
+                  <div class="dropdown-divider"></div>
+                  <div class="dropdown-item logout" @click="handleLogout">
+                    <svg-icon name="menu" :width="18" :height="18"/>
+                    <span>退出登录</span>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+        </template>
+        <template v-else>
+          <div class="user-icon-wrapper" @click="goToLogin">
+            <svg-icon name="user" :width="30" height="30" style="cursor: pointer;"/>
+          </div>
+        </template>
       </div>
 
       <div class="mobile-menu" @click="isMobileMenuOpen = !isMobileMenuOpen">
@@ -486,6 +665,217 @@ const selectSuggestion = (suggestion: typeof searchSuggestions.value[0]) => {
   font-size: 0.85rem;
   margin: 0;
   line-height: 1.4;
+}
+
+.desktop-user {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.user-info-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.user-info-wrapper:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.user-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.user-icon-wrapper:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.username-text {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ff4757;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  min-width: 18px;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(255, 71, 87, 0.5);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 240px;
+  background: rgba(1, 10, 14, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px 0;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  z-index: 1001;
+  backdrop-filter: blur(10px);
+  animation: dropdownSlide 0.2s ease;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+}
+
+.dropdown-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.dropdown-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.dropdown-username {
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-level {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 8px 16px;
+}
+
+.dropdown-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-item.logout {
+  color: #ff6b6b;
+}
+
+.dropdown-item.logout:hover {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.dropdown-item svg {
+  flex-shrink: 0;
+}
+
+.dropdown-item span {
+  font-size: 0.9rem;
+}
+
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
 .mobile-menu {

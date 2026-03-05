@@ -1,9 +1,13 @@
 <script>
 import { ref, reactive } from 'vue'
+import { login as apiLogin, createUser as apiCreateUser } from '@/api/user'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 
 export default {
   name: 'Users',
   setup () {
+    const router = useRouter()
     // true 为登录页面，false 为注册页面
     const isLogin = ref(true)
     // 记住密码
@@ -16,6 +20,8 @@ export default {
     const loginTypeTransition = ref('fade-left')
     // 登录类型：true 为学生，false 为教师
     const isStudent = ref(true)
+    // 倒计时相关
+    const registerCountdown = ref(0)
 
     const loginForm = reactive({
       username: '',
@@ -26,6 +32,7 @@ export default {
       password: '',
       confirmPassword: '',
       phone: '',
+      email: '',
       verificationCode: ''
     })
     const errors = reactive({
@@ -33,7 +40,8 @@ export default {
       password: '',
       confirmPassword: '',
       phone: '',
-      verificationCode: ''
+      verificationCode: '',
+      email: ''
     })
 
     const switchMode = () => {
@@ -44,6 +52,7 @@ export default {
       errors.confirmPassword = ''
       errors.phone = ''
       errors.verificationCode = ''
+      errors.email = ''
     }
 
     // 切换登录类型（学生/教师）
@@ -54,47 +63,151 @@ export default {
     }
 
     // 账号登录逻辑
-    const handleLogin = () => {
+    const handleLogin = async () => {
       const form = document.querySelector('.login-box form')
       if (!form.checkValidity()) {
         form.reportValidity()
         return
       }
 
-      console.log('登录信息：', {
-        type: isStudent.value ? '学生' : '教师',
-        username: loginForm.username,
-        password: loginForm.password
-      })
+      if (!agreeToTerms.value) {
+        ElMessage.warning('请先同意用户协议和隐私政策')
+        return
+      }
+
+      try {
+        // 调用后端登录接口
+        const response = await apiLogin(loginForm.username, loginForm.password)
+
+        if (response.data.code === 200) {
+          const user = response.data.data
+
+          // 验证用户级别
+          if (isStudent.value && user.level !== 'student') {
+            ElMessage.error('当前账号不是学生账号，请切换到教师登录')
+            return
+          }
+          if (!isStudent.value && user.level === 'student') {
+            ElMessage.error('当前账号不是教师账号，请切换到学生登录')
+            return
+          }
+
+          // 保存用户信息到 localStorage
+          localStorage.setItem('userInfo', JSON.stringify(user))
+          if (rememberMe.value) {
+            localStorage.setItem('rememberedUsername', loginForm.username)
+          }
+
+          // 提示登录成功
+          ElMessage.success('登录成功！')
+
+          // 延迟后跳转到首页
+          setTimeout(() => {
+            router.push('/Home')
+          }, 1000)
+        } else {
+          ElMessage.error(response.data.message || '登录失败')
+        }
+      } catch (error) {
+        console.error('登录失败:', error)
+        ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
+      }
     }
 
     // 注册逻辑
-    const handleRegister = () => {
+    const handleRegister = async () => {
       if (!registerForm.username) {
         errors.username = '请输入用户名'
         return
       }
-      if (registerForm.password.length < 8) {
-        errors.password = '密码至少需要 8 位'
+
+      // 验证用户名格式（6-9 位字母数字组合）
+      if (!/^[a-zA-Z0-9]{6,9}$/.test(registerForm.username)) {
+        errors.username = '用户名应为 6-9 位字母数字组合'
         return
       }
+
       if (!registerForm.password) {
         errors.password = '请输入密码'
         return
       }
+
+      // 验证密码格式（6-12 位字母数字组合）
+      if (!/^[a-zA-Z0-9]{6,12}$/.test(registerForm.password)) {
+        errors.password = '密码应为 6-12 位字母数字组合'
+        return
+      }
+
       if (registerForm.password !== registerForm.confirmPassword) {
         errors.confirmPassword = '两次输入的密码不一致'
         return
       }
+
       if (!registerForm.phone) {
         errors.phone = '请输入手机号'
         return
       }
+
+      // 验证手机号格式
+      if (!/^1[3-9]\d{9}$/.test(registerForm.phone)) {
+        errors.phone = '手机号格式不正确'
+        return
+      }
+
+      if (!registerForm.email) {
+        errors.email = '请输入邮箱'
+        return
+      }
+
+      // 验证邮箱格式
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerForm.email)) {
+        errors.email = '邮箱格式不正确'
+        return
+      }
+
       if (!registerForm.verificationCode) {
         errors.verificationCode = '请输入验证码'
         return
       }
-      console.log('注册信息：', registerForm)
+
+      if (!agreeToTerms.value) {
+        ElMessage.warning('请先阅读并同意用户协议和隐私政策')
+        return
+      }
+
+      try {
+        // 准备注册数据
+        const userData = {
+          username: registerForm.username,
+          password: registerForm.password,
+          phone: registerForm.phone,
+          email: registerForm.email,
+          level: isStudent.value ? 'student' : 'teacher'
+        }
+
+        // 调用后端注册接口
+        const response = await apiCreateUser(userData)
+
+        if (response.data.code === 201) {
+          ElMessage.success('注册成功！')
+          console.log('注册成功，用户信息：', response.data.data)
+
+          // 清空表单
+          Object.keys(registerForm).forEach(key => {
+            registerForm[key] = ''
+          })
+
+          // 切换到登录页面
+          setTimeout(() => {
+            switchMode()
+          }, 1500)
+        } else {
+          ElMessage.error(response.data.message || '注册失败')
+        }
+      } catch (error) {
+        console.error('注册失败:', error)
+        ElMessage.error(error.response?.data?.message || '注册失败，请稍后重试')
+      }
     }
 
     // 注册验证码逻辑
@@ -110,20 +223,33 @@ export default {
           return
         }
 
-        const response = await axios.post('#', {
-          phone: registerForm.phone
-        })
+        // TODO: 调用后端发送验证码接口
+        // const response = await axios.post('http://localhost:8080/api/sms/send', {
+        //   phone: registerForm.phone
+        // })
 
-        if (response.data.success) {
-          startCountdown('register')
-          ElMessage.success('验证码已发送')
-        } else {
-          ElMessage.error(response.data.message || '发送失败')
-        }
+        // 模拟发送成功
+        ElMessage.success('验证码已发送（模拟）')
+        startCountdown('register')
       } catch (error) {
         ElMessage.error('网络错误，请稍后重试')
         console.error('发送验证码失败:', error)
       }
+    }
+
+    // 倒计时逻辑
+    const startCountdown = (type) => {
+      let count = 60
+      registerCountdown.value = count
+
+      const timer = setInterval(() => {
+        count--
+        registerCountdown.value = count
+
+        if (count <= 0) {
+          clearInterval(timer)
+        }
+      }, 1000)
     }
 
     return {
@@ -140,7 +266,8 @@ export default {
       handleRegister,
       sendVerificationCode,
       loginTypeTransition,
-      transitionName
+      transitionName,
+      registerCountdown
     }
   }
 }
@@ -204,7 +331,7 @@ export default {
                       v-model="loginForm.username"
                       placeholder="手机号/邮箱/用户名"
                       required
-                      pattern=". {3,}"
+                      pattern=".{3,}"
                       title="用户名至少 3 个字符"
                       @invalid="handleInvalid">
                     <span class="error-message">{{ errors.username }}</span>
@@ -215,7 +342,7 @@ export default {
                       v-model="loginForm.password"
                       placeholder="密码"
                       required
-                      pattern=". {6,}"
+                      pattern=".{6,}"
                       title="密码至少 6 位"
                       @invalid="handleInvalid">
                     <span class="error-message">{{ errors.password }}</span>
@@ -250,9 +377,9 @@ export default {
                     <input
                       type="text"
                       v-model="loginForm.username"
-                      placeholder="教师工号/邮箱/用户名"
+                      placeholder="手机号/邮箱/用户名"
                       required
-                      pattern=". {3,}"
+                      pattern=".{3,}"
                       title="用户名至少 3 个字符"
                       @invalid="handleInvalid">
                     <span class="error-message">{{ errors.username }}</span>

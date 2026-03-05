@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 //菜单选项
 import Home from '@/views/Home/index.vue'
-//菜单-课程
+//菜单 - 课程
 import Course from "@/views/Course/index.vue"
 import CourseContent from "@/views/Course/Content/Content.vue"
 
@@ -28,6 +28,11 @@ import Supra from "@/views/Models/Supra/index.vue";
 import Brz  from "@/views/Models/Brz/index.vue";
 import Gtr from "@/views/Models/Gtr/index.vue";
 import Hellcat from "@/views/Models/Dodge/index.vue";
+
+// 用户相关
+import PersonalCenter from '@/views/Users/PersonalCenter/PersonalCenter.vue'
+import PersonalCourse from '@/views/Users/PersonalCourse/PersonalCourse.vue'
+import Notice from '@/views/Users/Notice/Notice.vue'
 
 const routes = [
     {
@@ -145,6 +150,24 @@ const routes = [
         name: 'Upload',
         component: Upload
     },
+    {
+        path: '/PersonalCenter',
+        name: 'PersonalCenter',
+        component: PersonalCenter,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/PersonalCourse',
+        name: 'PersonalCourse',
+        component: PersonalCourse,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/Notice',
+        name: 'Notice',
+        component: Notice,
+        meta: { requiresAuth: true }
+    },
 
 ]
 
@@ -153,6 +176,17 @@ const router = createRouter({
     routes,
     scrollBehavior() {
         return { top: 0 }
+    }
+})
+
+// 路由守卫
+router.beforeEach((to, from, next) => {
+    const isLoggedIn = localStorage.getItem('userInfo')
+    
+    if (to.meta.requiresAuth && !isLoggedIn) {
+        next('/Users')
+    } else {
+        next()
     }
 })
 
