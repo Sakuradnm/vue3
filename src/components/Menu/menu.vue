@@ -7,15 +7,60 @@ import { ElMessage } from 'element-plus'
 const router = useRouter()
 const isMobileMenuOpen = ref(false)
 const activeIndex = ref(-1)
-const searchQuery = ref('')
-const isSearchFocused = ref(false)
-const showSearchSuggestions = ref(false)
 
 // 用户相关状态
 const isLoggedIn = ref(false)
 const userInfo = ref<any>(null)
 const showUserDropdown = ref(false)
 const unreadNoticeCount = ref(0)
+
+// 判断是否为管理员
+const isAdmin = computed(() => {
+  return userInfo.value?.level === 'admin'
+})
+
+// 基础菜单链接（所有用户可见）
+const baseLinks = [
+  { path: '/Home', text: '首 页' },
+]
+
+// 仅登录用户可见的菜单链接
+const authOnlyLinks = [
+  { path: '/Upload',text: '上 传' },
+]
+
+// 非管理员可见的菜单（学生、教师可见）
+const nonAdminLinks = [
+  { path: '/Course',text: '课 程' },
+  { path: '/Forum', text: '论 坛' },
+  { path: '/Brand', text: '关 于' },
+]
+
+// 管理员专属菜单
+const adminLinks = [
+  { path: '/Admin', text: '管理后台' },
+]
+
+// 合并后的菜单链接（用于渲染）
+const mainLinks = computed(() => {
+  const links = [...baseLinks]
+
+  // 如果是管理员，只显示首页和管理后台
+  if (isAdmin.value) {
+    links.push(...adminLinks)
+    return links
+  }
+
+  // 如果不是管理员，添加普通用户菜单
+  links.push(...nonAdminLinks)
+
+  // 如果已登录，添加上传选项
+  if (isLoggedIn.value) {
+    links.push(...authOnlyLinks)
+  }
+
+  return links
+})
 
 onMounted(() => {
   checkLoginStatus()
@@ -65,14 +110,12 @@ const handleStorageChange = (e: StorageEvent) => {
   }
 }
 
-const mainLinks = [
-  { path: '/Home', text: '首 页' },
-  { path: '/Course',text: '课 程' },
-  { path: '/Upload',text: '上 传' },
-  { path: '/Forum', text: '论 坛' },
-  { path: '/Brand', text: '关 于' },
-  { text: '搜索', isSearch: true },
-]
+const showSubMenu = (index: number) => {
+  activeIndex.value = index
+}
+const hideSubMenu = () => {
+  activeIndex.value = -1
+}
 
 const searchSuggestions = computed(() => {
   if (!searchQuery.value || searchQuery.value.length === 0) return []
@@ -102,13 +145,6 @@ const searchSuggestions = computed(() => {
       item.path.toLowerCase().includes(query)
   ).slice(0, 5)
 })
-
-const showSubMenu = (index: number) => {
-  activeIndex.value = index
-}
-const hideSubMenu = () => {
-  activeIndex.value = -1
-}
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true
@@ -202,6 +238,17 @@ const getUserLevelText = (level: string) => {
     default:
       return level
   }
+}
+
+// 处理未登录时点击上传
+const handleUploadClick = (e: Event) => {
+  if (!isLoggedIn.value) {
+    e.preventDefault()
+    ElMessage.warning('请先登录后再上传内容')
+    router.push('/Users')
+    return false
+  }
+  return true
 }
 
 const handleLogout = () => {
@@ -473,6 +520,12 @@ const handleLogout = () => {
 }
 .nav-links a:hover::after, .service-trigger:hover::after {
   width: 100%;
+}
+
+.desktop-user {
+  display: flex;
+  align-items: center;
+  position: relative;
 }
 
 .search-container {

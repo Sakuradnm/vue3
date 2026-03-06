@@ -1254,7 +1254,7 @@ var AxiosHeaders = class {
 };
 AxiosHeaders.accessor([
   "Content-Type",
-  "Detail-Length",
+  "Content-Length",
   "Accept",
   "Accept-Encoding",
   "User-Agent",

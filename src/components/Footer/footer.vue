@@ -1,206 +1,299 @@
-<script setup lang="ts">
-</script>
 <template>
   <footer class="footer">
-    <div class="social-top">
-      <a href="https://x.com/cssdesignawards">
-        <img src="/logo/twitter.png" alt="Twitter"></a>
-      <a href="https://www.facebook.com/CSSDesignAwards/">
-        <img src="/logo/facebook.png" alt="Facebook"></a>
-      <a href="https://www.youtubu.com/cssdesignaward/">
-        <img src="/logo/youtubu.png" alt="Youtubu"></a>
-      <a href="https://www.instagram.com/cssdesignaward/">
-        <img src="/logo/instagram.png" alt="instagram"></a>
-    </div>
+    <!-- 社区标签：用圆角标签展示主要社区入口，符合课程资源共享的社交属性 -->
+
     <div class="container">
-      <div class="footer-content">
-        <div class="footer-logo">
-          <svg-icon name="home" :width="24" height="24" />
-          <h2>专业品质，用心服务</h2>
+      <!-- 主要内容区域：平台标识 + 三列导航/联系信息 -->
+      <div class="footer-main">
+        <!-- 平台简介区：用 emoji 和标题强调资源共享理念 -->
+        <div class="brand">
+          <div class="logo">
+            <span class="logo-icon">📚</span>
+            <h2 class="logo-title">CourseShare</h2>
+          </div>
+          <p class="brand-slogan">汇聚优质课程 · 共享学习资源</p>
+          <p class="brand-description">
+            一个开放、协作的课程资源共享社区，帮助学习者更高效地获取知识。
+          </p>
         </div>
 
-        <div class="footer-links">
-          <div class="footer-col">
-            <h3>服 务 内 容:</h3>
-              <p><a href="#">保修服务</a></p>
-              <p><a href="#">道路救援</a></p>
-              <p><a href="#">零配件服务</a></p>
-              <p><a href="#">增值服务</a></p>
+        <!-- 链接区块：分为课程分类、资源中心、联系我们三大块 -->
+        <div class="link-blocks">
+          <!-- 课程分类 -->
+          <div class="block">
+            <h3>课程分类</h3>
+            <ul>
+              <li><a href="#">前端开发</a></li>
+              <li><a href="#">后端开发</a></li>
+              <li><a href="#">移动开发</a></li>
+              <li><a href="#">人工智能</a></li>
+              <li><a href="#">产品/设计</a></li>
+            </ul>
           </div>
 
-          <div class="footer-col">
-            <h3>服 务 网 点:</h3>
-              <p><a href="#">服务中心查询</a></p>
-              <p><a href="#">网点分布</a></p>
-              <p><a href="#">服务标准</a></p>
-              <p><a href="#">预约服务</a></p>
+          <!-- 资源中心 -->
+          <div class="block">
+            <h3>资源中心</h3>
+            <ul>
+              <li><a href="#">学习路线</a></li>
+              <li><a href="#">项目实战</a></li>
+              <li><a href="#">题库/笔记</a></li>
+              <li><a href="#">开源资料</a></li>
+              <li><a href="#">推荐书单</a></li>
+            </ul>
           </div>
 
-          <div class="footer-col">
-            <h3>联 系 我 们:</h3>
-            客服热线：<p>400-888-8888</p>
-            救援热线：<p>400-888-9999</p>
-            服务时间：<p>8:00-20:00</p>
-            邮箱：<p>bbg7165@gmail.com</p>
+          <!-- 联系我们 -->
+          <div class="block contact-block">
+            <h3>联系我们</h3>
+            <ul>
+              <li><span>📧 邮箱：</span><a href="mailto:course@share.com">course@share.com</a></li>
+              <li><span>💬 QQ群：</span><span>123456789</span></li>
+              <li><span>📢 公众号：</span><span>课程共享平台</span></li>
+              <li><span>⏰ 在线时间：</span><span>9:00 - 22:00</span></li>
+            </ul>
           </div>
         </div>
       </div>
 
+      <!-- 底部版权与法律链接 -->
       <div class="footer-bottom">
-        <p>© 2025 汽车售后服务中心. 保留所有权利.</p>
-        <div class="social-links">
-          <a href="#" class="social-link">网站地图</a>
-          <router-link to="/agreement" class="social-link">使用条款</router-link>
-          <router-link to="/policy" class="social-link">隐私政策</router-link>
+        <p class="copyright">© 2025 课程资源共享平台. 保留所有权利。</p>
+        <div class="legal-links">
+          <router-link to="/sitemap">网站地图</router-link>
+          <router-link to="/terms">使用条款</router-link>
+          <router-link to="/privacy">隐私政策</router-link>
+          <router-link to="/help">帮助中心</router-link>
         </div>
       </div>
     </div>
   </footer>
 </template>
 
+<script setup>
+// 无需额外逻辑，纯展示组件
+</script>
+
 <style scoped>
-/* 页脚样式 */
+/* ========== 基础重置 & 字体 ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 .footer {
-  background-color: #000000;
-  color: white;
-  padding: 2rem 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
+  background-color: #0b0f17; /* 深色背景，突出科技感/专业感 */
+  color: #e0e4f0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
 }
 
-/* 4个社交图标 */
-.social-top {
-  background-color: transparent;
-  display: flex;
-  justify-content: center;
-  gap: 10rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-.social-top img {
-  height: 32px;
-  transition: opacity 0.3s;
-}
-.social-top img:hover {
-  opacity: 0.8;
+/* ========== 主容器 ========== */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem 1.5rem;
 }
 
-/* 页脚内容 */
-.footer-content {
+/* ========== 主要内容区域（品牌 + 三列链接） ========== */
+.footer-main {
   display: flex;
   flex-wrap: wrap;
-  gap: 40px;
-  margin: 45px;
-}
-.footer-logo {
-  margin-top: 50px;
-  flex: 1;
-  min-width: 100px;
-  white-space:nowrap;
+  gap: 3rem 4rem;
+  margin-bottom: 3rem;
 }
 
-/* 底部链接 */
-.footer-links {
-  flex: 2;
+/* 品牌区域 */
+.brand {
+  flex: 1 1 260px;
+  min-width: 240px;
+}
+
+.logo {
   display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-.footer-col {
-  flex: 1;
-  min-width: 160px;
-  text-align: left;
-}
-.footer-col a {
-  margin: 5px;
-  color: #bbb;
-  text-decoration: none;
-  transition: color 0.3s;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 }
 
-.footer-col a:hover {
+.logo-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.logo-title {
+  font-size: 1.8rem;
+  font-weight: 600;
   color: #fff;
+  letter-spacing: 1px;
+  white-space: nowrap;
 }
 
-.footer-bottom {
-  padding-top: 20px;
-  border-top: 1px solid #333;
+.brand-slogan {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #a5b4fc; /* 淡紫色点缀，增加层次 */
+  margin-bottom: 0.75rem;
+}
+
+.brand-description {
+  color: #a0a8c0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  max-width: 300px;
+}
+
+/* 链接区块容器 */
+.link-blocks {
+  flex: 3;
   display: flex;
+  flex-wrap: wrap;
+  gap: 2rem 3rem;
+  justify-content: space-between;
+}
+
+/* 单个链接块 */
+.block {
+  flex: 1 1 160px;
+  min-width: 150px;
+}
+
+.block h3 {
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1.2rem;
+  letter-spacing: 0.5px;
+  border-left: 4px solid #a5b4fc;
+  padding-left: 0.75rem;
+}
+
+.block ul {
+  list-style: none;
+}
+
+.block li {
+  margin-bottom: 0.7rem;
+  font-size: 0.95rem;
+}
+
+.block a {
+  color: #b0b8d0;
+  text-decoration: none;
+  transition: color 0.2s, padding-left 0.2s;
+  display: inline-block;
+}
+
+.block a:hover {
+  color: #fff;
+  padding-left: 5px;
+}
+
+/* 联系块特殊处理：有些行不是链接，需要保持颜色 */
+.contact-block li {
+  display: flex;
+  flex-wrap: wrap;
+  color: #b0b8d0;
+}
+
+.contact-block li span:first-child {
+  width: 70px;          /* 使标签对齐更美观 */
+  color: #a0a8c0;
+  flex-shrink: 0;
+}
+
+.contact-block li span:last-child {
+  color: #e0e4f0;
+  word-break: break-word;
+  flex: 1;
+}
+
+.contact-block a {
+  color: #b0b8d0;
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.contact-block a:hover {
+  color: #fff;
+  border-bottom-color: #a5b4fc;
+}
+
+/* ========== 底部版权区域 ========== */
+.footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
+  gap: 1.2rem 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.9rem;
 }
 
-.social-links {
+.copyright {
+  color: #8e96b0;
+}
+
+.legal-links {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 1.2rem 2rem;
 }
 
-.social-link {
-  color: #bbb;
+.legal-links a {
+  color: #b0b8d0;
   text-decoration: none;
-  transition: color 0.3s;
+  transition: color 0.2s;
+  font-size: 0.9rem;
 }
 
-.social-link:hover {
+.legal-links a:hover {
   color: #fff;
 }
 
-
-
-
-
-
-
-
-
-/* 底部文字布局 */
-.footer-bottom {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-
-h3 {
-  color: #ffffff;
-  margin-bottom: 1rem;
-  font-size: 1.2rem;
-}
-
-p {
-  color: #cccccc;
-  line-height: 1.8;
-  margin: 0.5rem 0;
-}
-
-@media (max-width: 768px) {
-  .social-top {
-    gap: 5rem;
-    flex-wrap: wrap;
+/* ========== 响应式优化 ========== */
+@media (max-width: 900px) {
+  .footer-main {
+    gap: 2.5rem;
   }
 
-  .footer-content {
-    flex-direction: column;
-    gap: 30px;
+  .brand {
+    flex-basis: 100%;
   }
 
-  .footer-links {
-    flex-direction: column;
-    gap: 30px;
+  .brand-description {
+    max-width: none;
   }
-  .footer-col {
-    margin-left: 20px;
+}
+
+@media (max-width: 600px) {
+  .community-tags {
+    gap: 0.8rem;
+  }
+
+  .tag {
+    padding: 0.4rem 1.2rem;
+    font-size: 0.9rem;
+  }
+
+  .container {
+    padding: 2rem 1.2rem 1rem;
   }
 
   .footer-bottom {
     flex-direction: column;
     text-align: center;
+  }
+
+  .legal-links {
+    justify-content: center;
+  }
+
+  .block h3 {
+    font-size: 1.1rem;
   }
 }
 </style>

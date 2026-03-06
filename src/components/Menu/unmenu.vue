@@ -1,5 +1,38 @@
 <script setup lang="ts">
-import { defineProps, watch, onBeforeUnmount, ref } from 'vue'
+import { defineProps, watch, onBeforeUnmount, ref, computed } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+// 用户登录状态
+const isLoggedIn = ref(false)
+const userInfo = ref<any>(null)
+
+// 检查登录状态
+const checkLoginStatus = () => {
+  const storedUserInfo = localStorage.getItem('userInfo')
+  if (storedUserInfo) {
+    userInfo.value = JSON.parse(storedUserInfo)
+    isLoggedIn.value = true
+  } else {
+    isLoggedIn.value = false
+    userInfo.value = null
+  }
+}
+
+// 判断是否为管理员
+const isAdmin = computed(() => {
+  return userInfo.value?.level === 'admin'
+})
+
+// 初始化时检查登录状态
+checkLoginStatus()
+
+// 监听 localStorage 变化（处理其他标签页登录/登出）
+watch(() => localStorage.getItem('userInfo'), () => {
+  checkLoginStatus()
+})
 
 // 定义子菜单类型
 interface SubmenuItem {
@@ -37,6 +70,17 @@ const toggleMenu = (menuType: keyof typeof submenus) => {
   } else {
     serviceMenuOpen.value = !serviceMenuOpen.value
   }
+}
+
+// 处理未登录时点击上传
+const handleUploadClick = (e: Event) => {
+  if (!isLoggedIn.value) {
+    e.preventDefault()
+    ElMessage.warning('请先登录后再上传内容')
+    router.push('/Users')
+    return false
+  }
+  return true
 }
 
 // 禁用滚动逻辑
@@ -115,59 +159,90 @@ onBeforeUnmount(() => {
             <span>{{ link.text }}</span>
           </router-link>
 
-          <div class="submenu-container">
-            <div class="unmenu-link" @click="toggleMenu('cardMenu')">
-              <svg-icon name="car" :width="24" height="24" />
-              <span>车 型</span>
-              <span class="dropdown-arrow" :class="{ 'open': cardMenuOpen }">▼</span>
+          <!-- 非管理员显示车型、服务菜单 -->
+          <template v-if="!isAdmin">
+            <div class="submenu-container">
+              <div class="unmenu-link" @click="toggleMenu('cardMenu')">
+                <svg-icon name="car" :width="24" height="24" />
+                <span>车 型</span>
+                <span class="dropdown-arrow" :class="{ 'open': cardMenuOpen }">▼</span>
+              </div>
+              <div class="mobile-submenu" v-if="cardMenuOpen">
+                <router-link
+                    v-for="(sublink, index) in submenus.cardMenu"
+                    :key="index"
+                    :to="sublink.path"
+                    @click="onClose"
+                    class="mobile-submenu-link"
+                >
+                  <svg-icon v-if="sublink.icon" :name="sublink.icon" :width="24" height="24" />
+                  <span>{{ sublink.text }}</span>
+                </router-link>
+              </div>
             </div>
-            <div class="mobile-submenu" v-if="cardMenuOpen">
-              <router-link
-                  v-for="(sublink, index) in submenus.cardMenu"
-                  :key="index"
-                  :to="sublink.path"
-                  @click="onClose"
-                  class="mobile-submenu-link"
-              >
-                <svg-icon v-if="sublink.icon" :name="sublink.icon" :width="24" height="24" />
-                <span>{{ sublink.text }}</span>
-              </router-link>
-            </div>
-          </div>
-          <!-- 服务菜单，带有子菜单 -->
-          <div class="submenu-container">
-            <div class="unmenu-link" @click="toggleMenu('serviceMenu')">
-              <svg-icon name="service" :width="24" height="24" />
-              <span>服 务</span>
-              <span class="dropdown-arrow" :class="{ 'open': serviceMenuOpen }">▼</span>
-            </div>
-            <div class="mobile-submenu" v-if="serviceMenuOpen">
-              <router-link
-                  v-for="(sublink, index) in submenus.serviceMenu"
-                  :key="index"
-                  :to="sublink.path"
-                  @click="onClose"
-                  class="mobile-submenu-link"
-              >
-                <svg-icon v-if="sublink.icon" :name="sublink.icon" :width="24" height="24" />
-                <span>{{ sublink.text }}</span>
-              </router-link>
-            </div>
-          </div>
 
+            <div class="submenu-container">
+              <div class="unmenu-link" @click="toggleMenu('serviceMenu')">
+                <svg-icon name="service" :width="24" height="24" />
+                <span>服 务</span>
+                <span class="dropdown-arrow" :class="{ 'open': serviceMenuOpen }">▼</span>
+              </div>
+              <div class="mobile-submenu" v-if="serviceMenuOpen">
+                <router-link
+                    v-for="(sublink, index) in submenus.serviceMenu"
+                    :key="index"
+                    :to="sublink.path"
+                    @click="onClose"
+                    class="mobile-submenu-link"
+                >
+                  <svg-icon v-if="sublink.icon" :name="sublink.icon" :width="24" height="24" />
+                  <span>{{ sublink.text }}</span>
+                </router-link>
+              </div>
+            </div>
+          </template>
+
+          <!-- 上传选项 - 仅登录且非管理员用户可见 -->
           <router-link
-            v-for="(link, index) in [
-              { path: '/Brand', text: '品牌故事', icon: 'brand' },
-              { path: '/Reserve', text: '预约试驾', icon: 'reserve' },
-              { path: '/Users', text: '个人中心', icon: 'user' }
-            ]"
-            :key="index"
-            :to="link.path"
+            v-if="isLoggedIn && !isAdmin"
+            to="/Upload"
+            @click="handleUploadClick"
+            class="unmenu-link"
+          >
+            <svg-icon name="upload" :width="24" height="24" />
+            <span>上 传</span>
+          </router-link>
+
+          <!-- 品牌、论坛 - 仅非管理员可见 -->
+          <template v-if="!isAdmin">
+            <router-link
+              to="/Brand"
+              @click="onClose"
+              class="unmenu-link"
+            >
+              <svg-icon name="brand" :width="24" height="24" />
+              <span>品牌故事</span>
+            </router-link>
+
+            <router-link
+              to="/Forum"
+              @click="onClose"
+              class="unmenu-link"
+            >
+              <svg-icon name="forum" :width="24" height="24" />
+              <span>论 坛</span>
+            </router-link>
+          </template>
+
+          <!-- 个人中心 - 仅非管理员可见 -->
+          <router-link
+            v-if="!isAdmin"
+            to="/Users"
             @click="onClose"
             class="unmenu-link"
           >
-            <svg-icon :name="link.icon" :width="24" height="24" />
-            <span>{{ link.text }}</span>
+            <svg-icon name="user" :width="24" height="24" />
+            <span>个人中心</span>
           </router-link>
         </div>
       </div>

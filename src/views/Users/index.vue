@@ -148,8 +148,10 @@ export default {
             if (rememberMe.value) {
               localStorage.setItem('rememberedUsername', loginForm.username)
             }
+            localStorage.setItem('userInfo', JSON.stringify(user))
+            window.dispatchEvent(new Event('userLogin')) // 触发事件通知 App.vue
             ElMessage.success('管理员登录成功！即将进入后台管理系统')
-            setTimeout(() => { router.push('/Admin') }, 1000)
+            await router.push('/Admin') // 立即跳转，不使用延迟
             return
           }
 

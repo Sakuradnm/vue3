@@ -2,58 +2,67 @@
   "hash": "b4695a04",
   "configHash": "4e146195",
   "lockfileHash": "b54cf2a0",
-  "browserHash": "b5d3c9a5",
+  "browserHash": "dffb6a22",
   "optimized": {
     "@studio-freight/lenis": {
       "src": "../../node_modules/@studio-freight/lenis/dist/lenis.mjs",
       "file": "@studio-freight_lenis.js",
-      "fileHash": "68ed24b7",
+      "fileHash": "eb5c53ff",
       "needsInterop": false
     },
     "axios": {
       "src": "../../node_modules/axios/index.js",
       "file": "axios.js",
-      "fileHash": "d447c4bb",
+      "fileHash": "31378bd1",
       "needsInterop": false
     },
     "element-plus": {
       "src": "../../node_modules/element-plus/es/index.mjs",
       "file": "element-plus.js",
-      "fileHash": "9c4e9a1c",
+      "fileHash": "d5475b5b",
       "needsInterop": false
     },
     "gsap": {
       "src": "../../node_modules/gsap/index.js",
       "file": "gsap.js",
-      "fileHash": "530c5c83",
+      "fileHash": "f832e38c",
       "needsInterop": false
     },
     "gsap/ScrollTrigger": {
       "src": "../../node_modules/gsap/ScrollTrigger.js",
       "file": "gsap_ScrollTrigger.js",
-      "fileHash": "8c0f1d3e",
+      "fileHash": "7b3eec18",
       "needsInterop": false
     },
     "vue": {
       "src": "../../node_modules/vue/dist/vue.runtime.esm-bundler.js",
       "file": "vue.js",
-      "fileHash": "2fb44b4a",
+      "fileHash": "3bdd1f05",
       "needsInterop": false
     },
     "vue-router": {
       "src": "../../node_modules/vue-router/dist/vue-router.mjs",
       "file": "vue-router.js",
-      "fileHash": "4e1e9864",
+      "fileHash": "4cc0ea55",
       "needsInterop": false
     },
     "element-plus/dist/locale/zh-cn.mjs": {
       "src": "../../node_modules/element-plus/dist/locale/zh-cn.mjs",
       "file": "element-plus_dist_locale_zh-cn__mjs.js",
-      "fileHash": "3ec5dc38",
+      "fileHash": "355491ec",
+      "needsInterop": false
+    },
+    "@element-plus/icons-vue": {
+      "src": "../../node_modules/@element-plus/icons-vue/dist/index.js",
+      "file": "@element-plus_icons-vue.js",
+      "fileHash": "a082c32d",
       "needsInterop": false
     }
   },
   "chunks": {
+    "chunk-LWTUFHBC": {
+      "file": "chunk-LWTUFHBC.js"
+    },
     "chunk-DGEITL4N": {
       "file": "chunk-DGEITL4N.js"
     },

@@ -9,7 +9,6 @@ import CourseDetail from "@/views/Course/Detail/Detail.vue"
 import Upload from "@/views/Upload/index.vue"
 import Forum from "@/views/Forum/index.vue"
 import Brand from "@/views/Brand/index.vue";
-import Search from "@/views/Search/index.vue";
 import Users from '@/views/Users/index.vue'
 
 // 帮助
@@ -19,16 +18,8 @@ import Help from "@/views//HelpSection/help.vue";
 import Customer from "@/views/HelpSection/customer.vue";
 
 // 服务
-import AfterSales from "@/views/Service/aftersales/index.vue";
 import Finance from "@/views/Service/finance/index.vue";
 import Maintenance from "@/views/Service/maintenance/index.vue";
-
-//车型
-import Ultra from "@/views/Models/Ultra/index.vue";
-import Supra from "@/views/Models/Supra/index.vue";
-import Brz  from "@/views/Models/Brz/index.vue";
-import Gtr from "@/views/Models/Gtr/index.vue";
-import Hellcat from "@/views/Models/Dodge/index.vue";
 
 // 用户相关
 import PersonalCenter from '@/views/Users/PersonalCenter/PersonalCenter.vue'
@@ -87,11 +78,6 @@ const routes = [
 
     //  服务
     {
-        path: '/AfterSales',
-        name: 'AfterSales',
-        component: AfterSales
-    },
-    {
         path: '/Finance',
         name: 'Finance',
         component: Finance
@@ -101,38 +87,6 @@ const routes = [
         path: '/Maintenance',
         name: 'Maintenance',
         component: Maintenance
-    },
-
-    //车型
-    {
-        path: '/Ultra',
-        name: 'Ultra',
-        component: Ultra
-    },
-    {
-        path: '/Supra',
-        name: 'Supra',
-        component: Supra
-    },
-    {
-        path: '/Brz',
-        name: 'Brz',
-        component: Brz
-    },
-    {
-        path: '/Gtr',
-        name: 'Gtr',
-        component: Gtr
-    },
-    {
-        path: '/Hellcat',
-        name: 'Hellcat',
-        component: Hellcat
-    },
-    {
-        path: '/Search',
-        name: 'Search',
-        component: Search
     },
     {
         path: '/Course',
