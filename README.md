@@ -1,6 +1,6 @@
 <<<<<<< HEAD
 # web
-由vue3+vite+ts制作的车企网站
+基于web的课程资料共享系统的开发与设计
 =======
 # Vue 3 + TypeScript + Vite
 
