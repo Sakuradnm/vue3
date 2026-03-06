@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
 //菜单选项
 import Home from '@/views/Home/index.vue'
 //菜单 - 课程
@@ -7,7 +8,7 @@ import CourseContent from "@/views/Course/Content/Content.vue"
 
 import Upload from "@/views/Upload/index.vue"
 import Forum from "@/views/Forum/index.vue"
-import Brand from "@/views/brand/index.vue";
+import Brand from "@/views/Brand/index.vue";
 import Search from "@/views/Search/index.vue";
 import Users from '@/views/Users/index.vue'
 
@@ -33,6 +34,9 @@ import Hellcat from "@/views/Models/Dodge/index.vue";
 import PersonalCenter from '@/views/Users/PersonalCenter/PersonalCenter.vue'
 import PersonalCourse from '@/views/Users/PersonalCourse/PersonalCourse.vue'
 import Notice from '@/views/Users/Notice/Notice.vue'
+
+// 管理员后台（待设计）
+import AdminDashboard from '@/views/Admin/Dashboard.vue'
 
 const routes = [
     {
@@ -168,6 +172,22 @@ const routes = [
         component: Notice,
         meta: { requiresAuth: true }
     },
+    {
+        path: '/Admin',
+        name: 'AdminDashboard',
+        component: AdminDashboard,
+        meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    // 捕获第三方脚本的路由请求
+    {
+        path: '/hybridaction/:actionName',
+        name: 'HybridAction',
+        component: { template: '' },
+        beforeEnter: (to, from, next) => {
+            // 直接拒绝第三方脚本的路由请求
+            next(false)
+        }
+    },
 
 ]
 
@@ -181,13 +201,24 @@ const router = createRouter({
 
 // 路由守卫
 router.beforeEach((to, from, next) => {
-    const isLoggedIn = localStorage.getItem('userInfo')
+    const userInfoStr = localStorage.getItem('userInfo')
     
-    if (to.meta.requiresAuth && !isLoggedIn) {
+    if (to.meta.requiresAuth && !userInfoStr) {
         next('/Users')
-    } else {
-        next()
+        return
     }
+    
+    // 检查是否需要管理员权限
+    if (to.meta.requiresAdmin) {
+        const userInfo = JSON.parse(userInfoStr || '{}')
+        if (userInfo.level !== 'admin') {
+            ElMessage.error('无权访问，需要管理员权限')
+            next('/Home')
+            return
+        }
+    }
+    
+    next()
 })
 
 export default router

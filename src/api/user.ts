@@ -25,6 +25,15 @@ export const createUser = (userData: any) => {
     })
 }
 
+// 用户注册（专用，与 createUser 区分）
+export const registerUser = (userData) => {
+    return request({
+        url: '/api/users/register',  // ← 注意：后端注册端点是 /register
+        method: 'post',
+        data: userData
+    })
+}
+
 // 更新用户
 export const updateUser = (id: number, userData: any) => {
     return request({

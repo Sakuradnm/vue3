@@ -1,6 +1,7 @@
 <script>
 import { ref, reactive } from 'vue'
-import { login as apiLogin, createUser as apiCreateUser } from '@/api/user'
+import { createUser as apiCreateUser, registerUser  } from '@/api/user'
+import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 
@@ -27,6 +28,33 @@ export default {
       username: '',
       password: ''
     })
+
+    // 添加用户输入类型标识
+    const inputType = ref('username')
+
+    // 验证输入类型的正则表达式
+    const phoneRegex = /^1[3-9]\d{9}$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    // 监听用户名输入，自动判断类型
+    const handleUsernameInput = () => {
+      const value = loginForm.username.trim()
+      if (phoneRegex.test(value)) {
+        inputType.value = 'phone'
+      } else if (emailRegex.test(value)) {
+        inputType.value = 'email'
+      } else {
+        inputType.value = 'username'
+      }
+    }
+
+    // 清空输入框同时清除账号和密码，方便更换账号
+    const clearInput = () => {
+      loginForm.username = ''
+      loginForm.password = ''
+      inputType.value = 'username'
+    }
+
     const registerForm = reactive({
       username: '',
       password: '',
@@ -60,9 +88,13 @@ export default {
       if (isStudent.value === type) return
       loginTypeTransition.value = type ? 'fade-left' : 'fade-right'
       isStudent.value = type
+      // 切换时清空表单，避免残留数据
+      loginForm.username = ''
+      loginForm.password = ''
+      inputType.value = 'username'
     }
 
-    // 账号登录逻辑
+    // 统一登录逻辑，level 由 isStudent 决定（student / teacher）
     const handleLogin = async () => {
       const form = document.querySelector('.login-box form')
       if (!form.checkValidity()) {
@@ -75,138 +107,165 @@ export default {
         return
       }
 
+      if (!loginForm.username.trim()) {
+        ElMessage.warning('请输入用户名/手机号/邮箱')
+        return
+      }
+
       try {
-        // 调用后端登录接口
-        const response = await apiLogin(loginForm.username, loginForm.password)
+        const inputValue = loginForm.username.trim()
+
+        // 自动识别输入类型
+        let loginData
+        if (phoneRegex.test(inputValue)) {
+          inputType.value = 'phone'
+          loginData = { phone: inputValue, password: loginForm.password }
+        } else if (emailRegex.test(inputValue)) {
+          inputType.value = 'email'
+          loginData = { email: inputValue, password: loginForm.password }
+        } else {
+          inputType.value = 'username'
+          loginData = { username: inputValue, password: loginForm.password }
+        }
+
+        // 附加 level 字段，由学生/教师登录框决定（admin 除外）
+        const inputValueLower = inputValue.toLowerCase()
+        if (inputValueLower === 'admin' || inputValueLower.startsWith('admin')) {
+          loginData.level = 'admin'
+        } else {
+          loginData.level = isStudent.value ? 'student' : 'teacher'
+        }
+
+        const response = await request({
+          url: '/api/users/login',
+          method: 'post',
+          data: loginData
+        })
 
         if (response.data.code === 200) {
           const user = response.data.data
+          const userLevel = user.level
+          const inputLabel = inputType.value === 'phone' ? '手机号' : inputType.value === 'email' ? '邮箱' : '用户名'
 
-          // 验证用户级别
-          if (isStudent.value && user.level !== 'student') {
-            ElMessage.error('当前账号不是学生账号，请切换到教师登录')
+          // 管理员：任意窗口均可登录，直接跳转后台
+          if (userLevel === 'admin') {
+            localStorage.setItem('userInfo', JSON.stringify(user))
+            if (rememberMe.value) {
+              localStorage.setItem('rememberedUsername', loginForm.username)
+            }
+            ElMessage.success('管理员登录成功！即将进入后台管理系统')
+            setTimeout(() => { router.push('/Admin') }, 1000)
             return
           }
-          if (!isStudent.value && user.level === 'student') {
-            ElMessage.error('当前账号不是教师账号，请切换到学生登录')
+
+          // 学生登录验证
+          if (isStudent.value) {
+            if (userLevel === 'student') {
+              localStorage.setItem('userInfo', JSON.stringify(user))
+              if (rememberMe.value) {
+                localStorage.setItem('rememberedUsername', loginForm.username)
+              }
+              ElMessage.success(`${inputLabel}登录成功！`)
+              setTimeout(() => { router.push('/Home') }, 1000)
+            } else {
+              ElMessage.error('账号、密码或级别不匹配')
+            }
             return
           }
 
-          // 保存用户信息到 localStorage
-          localStorage.setItem('userInfo', JSON.stringify(user))
-          if (rememberMe.value) {
-            localStorage.setItem('rememberedUsername', loginForm.username)
+          // 教师登录验证
+          if (!isStudent.value) {
+            if (userLevel === 'teacher') {
+              localStorage.setItem('userInfo', JSON.stringify(user))
+              if (rememberMe.value) {
+                localStorage.setItem('rememberedUsername', loginForm.username)
+              }
+              ElMessage.success(`${inputLabel}登录成功！`)
+              setTimeout(() => { router.push('/Home') }, 1000)
+            } else {
+              ElMessage.error('账号、密码或级别不匹配')
+            }
           }
-
-          // 提示登录成功
-          ElMessage.success('登录成功！')
-
-          // 延迟后跳转到首页
-          setTimeout(() => {
-            router.push('/Home')
-          }, 1000)
         } else {
-          ElMessage.error(response.data.message || '登录失败')
+          ElMessage.error('账号、密码或级别不匹配')
         }
       } catch (error) {
         console.error('登录失败:', error)
-        ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
+        ElMessage.error('账号、密码或级别不匹配')
       }
     }
 
     // 注册逻辑
     const handleRegister = async () => {
+      errors.username = ''
+      errors.password = ''
+      errors.phone = ''
+
       if (!registerForm.username) {
         errors.username = '请输入用户名'
         return
       }
-
-      // 验证用户名格式（6-9 位字母数字组合）
       if (!/^[a-zA-Z0-9]{6,9}$/.test(registerForm.username)) {
         errors.username = '用户名应为 6-9 位字母数字组合'
         return
       }
-
       if (!registerForm.password) {
         errors.password = '请输入密码'
         return
       }
-
-      // 验证密码格式（6-12 位字母数字组合）
       if (!/^[a-zA-Z0-9]{6,12}$/.test(registerForm.password)) {
         errors.password = '密码应为 6-12 位字母数字组合'
         return
       }
-
-      if (registerForm.password !== registerForm.confirmPassword) {
-        errors.confirmPassword = '两次输入的密码不一致'
-        return
-      }
-
       if (!registerForm.phone) {
         errors.phone = '请输入手机号'
         return
       }
-
-      // 验证手机号格式
       if (!/^1[3-9]\d{9}$/.test(registerForm.phone)) {
         errors.phone = '手机号格式不正确'
         return
       }
-
-      if (!registerForm.email) {
-        errors.email = '请输入邮箱'
-        return
-      }
-
-      // 验证邮箱格式
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerForm.email)) {
-        errors.email = '邮箱格式不正确'
-        return
-      }
-
-      if (!registerForm.verificationCode) {
-        errors.verificationCode = '请输入验证码'
-        return
-      }
-
       if (!agreeToTerms.value) {
         ElMessage.warning('请先阅读并同意用户协议和隐私政策')
         return
       }
 
       try {
-        // 准备注册数据
         const userData = {
           username: registerForm.username,
           password: registerForm.password,
           phone: registerForm.phone,
-          email: registerForm.email,
           level: isStudent.value ? 'student' : 'teacher'
         }
 
-        // 调用后端注册接口
-        const response = await apiCreateUser(userData)
+        const response = await registerUser(userData)
 
         if (response.data.code === 201) {
-          ElMessage.success('注册成功！')
-          console.log('注册成功，用户信息：', response.data.data)
-
-          // 清空表单
-          Object.keys(registerForm).forEach(key => {
-            registerForm[key] = ''
-          })
-
-          // 切换到登录页面
-          setTimeout(() => {
-            switchMode()
-          }, 1500)
+          ElMessage.success('注册成功！请登录')
+          Object.keys(registerForm).forEach(key => { registerForm[key] = '' })
+          isLogin.value = true
+          transitionName.value = 'slide-left'
+        } else if (response.data.code === 400) {
+          // 区分用户名还是手机号冲突
+          const msg = response.data.message || '注册失败'
+          if (msg.includes('用户名')) {
+            errors.username = msg
+          } else if (msg.includes('手机号')) {
+            errors.phone = msg
+          }
+          ElMessage.error(msg)
         } else {
           ElMessage.error(response.data.message || '注册失败')
         }
       } catch (error) {
-        console.error('注册失败:', error)
-        ElMessage.error(error.response?.data?.message || '注册失败，请稍后重试')
+        if (error.response?.data?.code === 400) {
+          const msg = error.response.data.message || '注册失败'
+          if (msg.includes('用户名')) errors.username = msg
+          else if (msg.includes('手机号')) errors.phone = msg
+          ElMessage.error(msg)
+        } else {
+          ElMessage.error('注册失败，请检查网络连接')
+        }
       }
     }
 
@@ -224,11 +283,6 @@ export default {
         }
 
         // TODO: 调用后端发送验证码接口
-        // const response = await axios.post('http://localhost:8080/api/sms/send', {
-        //   phone: registerForm.phone
-        // })
-
-        // 模拟发送成功
         ElMessage.success('验证码已发送（模拟）')
         startCountdown('register')
       } catch (error) {
@@ -237,31 +291,19 @@ export default {
       }
     }
 
-    // 倒计时逻辑
-    const startCountdown = (type) => {
-      let count = 60
-      registerCountdown.value = count
-
-      const timer = setInterval(() => {
-        count--
-        registerCountdown.value = count
-
-        if (count <= 0) {
-          clearInterval(timer)
-        }
-      }, 1000)
-    }
-
     return {
       isLogin,
       rememberMe,
       agreeToTerms,
       isStudent,
+      inputType,
       loginForm,
       registerForm,
       errors,
       switchMode,
       switchLoginType,
+      handleUsernameInput,
+      clearInput,
       handleLogin,
       handleRegister,
       sendVerificationCode,
@@ -295,68 +337,58 @@ export default {
 
       <!-- 中间区域 -->
       <div class="box">
-        <!-- 登录表单 -->
         <transition :name="transitionName" mode="out-in">
-          <div class="login-box" v-show="isLogin" key="login">
+
+          <!-- 登录表单 -->
+          <div class="login-box" v-if="isLogin" key="login">
             <!-- 二维码登录切换标签 -->
             <a class="qr-login-icon" @click="toggleLoginMethod">
-              <router-link to="/Code">
-                <svg-icon name="qr-code" :width="70" height="70"/>
-              </router-link>
+              <svg-icon name="qr-code" :width="70" height="70"/>
             </a>
 
             <!-- 登录类型切换标签 -->
             <div class="login-header">
               <div class="login-tabs">
-                <h2
-                  :class="{active: isStudent}"
-                  @click="switchLoginType(true)">
-                  学生登录
-                </h2>
-                <h2
-                  :class="{active: !isStudent}"
-                  @click="switchLoginType(false)">
-                  教师登录
-                </h2>
+                <h2 :class="{ active: isStudent }" @click="switchLoginType(true)">学生登录</h2>
+                <h2 :class="{ active: !isStudent }" @click="switchLoginType(false)">教师登录</h2>
               </div>
             </div>
 
             <!-- 登录表单容器 -->
             <div class="form-container">
               <transition :name="loginTypeTransition" mode="out-in">
+
+                <!-- 学生登录表单 -->
                 <form v-if="isStudent" key="student" @submit.prevent="handleLogin">
                   <div class="form-group">
                     <input
-                      type="text"
-                      v-model="loginForm.username"
-                      placeholder="手机号/邮箱/用户名"
-                      required
-                      pattern=".{3,}"
-                      title="用户名至少 3 个字符"
-                      @invalid="handleInvalid">
+                        type="text"
+                        v-model="loginForm.username"
+                        @input="handleUsernameInput"
+                        placeholder="手机号/邮箱/用户名"
+                        required
+                        pattern=".{3,}"
+                        title="请输入用户名/手机号/邮箱">
+                    <span class="clear-icon" @click="clearInput" v-if="loginForm.username" title="清空账号和密码">✕</span>
                     <span class="error-message">{{ errors.username }}</span>
                   </div>
                   <div class="form-group">
                     <input
-                      type="password"
-                      v-model="loginForm.password"
-                      placeholder="密码"
-                      required
-                      pattern=".{6,}"
-                      title="密码至少 6 位"
-                      @invalid="handleInvalid">
+                        type="password"
+                        v-model="loginForm.password"
+                        placeholder="密码"
+                        required
+                        pattern=".{6,}"
+                        title="密码至少 6 位">
                     <span class="error-message">{{ errors.password }}</span>
                   </div>
 
-                  <!-- 勾选菜单 -->
                   <label class="checkbox-group">
                     <input type="checkbox" v-model="agreeToTerms">
                     <span class="custom-checkbox"></span>
-                    <span class="checkbox-label">已阅读并同意<a href="#">用户协议</a>和<a href="#">隐私政策</a>
-                    </span>
+                    <span class="checkbox-label">已阅读并同意<a href="#">用户协议</a>和<a href="#">隐私政策</a></span>
                   </label>
 
-                  <!-- 登录按钮 -->
                   <button type="submit" class="submit-btn">LOGIN IN</button>
 
                   <div class="other-login">
@@ -372,39 +404,37 @@ export default {
                   </div>
                 </form>
 
+                <!-- 教师登录表单 -->
                 <form v-else key="teacher" @submit.prevent="handleLogin">
                   <div class="form-group">
                     <input
-                      type="text"
-                      v-model="loginForm.username"
-                      placeholder="手机号/邮箱/用户名"
-                      required
-                      pattern=".{3,}"
-                      title="用户名至少 3 个字符"
-                      @invalid="handleInvalid">
+                        type="text"
+                        v-model="loginForm.username"
+                        @input="handleUsernameInput"
+                        placeholder="手机号/邮箱/用户名"
+                        required
+                        pattern=".{3,}"
+                        title="请输入用户名/手机号/邮箱">
+                    <span class="clear-icon" @click="clearInput" v-if="loginForm.username" title="清空账号和密码">✕</span>
                     <span class="error-message">{{ errors.username }}</span>
                   </div>
                   <div class="form-group">
                     <input
-                      type="password"
-                      v-model="loginForm.password"
-                      placeholder="密码"
-                      required
-                      pattern=". {6,}"
-                      title="密码至少 6 位"
-                      @invalid="handleInvalid">
+                        type="password"
+                        v-model="loginForm.password"
+                        placeholder="密码"
+                        required
+                        pattern=".{6,}"
+                        title="密码至少 6 位">
                     <span class="error-message">{{ errors.password }}</span>
                   </div>
 
-                  <!-- 勾选菜单 -->
                   <label class="checkbox-group">
                     <input type="checkbox" v-model="agreeToTerms">
                     <span class="custom-checkbox"></span>
-                    <span class="checkbox-label">已阅读并同意<a href="#">用户协议</a>和<a href="#">隐私政策</a>
-                    </span>
+                    <span class="checkbox-label">已阅读并同意<a href="#">用户协议</a>和<a href="#">隐私政策</a></span>
                   </label>
 
-                  <!-- 登录按钮 -->
                   <button type="submit" class="submit-btn">LOGIN IN</button>
 
                   <div class="other-login">
@@ -419,55 +449,39 @@ export default {
                     </div>
                   </div>
                 </form>
+
               </transition>
             </div>
           </div>
-        </transition>
 
-        <!-- 注册表单 -->
-        <transition :name="transitionName" mode="out-in">
-          <div class="register-box" v-show="!isLogin" key="register">
+          <!-- 注册表单 -->
+          <div class="register-box" v-else key="register">
             <h2 style="color: rgb(255, 255, 255);">用户注册</h2>
             <form @submit.prevent="handleRegister">
               <div class="form-group">
                 <input
-                  type="text"
-                  v-model="registerForm.username"
-                  placeholder="用户名"
-                  :class="{ 'error': errors.username }" required>
+                    type="text"
+                    v-model="registerForm.username"
+                    placeholder="用户名 (6-9 位字母数字)"
+                    :class="{ 'error': errors.username }" required>
                 <span class="error-message">{{ errors.username }}</span>
               </div>
               <div class="form-group">
                 <input
-                  type="password"
-                  v-model="registerForm.password"
-                  placeholder="密码"
-                  :class="{ 'error': errors.password }" required>
+                    type="password"
+                    v-model="registerForm.password"
+                    placeholder="密码 (6-12 位字母数字)"
+                    :class="{ 'error': errors.password }" required>
                 <span class="error-message">{{ errors.password }}</span>
               </div>
               <div class="form-group">
                 <input
-                  type="tel"
-                  v-model="registerForm.phone"
-                  placeholder="手机号"
-                  :class="{ 'error': errors.phone }" required>
+                    type="tel"
+                    v-model="registerForm.phone"
+                    placeholder="手机号"
+                    :class="{ 'error': errors.phone }" required>
                 <span class="error-message">{{ errors.phone }}</span>
               </div>
-              <div class="code-container">
-                <input
-                  type="text"
-                  v-model="registerForm.verificationCode"
-                  placeholder="验证码"
-                  :class="{ 'error': errors.verificationCode }" required>
-                <button
-                  type="button"
-                  class="send-code-btn"
-                  @click="sendVerificationCode"
-                  :disabled="registerCountdown > 0">
-                  {{ registerCountdown > 0 ? `${registerCountdown}s` : '获取验证码' }}
-                </button>
-              </div>
-              <!-- 隐私策略部分 -->
               <label class="checkbox-group">
                 <input type="checkbox" v-model="agreeToTerms">
                 <span class="custom-checkbox"></span>
@@ -476,6 +490,7 @@ export default {
               <button type="submit" class="submit-btn">SIGN UP</button>
             </form>
           </div>
+
         </transition>
       </div>
 
@@ -540,17 +555,23 @@ export default {
 .box {
   width: 45%;
   min-width: 400px;
-  overflow: hidden;
+  /* ✅ 固定高度容器，防止切换时布局跳动 */
   position: relative;
+  min-height: 560px;
 }
 
 .login-box, .register-box {
+  /* ✅ 绝对定位铺满父容器，两个表单不再叠加占位 */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
   padding: 1.5rem;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   text-align: center;
   z-index: 4;
-  position: relative;
 }
 
 .login-header {
@@ -610,12 +631,12 @@ export default {
 .help-links {
   display: flex;
   flex-direction: column;
-  gap: 3rem;
+  gap: 2rem;
 }
 
 .help-item {
   color: white;
-  width: 5rem;
+  width: 6rem;
   text-decoration: none;
   font-size: 1rem;
   transition: all 0.3s ease;
@@ -699,9 +720,29 @@ export default {
   position: relative;
 }
 
+/* 清空按钮样式 */
+.clear-icon {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+  padding: 5px;
+}
+
+.clear-icon:hover {
+  color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-50%) scale(1.1);
+}
+
 input {
   width: 90%;
   padding: 1rem;
+  padding-right: 3rem;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -812,41 +853,40 @@ input:focus {
 
 /************************************************************
  * 过渡动画效果
+ * ✅ 使用 position:absolute 后动画期间不占文档流，彻底消除跳动
  ************************************************************/
-/* 登录/注册切换动画 */
 .slide-left-enter-active,
 .slide-left-leave-active,
 .slide-right-enter-active,
 .slide-right-leave-active {
-  transition: all 0.4s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .slide-left-enter-from {
   opacity: 0;
-  transform: translateX(30px);
+  transform: translateX(40px);
 }
 
 .slide-left-leave-to {
   opacity: 0;
-  transform: translateX(-30px);
+  transform: translateX(-40px);
 }
 
 .slide-right-enter-from {
   opacity: 0;
-  transform: translateX(-30px);
+  transform: translateX(-40px);
 }
 
 .slide-right-leave-to {
   opacity: 0;
-  transform: translateX(30px);
+  transform: translateX(40px);
 }
 
-/* 学生/教师切换动画 */
 .fade-left-enter-active,
 .fade-left-leave-active,
 .fade-right-enter-active,
 .fade-right-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fade-left-enter-from {
@@ -870,7 +910,7 @@ input:focus {
 }
 
 /************************************************************
- * 左侧响应式布局
+ * 响应式布局
  ************************************************************/
 @media (max-width: 768px) {
   .help-section {
@@ -889,12 +929,7 @@ input:focus {
   .help-item {
     width: 100%;
   }
-}
 
-/************************************************************
- * 中间响应式布局
- ************************************************************/
-@media (max-width: 768px) {
   .user-container {
     padding: 5vh 5%;
   }
@@ -928,10 +963,6 @@ input:focus {
     font-size: 16px;
   }
 
-  .verification-code input {
-    padding-right: 5px;
-  }
-
   .send-code-btn {
     padding: 6px 12px;
     font-size: 0.75rem;
@@ -953,12 +984,7 @@ input:focus {
     width: 82%;
     transition: all 0.5s ease;
   }
-}
 
-/************************************************************
- * 右侧响应式布局
- ************************************************************/
-@media (max-width: 768px) {
   .right-section {
     order: 3;
     width: 100%;

@@ -191,6 +191,19 @@ const markAllNoticesAsRead = () => {
   }
 }
 
+const getUserLevelText = (level: string) => {
+  switch (level) {
+    case 'student':
+      return '学生'
+    case 'teacher':
+      return '教师'
+    case 'admin':
+      return '管理员'
+    default:
+      return level
+  }
+}
+
 const handleLogout = () => {
   localStorage.removeItem('userInfo')
   localStorage.removeItem('rememberedUsername')
@@ -205,6 +218,7 @@ const handleLogout = () => {
     router.push('/Home')
   }, 500)
 }
+
 </script>
 
 <template>
@@ -361,7 +375,7 @@ const handleLogout = () => {
                   </div>
                   <div class="dropdown-info">
                     <div class="dropdown-username">{{ userInfo.username }}</div>
-                    <div class="dropdown-level">{{ userInfo.level === 'student' ? '学生' : '教师' }}</div>
+                    <div class="dropdown-level">{{ getUserLevelText(userInfo.level) }}</div>
                   </div>
                 </div>
 

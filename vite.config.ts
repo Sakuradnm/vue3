@@ -20,9 +20,14 @@ export default defineConfig({
     },
     server: {
         port: 5173,
-        // 禁用 HMR 缓存
         hmr: {
             overlay: true
+        },
+        fs: {
+            strict: false
+        },
+        headers: {
+            'Cache-Control': 'no-cache'
         },
         proxy: {
             '/api': {
@@ -32,8 +37,18 @@ export default defineConfig({
             }
         }
     },
-    // 优化构建缓存
-    cacheDir: '.vite'
+    cacheDir: '.vite',
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: undefined,
+                // 添加文件名 hash，确保每次构建生成不同的文件名
+                entryFileNames: 'js/[name].[hash].js',
+                chunkFileNames: 'js/[name].[hash].js',
+                assetFileNames: '[ext]/[name].[hash].[ext]'
+            }
+        }
+    }
 })
 
 
