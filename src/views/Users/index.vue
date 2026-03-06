@@ -75,12 +75,7 @@ export default {
     const switchMode = () => {
       transitionName.value = isLogin.value ? 'slide-right' : 'slide-left'
       isLogin.value = !isLogin.value
-      errors.username = ''
-      errors.password = ''
-      errors.confirmPassword = ''
-      errors.phone = ''
-      errors.verificationCode = ''
-      errors.email = ''
+      Object.keys(errors).forEach(key => { errors[key] = '' })
     }
 
     // 切换登录类型（学生/教师）
@@ -191,15 +186,13 @@ export default {
         }
       } catch (error) {
         console.error('登录失败:', error)
-        ElMessage.error('账号、密码或级别不匹配')
       }
     }
 
     // 注册逻辑
     const handleRegister = async () => {
-      errors.username = ''
-      errors.password = ''
-      errors.phone = ''
+      // 清空所有错误提示
+      Object.keys(errors).forEach(key => { errors[key] = '' })
 
       if (!registerForm.username) {
         errors.username = '请输入用户名'
@@ -235,7 +228,7 @@ export default {
           username: registerForm.username,
           password: registerForm.password,
           phone: registerForm.phone,
-          level: isStudent.value ? 'student' : 'teacher'
+          level: 'student'  // 注册权限固定为学生，教师账号由管理员创建
         }
 
         const response = await registerUser(userData)
@@ -263,8 +256,6 @@ export default {
           if (msg.includes('用户名')) errors.username = msg
           else if (msg.includes('手机号')) errors.phone = msg
           ElMessage.error(msg)
-        } else {
-          ElMessage.error('注册失败，请检查网络连接')
         }
       }
     }
@@ -555,13 +546,11 @@ export default {
 .box {
   width: 45%;
   min-width: 400px;
-  /* ✅ 固定高度容器，防止切换时布局跳动 */
   position: relative;
   min-height: 560px;
 }
 
 .login-box, .register-box {
-  /* ✅ 绝对定位铺满父容器，两个表单不再叠加占位 */
   position: absolute;
   top: 0;
   left: 0;
@@ -716,15 +705,16 @@ export default {
  * 输入表单样式
  ************************************************************/
 .form-group {
-  margin: 1rem;
+  margin: 0.6rem 1rem;
   position: relative;
+  min-height: 74px;
 }
 
 /* 清空按钮样式 */
 .clear-icon {
   position: absolute;
   right: 15px;
-  top: 50%;
+  top: 38%;
   transform: translateY(-50%);
   color: rgba(255, 255, 255, 0.5);
   font-size: 1.2rem;
@@ -755,6 +745,45 @@ input:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.09);
   box-shadow: 0 3px 10px 1px rgba(255, 255, 255, 0.32);
+}
+
+/* input 在 error 状态下高亮边框 */
+input.error {
+  border-color: rgba(255, 107, 107, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.15);
+}
+
+/************************************************************
+ * 错误提示样式
+ ************************************************************/
+.error-message {
+  display: block;           /* 独占一行，不被挤压 */
+  min-height: 1.1rem;       /* 占位：没有错误时也留出高度，防止表单跳动 */
+  color: #ff6b6b;           /* 红色提示 */
+  font-size: 0.75rem;
+  text-align: left;
+  padding: 3px 0 0 12px;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  transition: opacity 0.2s ease;
+}
+
+/* 没有内容时保持占位但不显示 */
+.error-message:empty {
+  opacity: 0;
+}
+
+/* input 在 error 状态下高亮边框 */
+input.error {
+  border-color: rgba(255, 107, 107, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.15);
+}
+
+/* form-group 保持固定最小高度，防止错误出现时整体布局跳动 */
+.form-group {
+  margin: 0.6rem 1rem;       /* 覆盖原来的 margin: 1rem，稍微收紧给错误留空间 */
+  position: relative;
+  min-height: 74px;           /* input(约48px) + error(约18px) + padding */
 }
 
 .submit-btn {
@@ -853,7 +882,6 @@ input:focus {
 
 /************************************************************
  * 过渡动画效果
- * ✅ 使用 position:absolute 后动画期间不占文档流，彻底消除跳动
  ************************************************************/
 .slide-left-enter-active,
 .slide-left-leave-active,

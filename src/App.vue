@@ -21,6 +21,7 @@ body,html {
 }
 main {
   flex: 1;
+  padding-top: 80px; /* 为固定菜单预留空间，菜单高度为 80px */
 }
 .parallax__layers > * {
   backface-visibility: hidden;

@@ -393,7 +393,7 @@ const handleLogout = () => {
                   </div>
                   <div class="dropdown-item" @click="goToLibrary">
                     <svg-icon name="home" :width="18" :height="18"/>
-                    <span>学习库</span>
+                    <span>学习记录</span>
                   </div>
                   <div class="dropdown-divider"></div>
                   <div class="dropdown-item logout" @click="handleLogout">

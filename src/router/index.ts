@@ -4,7 +4,7 @@ import { ElMessage } from 'element-plus'
 import Home from '@/views/Home/index.vue'
 //菜单 - 课程
 import Course from "@/views/Course/index.vue"
-import CourseContent from "@/views/Course/Content/Content.vue"
+import CourseDetail from "@/views/Course/Detail/Detail.vue"
 
 import Upload from "@/views/Upload/index.vue"
 import Forum from "@/views/Forum/index.vue"
@@ -142,12 +142,12 @@ const routes = [
     {
         path: '/course/:id',
         name: 'CourseDetail',
-        component: CourseContent
+        component: CourseDetail
     },
     {
         path: '/course/:id/learn',
         name: 'CourseLearn',
-        component: CourseContent
+        component: CourseDetail
     },
     {
         path: '/Upload',

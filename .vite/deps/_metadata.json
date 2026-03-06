@@ -2,48 +2,54 @@
   "hash": "b4695a04",
   "configHash": "4e146195",
   "lockfileHash": "b54cf2a0",
-  "browserHash": "20e82ea7",
+  "browserHash": "b5d3c9a5",
   "optimized": {
     "@studio-freight/lenis": {
       "src": "../../node_modules/@studio-freight/lenis/dist/lenis.mjs",
       "file": "@studio-freight_lenis.js",
-      "fileHash": "0eea430c",
+      "fileHash": "68ed24b7",
       "needsInterop": false
     },
     "axios": {
       "src": "../../node_modules/axios/index.js",
       "file": "axios.js",
-      "fileHash": "a8af87b5",
+      "fileHash": "d447c4bb",
       "needsInterop": false
     },
     "element-plus": {
       "src": "../../node_modules/element-plus/es/index.mjs",
       "file": "element-plus.js",
-      "fileHash": "c3adb4d7",
+      "fileHash": "9c4e9a1c",
       "needsInterop": false
     },
     "gsap": {
       "src": "../../node_modules/gsap/index.js",
       "file": "gsap.js",
-      "fileHash": "f99beff8",
+      "fileHash": "530c5c83",
       "needsInterop": false
     },
     "gsap/ScrollTrigger": {
       "src": "../../node_modules/gsap/ScrollTrigger.js",
       "file": "gsap_ScrollTrigger.js",
-      "fileHash": "f61d8f79",
+      "fileHash": "8c0f1d3e",
       "needsInterop": false
     },
     "vue": {
       "src": "../../node_modules/vue/dist/vue.runtime.esm-bundler.js",
       "file": "vue.js",
-      "fileHash": "9a503455",
+      "fileHash": "2fb44b4a",
       "needsInterop": false
     },
     "vue-router": {
       "src": "../../node_modules/vue-router/dist/vue-router.mjs",
       "file": "vue-router.js",
-      "fileHash": "23ab445e",
+      "fileHash": "4e1e9864",
+      "needsInterop": false
+    },
+    "element-plus/dist/locale/zh-cn.mjs": {
+      "src": "../../node_modules/element-plus/dist/locale/zh-cn.mjs",
+      "file": "element-plus_dist_locale_zh-cn__mjs.js",
+      "fileHash": "3ec5dc38",
       "needsInterop": false
     }
   },

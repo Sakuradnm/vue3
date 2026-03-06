@@ -8,10 +8,15 @@ import router from "./router"
 //svg图标
 import SvgIcon from '@/components/SvgIcon/index.vue'
 import 'virtual:svg-icons-register'
+// 导入 Element Plus
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
 const app = createApp(App)
 
 app.use(router)
+app.use(ElementPlus, { locale: zhCn })
 app.component('SvgIcon', SvgIcon)
 
 // 全局错误处理 - 捕获 Vue 组件错误

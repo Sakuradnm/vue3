@@ -5,295 +5,453 @@
     <link rel="icon" type="image/svg+xml" href="/src/assets/icons/home.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>课程学习资料共享系统</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #050508;
+            --accent-1: #6c63ff;
+            --accent-2: #00d4ff;
+            --accent-3: #ff6b9d;
+            --text: #f0f0f5;
+            --muted: #4a4a6a;
+        }
+
+        body {
+            background: var(--bg);
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: 'Syne', sans-serif;
+        }
+
+        /* ─── LOADER OVERLAY ─── */
+        #loader {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg);
+            /* will slide up on exit */
+            transform: translateY(0);
+            transition: transform 0.9s cubic-bezier(0.76, 0, 0.24, 1);
+        }
+
+        #loader.exit {
+            transform: translateY(-100%);
+        }
+
+        /* ─── NOISE TEXTURE OVERLAY ─── */
+        #loader::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* ─── AMBIENT GLOWS ─── */
+        .glow-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0;
+            animation: glow-in 1.2s ease forwards;
+        }
+
+        .glow-orb:nth-child(1) {
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, #6c63ff22, transparent 70%);
+            top: -150px; left: -100px;
+            animation-delay: 0.1s;
+        }
+        .glow-orb:nth-child(2) {
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, #00d4ff18, transparent 70%);
+            bottom: -100px; right: -80px;
+            animation-delay: 0.3s;
+        }
+        .glow-orb:nth-child(3) {
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, #ff6b9d14, transparent 70%);
+            top: 50%; left: 55%;
+            animation-delay: 0.5s;
+        }
+
+        @keyframes glow-in {
+            to { opacity: 1; }
+        }
+
+        /* ─── CANVAS (particles) ─── */
+        #particle-canvas {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        /* ─── CENTER CONTENT ─── */
+        .loader-center {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 48px;
+        }
+
+        /* ─── RING ANIMATION ─── */
+        .ring-wrapper {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ring-wrapper svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ring-track {
+            fill: none;
+            stroke: #ffffff08;
+            stroke-width: 1;
+        }
+
+        .ring-progress {
+            fill: none;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-dasharray: 326;
+            stroke-dashoffset: 326;
+            stroke: url(#ringGrad);
+            transition: stroke-dashoffset 0.06s linear;
+        }
+
+        .ring-inner-dot {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 0 12px #6c63ff, 0 0 24px #6c63ff80;
+            animation: orbit 2.4s linear infinite;
+        }
+
+        @keyframes orbit {
+            from { transform: rotate(0deg) translateX(52px) rotate(0deg); }
+            to   { transform: rotate(360deg) translateX(52px) rotate(-360deg); }
+        }
+
+        /* ─── COUNTER ─── */
+        .counter-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .counter {
+            font-family: 'Space Mono', monospace;
+            font-size: clamp(48px, 8vw, 72px);
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+            letter-spacing: -0.04em;
+            /* gradient shimmer */
+            background: linear-gradient(90deg, #fff 0%, #6c63ff 40%, #00d4ff 70%, #fff 100%);
+            background-size: 200%;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 2.4s linear infinite;
+        }
+
+        @keyframes shimmer {
+            0%   { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+
+        .counter-pct {
+            font-family: 'Space Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 0.3em;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        /* ─── LABEL ─── */
+        .loader-label {
+            font-size: 11px;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-weight: 400;
+        }
+
+        /* ─── PROGRESS BAR ─── */
+        .progress-bar-wrap {
+            width: min(340px, 80vw);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .progress-bar-track {
+            width: 100%;
+            height: 1px;
+            background: #ffffff10;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #6c63ff, #00d4ff);
+            box-shadow: 0 0 8px #6c63ff;
+            transition: width 0.08s linear;
+            position: relative;
+        }
+
+        .progress-bar-fill::after {
+            content: '';
+            position: absolute;
+            right: 0; top: -2px;
+            width: 4px; height: 5px;
+            background: #fff;
+            box-shadow: 0 0 6px #00d4ff, 0 0 12px #6c63ff;
+            border-radius: 50%;
+        }
+
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .step-text {
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+            transition: color 0.3s;
+        }
+
+        .step-text.active {
+            color: #00d4ff;
+        }
+
+        /* ─── SCAN LINE ─── */
+        .scan-line {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, #6c63ff40, #00d4ff60, #6c63ff40, transparent);
+            animation: scan 3s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scan {
+            0%   { top: 0; opacity: 0; }
+            5%   { opacity: 1; }
+            95%  { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+    </style>
 </head>
 
 <body>
-<div id="app">
-    <style>
-        body {
-            min-height: 100vh;
-            margin: 0;
-            position: relative;
-            background: #0a0a0a;
-        }
+<div id="loader">
+    <!-- ambient glows -->
+    <div class="glow-orb"></div>
+    <div class="glow-orb"></div>
+    <div class="glow-orb"></div>
 
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #0a0a0a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-        }
+    <!-- particle canvas -->
+    <canvas id="particle-canvas"></canvas>
 
-        .loader {
-            --main-size: 4em;
-            --text-color: #ffffff;
-            --shine-color: #ffffff40;
-            --shadow-color: #aaaaaa;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            user-select: none;
-            position: relative;
-            font-size: var(--main-size);
-            font-weight: 900;
-            text-transform: uppercase;
-            color: var(--text-color);
-            width: 7.3em;
-            height: 1em;
-            filter: drop-shadow(0 0 0.05em var(--shine-color));
-        }
+    <!-- scan line -->
+    <div class="scan-line"></div>
 
-        .loader .text {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            white-space: nowrap;
-            overflow: hidden;
-            position: absolute;
-        }
+    <!-- center -->
+    <div class="loader-center">
 
-        .loader .text:nth-child(1) {
-            clip-path: polygon(0% 0%, 11.11% 0%, 11.11% 100%, 0% 100%);
-            font-size: calc(var(--main-size) / 20);
-            margin-left: -2.1em;
-            opacity: 0.6;
-        }
-
-        .loader .text:nth-child(2) {
-            clip-path: polygon(11.11% 0%, 22.22% 0%, 22.22% 100%, 11.11% 100%);
-            font-size: calc(var(--main-size) / 16);
-            margin-left: -0.98em;
-            opacity: 0.7;
-        }
-
-        .loader .text:nth-child(3) {
-            clip-path: polygon(22.22% 0%, 33.33% 0%, 33.33% 100%, 22.22% 100%);
-            font-size: calc(var(--main-size) / 13);
-            margin-left: -0.33em;
-            opacity: 0.8;
-        }
-
-        .loader .text:nth-child(4) {
-            clip-path: polygon(33.33% 0%, 44.44% 0%, 44.44% 100%, 33.33% 100%);
-            font-size: calc(var(--main-size) / 11);
-            margin-left: -0.05em;
-            opacity: 0.9;
-        }
-
-        .loader .text:nth-child(5) {
-            clip-path: polygon(44.44% 0%, 55.55% 0%, 55.55% 100%, 44.44% 100%);
-            font-size: calc(var(--main-size) / 10);
-            margin-left: 0em;
-            opacity: 1;
-        }
-
-        .loader .text:nth-child(6) {
-            clip-path: polygon(55.55% 0%, 66.66% 0%, 66.66% 100%, 55.55% 100%);
-            font-size: calc(var(--main-size) / 11);
-            margin-left: 0.05em;
-            opacity: 0.9;
-        }
-
-        .loader .text:nth-child(7) {
-            clip-path: polygon(66.66% 0%, 77.77% 0%, 77.77% 100%, 66.66% 100%);
-            font-size: calc(var(--main-size) / 13);
-            margin-left: 0.33em;
-            opacity: 0.8;
-        }
-
-        .loader .text:nth-child(8) {
-            clip-path: polygon(77.77% 0%, 88.88% 0%, 88.88% 100%, 77.77% 100%);
-            font-size: calc(var(--main-size) / 16);
-            margin-left: 0.98em;
-            opacity: 0.7;
-        }
-
-        .loader .text:nth-child(9) {
-            clip-path: polygon(88.88% 0%, 100% 0%, 100% 100%, 88.88% 100%);
-            font-size: calc(var(--main-size) / 20);
-            margin-left: 2.1em;
-            opacity: 0.6;
-        }
-
-        .loader .text span {
-            animation:
-                    scrolling 2s cubic-bezier(0.1, 0.6, 0.9, 0.4) infinite,
-                    shadow 2s cubic-bezier(0.1, 0.6, 0.9, 0.4) infinite;
-        }
-
-        .loader .text:nth-child(1) span {
-            background: linear-gradient(
-                    to right,
-                    var(--text-color) 4%,
-                    var(--shadow-color) 7%
-            );
-            background-size: 200% auto;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .loader .text:nth-child(2) span {
-            background: linear-gradient(
-                    to right,
-                    var(--text-color) 9%,
-                    var(--shadow-color) 13%
-            );
-            background-size: 200% auto;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .loader .text:nth-child(3) span {
-            background: linear-gradient(
-                    to right,
-                    var(--text-color) 15%,
-                    var(--shadow-color) 18%
-            );
-            background-size: 200% auto;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .loader .text:nth-child(4) span {
-            background: linear-gradient(
-                    to right,
-                    var(--text-color) 20%,
-                    var(--shadow-color) 23%
-            );
-            background-size: 200% auto;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .loader .text:nth-child(6) span {
-            background: linear-gradient(
-                    to right,
-                    var(--shadow-color) 29%,
-                    var(--text-color) 32%
-            );
-            background-size: 200% auto;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .loader .text:nth-child(7) span {
-            background: linear-gradient(
-                    to right,
-                    var(--shadow-color) 34%,
-                    var(--text-color) 37%
-            );
-            background-size: 200% auto;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .loader .text:nth-child(8) span {
-            background: linear-gradient(
-                    to right,
-                    var(--shadow-color) 39%,
-                    var(--text-color) 42%
-            );
-            background-size: 200% auto;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .loader .text:nth-child(9) span {
-            background: linear-gradient(
-                    to right,
-                    var(--shadow-color) 45%,
-                    var(--text-color) 48%
-            );
-            background-size: 200% auto;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .loader .line {
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            height: 0.05em;
-            width: calc(var(--main-size) / 2);
-            margin-top: 0.9em;
-            border-radius: 0.05em;
-        }
-
-        .loader .line::before {
-            content: "";
-            position: absolute;
-            height: 100%;
-            width: 100%;
-            background-color: var(--text-color);
-            opacity: 0.3;
-        }
-
-        .loader .line::after {
-            content: "";
-            position: absolute;
-            height: 100%;
-            width: 100%;
-            background-color: var(--text-color);
-            border-radius: 0.05em;
-            transform: translateX(-90%);
-            animation: wobble 2s cubic-bezier(0.5, 0.8, 0.5, 0.2) infinite;
-        }
-
-        @keyframes wobble {
-            0% {
-                transform: translateX(-90%);
-            }
-            50% {
-                transform: translateX(90%);
-            }
-            100% {
-                transform: translateX(-90%);
-            }
-        }
-
-        @keyframes scrolling {
-            0% {
-                transform: translateX(-100%);
-            }
-            100% {
-                transform: translateX(100%);
-            }
-        }
-
-        @keyframes shadow {
-            0% {
-                background-position: -98% 0;
-            }
-            100% {
-                background-position: 102% 0;
-            }
-        }
-    </style>
-    <div v-if="show" class="loading-overlay">
-        <div class="loader">
-            <div class="text"><span>Loading</span></div>
-            <div class="text"><span>Loading</span></div>
-            <div class="text"><span>Loading</span></div>
-            <div class="text"><span>Loading</span></div>
-            <div class="text"><span>Loading</span></div>
-            <div class="text"><span>Loading</span></div>
-            <div class="text"><span>Loading</span></div>
-            <div class="text"><span>Loading</span></div>
-            <div class="text"><span>Loading</span></div>
-            <div class="line"></div>
+        <!-- Ring -->
+        <div class="ring-wrapper">
+            <svg viewBox="0 0 120 120">
+                <defs>
+                    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stop-color="#6c63ff"/>
+                        <stop offset="50%"  stop-color="#00d4ff"/>
+                        <stop offset="100%" stop-color="#ff6b9d"/>
+                    </linearGradient>
+                </defs>
+                <circle class="ring-track"    cx="60" cy="60" r="52"/>
+                <circle class="ring-progress" id="ringCircle" cx="60" cy="60" r="52"
+                        transform="rotate(-90 60 60)"/>
+            </svg>
+            <div class="ring-inner-dot"></div>
         </div>
+
+        <!-- Counter -->
+        <div class="counter-wrap">
+            <span class="counter" id="counterVal">0</span>
+            <span class="counter-pct">Loading</span>
+        </div>
+
+        <!-- Progress bar + steps -->
+        <div class="progress-bar-wrap">
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-steps">
+                <span class="step-text active" id="step0">初始化</span>
+                <span class="step-text" id="step1">加载资源</span>
+                <span class="step-text" id="step2">渲染界面</span>
+                <span class="step-text" id="step3">就绪</span>
+            </div>
+        </div>
+
+        <span class="loader-label">课程学习资料共享系统</span>
     </div>
 </div>
+
+<div id="app"></div>
 <script type="module" src="/src/main.ts"></script>
+
+<script>
+    /* ──────────────────────────────────────────────
+       Particle System
+    ────────────────────────────────────────────── */
+    const canvas = document.getElementById('particle-canvas');
+    const ctx    = canvas.getContext('2d');
+
+    function resize() {
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    const COLORS = ['#6c63ff', '#00d4ff', '#ff6b9d', '#ffffff'];
+
+    class Particle {
+        constructor() { this.reset(); }
+        reset() {
+            this.x     = Math.random() * canvas.width;
+            this.y     = Math.random() * canvas.height;
+            this.vx    = (Math.random() - 0.5) * 0.4;
+            this.vy    = (Math.random() - 0.5) * 0.4 - 0.2;
+            this.size  = Math.random() * 1.5 + 0.3;
+            this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+            this.alpha = Math.random() * 0.6 + 0.1;
+            this.life  = Math.random() * 200 + 100;
+            this.age   = 0;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.age++;
+            if (this.age > this.life || this.y < 0) this.reset();
+        }
+        draw() {
+            const fade = Math.min(this.age / 20, (this.life - this.age) / 20, 1);
+            ctx.globalAlpha = this.alpha * fade;
+            ctx.fillStyle   = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    const particles = Array.from({ length: 120 }, () => new Particle());
+
+    function animParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(animParticles);
+    }
+    animParticles();
+
+    /* ──────────────────────────────────────────────
+       Progress Simulation
+    ────────────────────────────────────────────── */
+    const counterEl  = document.getElementById('counterVal');
+    const fillEl     = document.getElementById('progressFill');
+    const ringEl     = document.getElementById('ringCircle');
+    const CIRCUMF    = 326; // 2πr ≈ 2 × 3.14 × 52
+
+    const steps = [
+        { id: 'step0', at: 0   },
+        { id: 'step1', at: 25  },
+        { id: 'step2', at: 65  },
+        { id: 'step3', at: 90  },
+    ];
+
+    let progress = 0;
+    let rafId;
+
+    // Eased random increments so it feels organic
+    function tick() {
+        if (progress >= 100) {
+            setProgress(100);
+            setTimeout(exitLoader, 300);
+            return;
+        }
+
+        // accelerate near start, slow near end (all timings halved)
+        const increment = progress < 40 ? Math.random() * 5 + 1
+            : progress < 80 ? Math.random() * 2.4 + 0.6
+                : Math.random() * 0.8 + 0.2;
+
+        progress = Math.min(progress + increment, 100);
+        setProgress(progress);
+
+        const delay = progress < 40 ? 20 : progress < 80 ? 30 : 45;
+        setTimeout(tick, delay + Math.random() * 15);
+    }
+
+    function setProgress(val) {
+        const pct = Math.floor(val);
+        counterEl.textContent = String(pct).padStart(2, '0');
+        fillEl.style.width    = pct + '%';
+        ringEl.style.strokeDashoffset = CIRCUMF - (CIRCUMF * pct / 100);
+
+        // activate step labels
+        steps.forEach(s => {
+            const el = document.getElementById(s.id);
+            if (pct >= s.at) el.classList.add('active');
+        });
+    }
+
+    function exitLoader() {
+        const loader = document.getElementById('loader');
+        loader.classList.add('exit');
+        // fully remove after transition so Vue can mount cleanly
+        loader.addEventListener('transitionend', () => {
+            loader.style.display = 'none';
+            // dispatch event so App.vue can trigger its entrance animation
+            window.dispatchEvent(new CustomEvent('loader:done'));
+        }, { once: true });
+    }
+
+    // Start after a brief moment
+    setTimeout(tick, 200);
+</script>
 </body>
 </html>

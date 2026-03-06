@@ -431,7 +431,7 @@ export default defineComponent({
   box-shadow: 0 8px 30px rgba(200, 0, 0, 0.3);
 }
 
-/* Content blocks */
+/* Detail blocks */
 .content-block {
   background: rgba(70, 0, 0, 0.18);
   border: 1px solid rgba(255, 0, 0, 0.24);

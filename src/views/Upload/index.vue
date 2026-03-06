@@ -1,598 +1,591 @@
-NEW_FILE_CODE
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
-const router = useRouter()
+interface UploadedFile {
+  file: File
+  preview: string | null
+  id: string
+}
 
-const uploadForm = ref({
-  title: '',
-  description: '',
-  category: '',
-  tags: ''
-})
-
-const uploadedFiles = ref<File[]>([])
-const previewImages = ref<string[]>([])
+const form = ref({ title: '', description: '', category: '', tags: '', license: 'free' })
+const uploadedFiles = ref<UploadedFile[]>([])
 const isUploading = ref(false)
 const uploadProgress = ref(0)
-const showMessage = ref(false)
-const messageText = ref('')
-const messageType = ref<'success' | 'error'>('success')
+const isDragging = ref<boolean>(false)
+const notification = ref<{ show: boolean; text: string; type: 'success' | 'error' }>({ show: false, text: '', type: 'success' })
+const mouseX = ref(0)
+const mouseY = ref(0)
+const currentStep = ref(1)
 
 const categories = [
-  { value: 'model', label: '3D 模型' },
-  { value: 'texture', label: '材质贴图' },
-  { value: 'course', label: '教程课程' },
-  { value: 'resource', label: '资源素材' }
+  { value: 'notes', label: '课程笔记', emoji: '📝' },
+  { value: 'exam', label: '历年真题', emoji: '📋' },
+  { value: 'video', label: '视频资源', emoji: '🎬' },
+  { value: 'book', label: '电子书籍', emoji: '📚' },
+  { value: 'mind', label: '思维导图', emoji: '🗺️' },
+  { value: 'code', label: '代码项目', emoji: '💻' },
 ]
 
-const handleFileChange = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const files = target.files
-  if (!files) return
+const licenses = [
+  { value: 'free', label: '完全免费', desc: '任何人均可免费下载' },
+  { value: 'share', label: '分享后可取', desc: '分享帖子后解锁下载' },
+  { value: 'points', label: '积分兑换', desc: '消耗积分下载' },
+]
 
-  Array.from(files).forEach(file => {
-    if (validateFile(file)) {
-      uploadedFiles.value.push(file)
-      createPreview(file)
+const isFormValid = computed(() =>
+    form.value.title.trim() && form.value.category && uploadedFiles.value.length > 0
+)
+
+const totalSize = computed(() =>
+    uploadedFiles.value.reduce((s, f) => s + f.file.size, 0)
+)
+
+const fmtSize = (b: number) => {
+  if (b >= 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB'
+  if (b >= 1024) return (b / 1024).toFixed(0) + ' KB'
+  return b + ' B'
+}
+
+const handleDrop = (e: DragEvent) => {
+  isDragging.value = false
+  const files = e.dataTransfer?.files
+  if (files) processFiles(Array.from(files))
+}
+
+const handleFileChange = (e: Event) => {
+  const files = (e.target as HTMLInputElement).files
+  if (files) processFiles(Array.from(files))
+  ;(e.target as HTMLInputElement).value = ''
+}
+
+const processFiles = (files: File[]) => {
+  files.forEach(file => {
+    const maxSize = 100 * 1024 * 1024
+    if (file.size > maxSize) { notify('文件不能超过 100MB', 'error'); return }
+
+    const id = Math.random().toString(36).slice(2)
+    const uploaded: UploadedFile = { file, preview: null, id }
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = e => { uploaded.preview = e.target?.result as string }
+      reader.readAsDataURL(file)
     }
+
+    uploadedFiles.value.push(uploaded)
   })
-
-  // 清空 input 值，允许重复选择同一文件
-  target.value = ''
 }
 
-const validateFile = (file: File): boolean => {
-  const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'model/gltf-binary', 'model/gltf+json']
-  const maxSize = 50 * 1024 * 1024 // 50MB
-
-  if (!validTypes.includes(file.type)) {
-    showNotification('不支持的文件格式', 'error')
-    return false
-  }
-
-  if (file.size > maxSize) {
-    showNotification('文件大小不能超过 50MB', 'error')
-    return false
-  }
-
-  return true
-}
-
-const createPreview = (file: File) => {
-  if (file.type.startsWith('image/')) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        previewImages.value.push(e.target.result as string)
-      }
-    }
-    reader.readAsDataURL(file)
-  }
-}
-
-const removeFile = (index: number) => {
-  uploadedFiles.value.splice(index, 1)
-  previewImages.value.splice(index, 1)
+const removeFile = (id: string) => {
+  uploadedFiles.value = uploadedFiles.value.filter(f => f.id !== id)
 }
 
 const handleSubmit = async () => {
-  if (!validateForm()) return
-
+  if (!isFormValid.value) return
   isUploading.value = true
   uploadProgress.value = 0
 
-  try {
-    // 模拟上传过程
-    const formData = new FormData()
-    formData.append('title', uploadForm.value.title)
-    formData.append('description', uploadForm.value.description)
-    formData.append('category', uploadForm.value.category)
-    formData.append('tags', uploadForm.value.tags)
+  const interval = setInterval(() => {
+    uploadProgress.value = Math.min(uploadProgress.value + Math.random() * 12, 95)
+  }, 200)
 
-    uploadedFiles.value.forEach((file, index) => {
-      formData.append(`files[${index}]`, file)
-    })
+  await new Promise(r => setTimeout(r, 2800))
+  clearInterval(interval)
+  uploadProgress.value = 100
 
-    // 模拟上传进度
-    const progressInterval = setInterval(() => {
-      uploadProgress.value += 10
-      if (uploadProgress.value >= 100) {
-        clearInterval(progressInterval)
-      }
-    }, 300)
-
-    // TODO: 实际的上传 API 调用
-    // await api.upload(formData)
-
-    setTimeout(() => {
-      isUploading.value = false
-      showNotification('上传成功！', 'success')
-      resetForm()
-    }, 3000)
-
-  } catch (error) {
-    isUploading.value = false
-    showNotification('上传失败，请重试', 'error')
-  }
-}
-
-const validateForm = (): boolean => {
-  if (!uploadForm.value.title.trim()) {
-    showNotification('请输入标题', 'error')
-    return false
-  }
-
-  if (!uploadForm.value.category) {
-    showNotification('请选择分类', 'error')
-    return false
-  }
-
-  if (uploadedFiles.value.length === 0) {
-    showNotification('请至少上传一个文件', 'error')
-    return false
-  }
-
-  return true
+  await new Promise(r => setTimeout(r, 400))
+  isUploading.value = false
+  notify('资料上传成功！审核后将公开发布 🎉', 'success')
+  resetForm()
 }
 
 const resetForm = () => {
-  uploadForm.value = {
-    title: '',
-    description: '',
-    category: '',
-    tags: ''
-  }
+  form.value = { title: '', description: '', category: '', tags: '', license: 'free' }
   uploadedFiles.value = []
-  previewImages.value = []
   uploadProgress.value = 0
+  currentStep.value = 1
 }
 
-const showNotification = (text: string, type: 'success' | 'error') => {
-  messageText.value = text
-  messageType.value = type
-  showMessage.value = true
-
-  setTimeout(() => {
-    showMessage.value = false
-  }, 3000)
+const notify = (text: string, type: 'success' | 'error') => {
+  notification.value = { show: true, text, type }
+  setTimeout(() => { notification.value.show = false }, 4000)
 }
 
-const goBack = () => {
-  router.back()
+const getFileIcon = (file: File) => {
+  if (file.type.startsWith('image/')) return '🖼️'
+  if (file.type.includes('pdf')) return '📄'
+  if (file.type.includes('zip') || file.type.includes('rar')) return '📦'
+  if (file.name.match(/\.(ppt|pptx)$/i)) return '📊'
+  if (file.name.match(/\.(doc|docx)$/i)) return '📝'
+  if (file.name.match(/\.(xls|xlsx)$/i)) return '📈'
+  if (file.name.match(/\.(mp4|mov|avi)$/i)) return '🎬'
+  return '📎'
 }
+
+const handleMouseMove = (e: MouseEvent) => {
+  mouseX.value = e.clientX
+  mouseY.value = e.clientY
+}
+onMounted(() => window.addEventListener('mousemove', handleMouseMove))
+onUnmounted(() => window.removeEventListener('mousemove', handleMouseMove))
 </script>
 
 <template>
-  <div class="upload-page">
-    <div class="upload-container">
-      <!-- 头部导航 -->
-      <div class="upload-header">
-        <button class="back-btn" @click="goBack">
-          <svg-icon name="arrow-left" :width="24" :height="24" />
-        </button>
-        <h1 class="upload-title">上传内容</h1>
-      </div>
+  <div class="upload-root">
+    <div class="cursor-glow" :style="{ left: mouseX + 'px', top: mouseY + 'px' }" />
+    <div class="bg-grid" />
+    <div class="bg-orb o1" />
+    <div class="bg-orb o2" />
+    <div class="bg-orb o3" />
 
-      <!-- 上传表单 -->
-      <div class="upload-form">
-        <!-- 文件上传区域 -->
-        <div class="upload-area">
-          <label class="upload-label" for="file-input">
-            <div class="upload-icon">
-              <svg-icon name="cloud-upload" :width="48" :height="48" />
+    <div class="page-wrap">
+      <!-- LEFT: FORM -->
+      <div class="form-side">
+        <!-- Step indicator -->
+        <div class="steps">
+          <div v-for="n in 3" :key="n" class="step" :class="{ active: currentStep >= n, done: currentStep > n }">
+            <div class="step-dot">
+              <span v-if="currentStep <= n">{{ n }}</span>
+              <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
             </div>
-            <p class="upload-text">点击或拖拽文件到此处上传</p>
-            <p class="upload-hint">支持 JPG、PNG、WEBP、GLTF、GLB 格式，最大 50MB</p>
-          </label>
-          <input
-              id="file-input"
-              type="file"
-              multiple
-              accept="image/*,.gltf,.glb"
-              @change="handleFileChange"
-              class="file-input"
-          />
-        </div>
-
-        <!-- 预览区域 -->
-        <div v-if="previewImages.length > 0" class="preview-grid">
-          <div v-for="(preview, index) in previewImages" :key="index" class="preview-item">
-            <img :src="preview" :alt="`预览${index + 1}`" class="preview-image" />
-            <button class="remove-btn" @click="removeFile(index)">
-              <svg-icon name="close" :width="20" :height="20" />
-            </button>
-            <div class="file-info">
-              <span class="file-name">{{ uploadedFiles[index].name }}</span>
-              <span class="file-size">{{ (uploadedFiles[index].size / 1024 / 1024).toFixed(2) }} MB</span>
-            </div>
+            <span class="step-label">{{ ['选择文件', '填写信息', '发布设置'][n-1] }}</span>
+            <div v-if="n < 3" class="step-line" :class="{ filled: currentStep > n }" />
           </div>
         </div>
 
-        <!-- 表单字段 -->
-        <div class="form-fields">
-          <div class="form-group">
-            <label class="form-label" for="title">标题 *</label>
-            <input
-                id="title"
-                v-model="uploadForm.title"
-                type="text"
-                placeholder="请输入标题"
-                class="form-input"
-            />
+        <h1 class="page-title">上传学习资料</h1>
+        <p class="page-sub">分享你的笔记、真题和学习心得，帮助更多同学</p>
+
+        <!-- STEP 1: File Upload -->
+        <div class="section" v-show="currentStep === 1">
+          <div
+              class="drop-zone"
+              :class="{ dragging: isDragging, 'has-files': uploadedFiles.length > 0 }"
+              @dragover.prevent="isDragging = true"
+              @dragleave="isDragging = false"
+              @drop.prevent="handleDrop"
+          >
+            <label class="drop-label" for="file-inp">
+              <div class="drop-icon-wrap">
+                <div class="drop-ring" />
+                <div class="drop-ring r2" />
+                <svg class="drop-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <p class="drop-text">拖拽文件到此，或 <span class="drop-link">点击选择</span></p>
+              <p class="drop-hint">支持 PDF · Word · PPT · 图片 · 视频 · 压缩包 · 最大 100MB</p>
+            </label>
+            <input id="file-inp" type="file" multiple @change="handleFileChange" class="file-input" />
           </div>
 
-          <div class="form-group">
-            <label class="form-label" for="category">分类 *</label>
-            <select
-                id="category"
-                v-model="uploadForm.category"
-                class="form-select"
-            >
-              <option value="" disabled>请选择分类</option>
-              <option v-for="cat in categories" :key="cat.value" :value="cat.value">
+          <!-- File list -->
+          <div v-if="uploadedFiles.length > 0" class="file-list">
+            <div class="file-list-header">
+              <span>已选文件 ({{ uploadedFiles.length }})</span>
+              <span class="total-size">共 {{ fmtSize(totalSize) }}</span>
+            </div>
+            <TransitionGroup name="flist" tag="div">
+              <div v-for="uf in uploadedFiles" :key="uf.id" class="file-item">
+                <div class="file-thumb">
+                  <img v-if="uf.preview" :src="uf.preview" alt="preview" />
+                  <span v-else class="file-emoji">{{ getFileIcon(uf.file) }}</span>
+                </div>
+                <div class="file-info">
+                  <span class="fname">{{ uf.file.name }}</span>
+                  <span class="fsize">{{ fmtSize(uf.file.size) }}</span>
+                </div>
+                <button class="rm-btn" @click="removeFile(uf.id)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </TransitionGroup>
+          </div>
+
+          <button class="next-btn" :disabled="uploadedFiles.length === 0" @click="currentStep = 2">
+            下一步：填写信息
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <!-- STEP 2: Info -->
+        <div class="section" v-show="currentStep === 2">
+          <div class="field">
+            <label>资料标题 <span class="req">*</span></label>
+            <input v-model="form.title" placeholder="例如：大学物理期末公式速查手册" maxlength="80" />
+            <span class="cc">{{ form.title.length }}/80</span>
+          </div>
+
+          <div class="field">
+            <label>资料类别 <span class="req">*</span></label>
+            <div class="cat-grid">
+              <button
+                  v-for="cat in categories" :key="cat.value"
+                  class="cat-option" :class="{ selected: form.category === cat.value }"
+                  @click="form.category = cat.value"
+              >
+                <span class="co-emoji">{{ cat.emoji }}</span>
                 {{ cat.label }}
-              </option>
-            </select>
+              </button>
+            </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label" for="description">描述</label>
-            <textarea
-                id="description"
-                v-model="uploadForm.description"
-                placeholder="请描述您的作品..."
-                rows="4"
-                class="form-textarea"
-            ></textarea>
+          <div class="field">
+            <label>内容简介</label>
+            <textarea v-model="form.description" placeholder="描述资料的内容、适用范围、使用方法等..." rows="4" />
           </div>
 
-          <div class="form-group">
-            <label class="form-label" for="tags">标签</label>
-            <input
-                id="tags"
-                v-model="uploadForm.tags"
-                type="text"
-                placeholder="用逗号分隔标签，例如：汽车，3D 模型，红色"
-                class="form-input"
-            />
+          <div class="field">
+            <label>标签（逗号分隔）</label>
+            <input v-model="form.tags" placeholder="如：高数, 期末, 大一" />
+          </div>
+
+          <div class="step-btns">
+            <button class="back-btn" @click="currentStep = 1">← 上一步</button>
+            <button class="next-btn" :disabled="!form.title.trim() || !form.category" @click="currentStep = 3">
+              下一步：发布设置
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
           </div>
         </div>
 
-        <!-- 提交按钮 -->
-        <button
-            class="submit-btn"
-            :disabled="isUploading"
-            @click="handleSubmit"
-        >
-          <span v-if="!isUploading">立即上传</span>
-          <span v-else class="uploading-text">
-            上传中... {{ uploadProgress }}%
-          </span>
-          <div v-if="isUploading" class="progress-bar">
-            <div class="progress-fill" :style="{ width: `${uploadProgress}%` }"></div>
+        <!-- STEP 3: Publish settings -->
+        <div class="section" v-show="currentStep === 3">
+          <div class="field">
+            <label>下载权限</label>
+            <div class="license-list">
+              <div
+                  v-for="lic in licenses" :key="lic.value"
+                  class="license-opt" :class="{ selected: form.license === lic.value }"
+                  @click="form.license = lic.value"
+              >
+                <div class="lic-radio" :class="{ sel: form.license === lic.value }" />
+                <div>
+                  <div class="lic-label">{{ lic.label }}</div>
+                  <div class="lic-desc">{{ lic.desc }}</div>
+                </div>
+              </div>
+            </div>
           </div>
-        </button>
+
+          <!-- Preview summary -->
+          <div class="summary">
+            <div class="summary-title">发布预览</div>
+            <div class="summary-row"><span>标题</span><strong>{{ form.title || '—' }}</strong></div>
+            <div class="summary-row"><span>类别</span><strong>{{ categories.find(c => c.value === form.category)?.label || '—' }}</strong></div>
+            <div class="summary-row"><span>文件数</span><strong>{{ uploadedFiles.length }} 个文件（{{ fmtSize(totalSize) }}）</strong></div>
+            <div class="summary-row"><span>权限</span><strong>{{ licenses.find(l => l.value === form.license)?.label }}</strong></div>
+          </div>
+
+          <!-- Upload progress -->
+          <div v-if="isUploading" class="progress-wrap">
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: uploadProgress + '%' }" />
+              <div class="progress-glow" :style="{ left: uploadProgress + '%' }" />
+            </div>
+            <div class="progress-text">正在上传... {{ Math.round(uploadProgress) }}%</div>
+          </div>
+
+          <div class="step-btns">
+            <button class="back-btn" @click="currentStep = 2">← 上一步</button>
+            <button class="submit-btn" :disabled="isUploading || !isFormValid" @click="handleSubmit">
+              <span v-if="!isUploading">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9l20-7z"/></svg>
+                立即发布
+              </span>
+              <span v-else class="uploading">
+                <span class="spin">⟳</span> 上传中...
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
+
+      <!-- RIGHT: Info panel -->
+      <aside class="info-side">
+        <div class="info-card">
+          <div class="info-header">
+            <div class="info-icon">✨</div>
+            <h3>上传须知</h3>
+          </div>
+          <ul class="info-list">
+            <li>请上传原创或经授权的学习资料</li>
+            <li>禁止上传违规、侵权内容</li>
+            <li>资料通过审核后公开，通常 24h 内完成</li>
+            <li>每次上传最多 10 个文件</li>
+          </ul>
+        </div>
+
+        <div class="info-card reward">
+          <div class="info-header">
+            <div class="info-icon">🏆</div>
+            <h3>上传奖励</h3>
+          </div>
+          <div class="reward-list">
+            <div class="reward-item">
+              <span class="r-label">上传资料</span>
+              <span class="r-pts">+10 积分</span>
+            </div>
+            <div class="reward-item">
+              <span class="r-label">资料被下载</span>
+              <span class="r-pts">+2 积分/次</span>
+            </div>
+            <div class="reward-item">
+              <span class="r-label">获得点赞</span>
+              <span class="r-pts">+1 积分/个</span>
+            </div>
+            <div class="reward-item">
+              <span class="r-label">精选资料奖励</span>
+              <span class="r-pts hot">+50 积分</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card stats-card">
+          <div class="info-header">
+            <div class="info-icon">📊</div>
+            <h3>平台数据</h3>
+          </div>
+          <div class="plat-stats">
+            <div class="pstat"><span class="ps-n">12,847</span><span class="ps-l">份资料</span></div>
+            <div class="pstat"><span class="ps-n">38,291</span><span class="ps-l">名用户</span></div>
+            <div class="pstat"><span class="ps-n">521k</span><span class="ps-l">次下载</span></div>
+          </div>
+        </div>
+      </aside>
     </div>
 
-    <!-- 通知消息 -->
-    <transition name="fade">
-      <div v-if="showMessage" class="notification" :class="`notification--${messageType}`">
-        <svg-icon :name="messageType === 'success' ? 'check' : 'error'" :width="24" :height="24" />
-        <span>{{ messageText }}</span>
-      </div>
-    </transition>
+    <!-- NOTIFICATION -->
+    <Teleport to="body">
+      <Transition name="notif">
+        <div v-if="notification.show" class="notif" :class="notification.type">
+          <span class="notif-icon">{{ notification.type === 'success' ? '✓' : '✕' }}</span>
+          {{ notification.text }}
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-.upload-page {
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+.upload-root {
+  font-family: 'DM Sans', sans-serif;
   min-height: 100vh;
-  background: linear-gradient(135deg, #0c1420 0%, #010a0e 100%);
-  padding: 120px 20px 40px;
-}
-
-.upload-container {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.upload-header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 40px;
-}
-
-.back-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  color: #fff;
-  padding: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.back-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateX(-5px);
-}
-
-.upload-title {
-  color: #fff;
-  font-size: 2rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.upload-form {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 40px;
-  backdrop-filter: blur(10px);
-}
-
-.upload-area {
-  border: 2px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 60px 20px;
-  text-align: center;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  margin-bottom: 30px;
-}
-
-.upload-area:hover {
-  border-color: rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.upload-label {
-  display: block;
-  cursor: pointer;
-}
-
-.upload-icon {
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 15px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.upload-text {
-  color: #fff;
-  font-size: 1.1rem;
-  margin: 0 0 8px 0;
-  font-weight: 500;
-}
-
-.upload-hint {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.9rem;
-  margin: 0;
-}
-
-.file-input {
-  display: none;
-}
-
-.preview-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.preview-item {
+  background: #060912;
+  color: #dde1ed;
   position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-x: hidden;
 }
 
-.preview-image {
-  width: 100%;
-  height: 150px;
-  object-fit: cover;
-  display: block;
-}
+/* BG */
+.cursor-glow { position: fixed; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(0,201,167,0.065) 0%, transparent 65%); transform: translate(-50%,-50%); pointer-events: none; z-index: 0; transition: left 0.12s linear, top 0.12s linear; }
+.bg-grid { position: fixed; inset: 0; background-image: linear-gradient(rgba(108,99,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(108,99,255,0.03) 1px, transparent 1px); background-size: 56px 56px; z-index: 0; pointer-events: none; }
+.bg-orb { position: fixed; border-radius: 50%; filter: blur(130px); pointer-events: none; z-index: 0; animation: of 14s ease-in-out infinite alternate; }
+.o1 { width: 450px; height: 450px; background: rgba(108,99,255,0.1); top: -150px; left: -150px; }
+.o2 { width: 350px; height: 350px; background: rgba(0,201,167,0.08); bottom: -100px; right: 0; animation-delay: -5s; }
+.o3 { width: 300px; height: 300px; background: rgba(255,179,71,0.06); top: 40%; left: 40%; animation-delay: -10s; }
+@keyframes of { from { transform: translate(0,0) scale(1); } to { transform: translate(30px,25px) scale(1.12); } }
 
-.remove-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: rgba(0, 0, 0, 0.7);
-  border: none;
-  color: #fff;
-  padding: 5px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
+/* PAGE LAYOUT */
+.page-wrap { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 320px; gap: 32px; max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
 
-.remove-btn:hover {
-  background: rgba(255, 0, 0, 0.8);
-  transform: scale(1.1);
-}
+/* FORM SIDE */
+.form-side {}
 
-.file-info {
-  padding: 12px;
-}
+/* STEPS */
+.steps { display: flex; align-items: center; margin-bottom: 36px; }
+.step { display: flex; align-items: center; gap: 8px; }
+.step-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.12); background: transparent; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; color: rgba(221,225,237,0.35); transition: all 0.35s ease; flex-shrink: 0; }
+.step.active .step-dot { border-color: #6C63FF; background: rgba(108,99,255,0.2); color: #a09fff; }
+.step.done .step-dot { border-color: #00C9A7; background: rgba(0,201,167,0.2); color: #00C9A7; }
+.step-label { font-size: 0.82rem; color: rgba(221,225,237,0.35); white-space: nowrap; transition: color 0.3s; }
+.step.active .step-label, .step.done .step-label { color: rgba(221,225,237,0.75); }
+.step-line { flex: 1; height: 1px; background: rgba(255,255,255,0.08); margin: 0 12px; min-width: 20px; transition: background 0.4s; }
+.step-line.filled { background: rgba(0,201,167,0.4); }
 
-.file-name {
-  display: block;
-  color: #fff;
-  font-size: 0.9rem;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.page-title { font-family: 'Syne', sans-serif; font-size: 2.2rem; font-weight: 800; color: #fff; letter-spacing: -0.03em; margin-bottom: 8px; }
+.page-sub { color: rgba(221,225,237,0.42); font-size: 0.95rem; font-weight: 300; margin-bottom: 36px; }
 
-.file-size {
-  display: block;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.8rem;
-}
+/* SECTION */
+.section { display: flex; flex-direction: column; gap: 24px; animation: fadeIn 0.35s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-.form-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  margin-bottom: 30px;
+/* DROP ZONE */
+.drop-zone {
+  border: 2px dashed rgba(255,255,255,0.1); border-radius: 20px; padding: 56px 24px;
+  text-align: center; cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden;
+  background: rgba(255,255,255,0.015);
 }
+.drop-zone:hover, .drop-zone.dragging { border-color: rgba(108,99,255,0.5); background: rgba(108,99,255,0.04); }
+.drop-zone.has-files { border-color: rgba(0,201,167,0.3); }
+.drop-label { display: block; cursor: pointer; }
+.file-input { display: none; }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.drop-icon-wrap { position: relative; width: 72px; height: 72px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; }
+.drop-ring { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(108,99,255,0.2); animation: ringPulse 2.5s ease-in-out infinite; }
+.drop-ring.r2 { animation-delay: 1.2s; inset: -8px; }
+@keyframes ringPulse { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.05); } }
+.drop-icon { color: rgba(108,99,255,0.7); position: relative; }
+
+.drop-text { font-size: 1.05rem; color: #dde1ed; margin-bottom: 8px; font-weight: 400; }
+.drop-link { color: #6C63FF; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.drop-hint { font-size: 0.82rem; color: rgba(221,225,237,0.3); font-weight: 300; }
+
+/* FILE LIST */
+.file-list { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; }
+.file-list-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: rgba(221,225,237,0.5); }
+.total-size { color: rgba(221,225,237,0.35); }
+.file-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.2s; }
+.file-item:last-child { border-bottom: none; }
+.file-item:hover { background: rgba(255,255,255,0.03); }
+.file-thumb { width: 38px; height: 38px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.06); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.file-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.file-emoji { font-size: 1.2rem; }
+.file-info { flex: 1; min-width: 0; }
+.fname { display: block; font-size: 0.87rem; color: #dde1ed; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fsize { font-size: 0.76rem; color: rgba(221,225,237,0.35); }
+.rm-btn { background: rgba(255,255,255,0.05); border: none; color: rgba(221,225,237,0.4); width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+.rm-btn:hover { background: rgba(255,80,80,0.15); color: #ff6b6b; }
+
+/* FIELDS */
+.field { display: flex; flex-direction: column; gap: 8px; position: relative; }
+.field label { font-size: 0.85rem; font-weight: 500; color: rgba(221,225,237,0.65); }
+.req { color: #ff6b6b; }
+.cc { position: absolute; right: 12px; bottom: 12px; font-size: 0.74rem; color: rgba(221,225,237,0.28); }
+.field input, .field textarea {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.085);
+  border-radius: 12px; padding: 12px 16px; color: #dde1ed;
+  font-family: 'DM Sans', sans-serif; font-size: 0.94rem; outline: none; transition: all 0.22s;
 }
+.field input:focus, .field textarea:focus { border-color: rgba(108,99,255,0.5); background: rgba(108,99,255,0.048); box-shadow: 0 0 0 3px rgba(108,99,255,0.1); }
+.field textarea { resize: vertical; line-height: 1.7; }
 
-.form-label {
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 500;
+/* CAT GRID */
+.cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cat-option { background: rgba(255,255,255,0.038); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 10px; color: rgba(221,225,237,0.6); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: all 0.22s; }
+.cat-option:hover { background: rgba(255,255,255,0.07); color: #dde1ed; }
+.cat-option.selected { background: rgba(108,99,255,0.18); border-color: rgba(108,99,255,0.4); color: #a09fff; }
+.co-emoji { font-size: 1.3rem; }
+
+/* LICENSE */
+.license-list { display: flex; flex-direction: column; gap: 10px; }
+.license-opt { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; cursor: pointer; transition: all 0.22s; }
+.license-opt:hover { background: rgba(255,255,255,0.055); }
+.license-opt.selected { background: rgba(108,99,255,0.1); border-color: rgba(108,99,255,0.35); }
+.lic-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0; transition: all 0.2s; position: relative; }
+.lic-radio.sel { border-color: #6C63FF; background: rgba(108,99,255,0.3); }
+.lic-radio.sel::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: #6C63FF; }
+.lic-label { font-size: 0.9rem; font-weight: 500; color: #dde1ed; margin-bottom: 2px; }
+.lic-desc { font-size: 0.8rem; color: rgba(221,225,237,0.4); }
+
+/* SUMMARY */
+.summary { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; }
+.summary-title { padding: 14px 18px 12px; font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.9rem; color: rgba(221,225,237,0.7); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.summary-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 18px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.87rem; }
+.summary-row:last-child { border-bottom: none; }
+.summary-row span { color: rgba(221,225,237,0.4); }
+.summary-row strong { color: #dde1ed; font-weight: 400; max-width: 60%; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* PROGRESS */
+.progress-wrap { display: flex; flex-direction: column; gap: 10px; }
+.progress-bar { height: 6px; background: rgba(255,255,255,0.07); border-radius: 100px; overflow: visible; position: relative; }
+.progress-fill { height: 100%; border-radius: 100px; background: linear-gradient(90deg, #6C63FF, #00C9A7); transition: width 0.25s ease; position: relative; }
+.progress-glow { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #00C9A7; box-shadow: 0 0 12px #00C9A7; transition: left 0.25s ease; }
+.progress-text { font-size: 0.82rem; color: rgba(221,225,237,0.5); text-align: center; }
+
+/* BUTTONS */
+.step-btns { display: flex; gap: 12px; }
+.back-btn { background: rgba(255,255,255,0.055); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; color: rgba(221,225,237,0.6); font-family: 'DM Sans', sans-serif; font-size: 0.94rem; padding: 12px 20px; cursor: pointer; transition: all 0.2s; }
+.back-btn:hover { background: rgba(255,255,255,0.09); color: #dde1ed; }
+.next-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, #6C63FF, #4ECDC4); border: none;
+  border-radius: 12px; color: #fff;
+  font-family: 'DM Sans', sans-serif; font-size: 0.94rem; font-weight: 500;
+  padding: 12px 24px; cursor: pointer; flex: 1; justify-content: center;
+  transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 4px 20px rgba(108,99,255,0.28);
 }
-
-.form-input,
-.form-select,
-.form-textarea {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 12px 16px;
-  color: #fff;
-  font-size: 1rem;
-  outline: none;
-  transition: all 0.3s ease;
-}
-
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.form-textarea {
-  resize: vertical;
-  font-family: inherit;
-}
-
-.form-select option {
-  background: #0c1420;
-  color: #fff;
-}
-
+.next-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(108,99,255,0.48); }
+.next-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
 .submit-btn {
-  width: 100%;
-  padding: 16px;
-  background: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%);
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: linear-gradient(135deg, #00C9A7, #6C63FF);
+  border: none; border-radius: 12px; color: #fff;
+  font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 500;
+  padding: 14px 32px; cursor: pointer; flex: 1;
+  transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 4px 24px rgba(0,201,167,0.3);
 }
+.submit-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,201,167,0.5); }
+.submit-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.uploading { display: flex; align-items: center; gap: 6px; }
+.spin { display: inline-block; animation: spin 1s linear infinite; font-size: 1.1rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.submit-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+/* INFO SIDE */
+.info-side { display: flex; flex-direction: column; gap: 16px; }
+.info-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 24px; }
+.info-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.info-icon { font-size: 1.2rem; }
+.info-header h3 { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; color: #e8eaf0; }
+.info-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.info-list li { font-size: 0.85rem; color: rgba(221,225,237,0.55); padding-left: 16px; position: relative; line-height: 1.5; }
+.info-list li::before { content: '·'; position: absolute; left: 4px; color: #6C63FF; font-weight: 700; }
+
+.reward.info-card { border-color: rgba(255,179,71,0.15); background: rgba(255,179,71,0.03); }
+.reward-list { display: flex; flex-direction: column; gap: 10px; }
+.reward-item { display: flex; justify-content: space-between; align-items: center; }
+.r-label { font-size: 0.85rem; color: rgba(221,225,237,0.55); }
+.r-pts { font-size: 0.85rem; font-weight: 600; color: #FFB347; font-family: 'Syne', sans-serif; }
+.r-pts.hot { color: #ff6b6b; }
+
+.stats-card { border-color: rgba(108,99,255,0.15); background: rgba(108,99,255,0.025); }
+.plat-stats { display: flex; justify-content: space-between; }
+.pstat { text-align: center; }
+.ps-n { display: block; font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+.ps-l { font-size: 0.76rem; color: rgba(221,225,237,0.38); }
+
+/* FILE LIST TRANSITION */
+.flist-enter-active, .flist-leave-active { transition: all 0.3s ease; }
+.flist-enter-from { opacity: 0; transform: translateX(-12px); }
+.flist-leave-to { opacity: 0; transform: translateX(12px); }
+
+/* NOTIFICATION */
+.notif {
+  position: fixed; bottom: 32px; right: 32px; z-index: 2000;
+  display: flex; align-items: center; gap: 10px;
+  background: #0e1321; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px; padding: 14px 20px;
+  font-size: 0.92rem; box-shadow: 0 16px 48px rgba(0,0,0,0.7);
+  max-width: 360px; backdrop-filter: blur(16px);
 }
+.notif.success { border-color: rgba(0,201,167,0.35); }
+.notif.error { border-color: rgba(255,107,107,0.35); }
+.notif-icon { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; flex-shrink: 0; }
+.notif.success .notif-icon { background: rgba(0,201,167,0.18); color: #00C9A7; }
+.notif.error .notif-icon { background: rgba(255,107,107,0.15); color: #ff6b6b; }
 
-.submit-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.notif-enter-active, .notif-leave-active { transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+.notif-enter-from, .notif-leave-to { opacity: 0; transform: translateY(20px) scale(0.9); }
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .page-wrap { grid-template-columns: 1fr; }
+  .info-side { order: -1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stats-card { grid-column: 1/-1; }
 }
-
-.uploading-text {
-  display: block;
-  margin-bottom: 8px;
-}
-
-.progress-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 0 0 8px 8px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: #fff;
-  transition: width 0.3s ease;
-}
-
-.notification {
-  position: fixed;
-  top: 100px;
-  right: 20px;
-  background: rgba(1, 10, 14, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  padding: 16px 24px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #fff;
-  font-size: 1rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  z-index: 2000;
-}
-
-.notification--success {
-  border-color: rgba(0, 255, 128, 0.3);
-}
-
-.notification--error {
-  border-color: rgba(255, 0, 0, 0.3);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: translateX(30px);
-}
-
-@media (max-width: 768px) {
-  .upload-page {
-    padding-top: 100px;
-  }
-
-  .upload-form {
-    padding: 24px;
-  }
-
-  .upload-title {
-    font-size: 1.5rem;
-  }
-
-  .preview-grid {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 600px) {
+  .page-wrap { padding: 32px 16px 60px; }
+  .page-title { font-size: 1.7rem; }
+  .cat-grid { grid-template-columns: repeat(2, 1fr); }
+  .info-side { grid-template-columns: 1fr; }
+  .stats-card { grid-column: auto; }
+  .topnav { padding: 0 20px; }
+  .nav-links { display: none; }
 }
 </style>
