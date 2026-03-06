@@ -456,7 +456,7 @@ const ratingBars = [
 .cd-bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
 .bg-orb { position: absolute; border-radius: 50%; filter: blur(150px); }
 .o1 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(79,110,247,.15), transparent); top: -200px; right: 0; animation: drift 20s ease-in-out infinite alternate; }
-.o2 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(168,85,247,.1), transparent); bottom: 0; left: 0; animation: drift 25s ease-in-out infinite alternate reverse; }
+.o2 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(168,85,247,.1), transparent); bottom: 0; left: 0; animation: drift 25s ease-in-out infinite alternate; }
 @keyframes drift { to { transform: translate(50px, 60px); } }
 .bg-grid {
   position: absolute; inset: 0;
