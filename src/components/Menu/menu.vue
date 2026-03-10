@@ -270,11 +270,12 @@ const handleLogout = () => {
 
 <template>
   <header class="header">
-    <nav class="nav-container" @mouseleave="hideSubMenu">
-      <router-link to="/Home">
-        <svg-icon name="home" :width="70" height="70"/>
-      </router-link>
+    <div class="logo">
+      <svg-icon name="courseShare" :width="70" height="70"/>
+      <span class="logo-text">CourseShare</span>
+    </div>
 
+    <nav class="nav-container" @mouseleave="hideSubMenu">
       <div class="nav-links">
         <div
             class="nav-item"
@@ -380,89 +381,89 @@ const handleLogout = () => {
         </div>
       </div>
 
-      <div class="desktop-user">
-        <template v-if="isLoggedIn && userInfo">
-          <div
-              class="user-info-wrapper"
-              @mouseenter="showUserDropdown = true"
-              @mouseleave="showUserDropdown = false"
-          >
-            <div class="user-avatar">
-              <img
-                  v-if="userInfo.avatar"
-                  :src="userInfo.avatar"
-                  :alt="userInfo.username"
-                  class="avatar-img"
-                  @error="handleAvatarError"
-              />
-              <div v-else class="avatar-placeholder">
-                {{ userInfo.username?.charAt(0).toUpperCase() }}
-              </div>
-            </div>
-            <span class="username-text">{{ userInfo.username }}</span>
-
-            <div v-if="unreadNoticeCount > 0" class="notice-badge">
-              {{ unreadNoticeCount > 9 ? '9+' : unreadNoticeCount }}
-            </div>
-
-            <transition name="dropdown-fade">
-              <div v-if="showUserDropdown" class="user-dropdown">
-                <div class="dropdown-header">
-                  <div class="dropdown-avatar">
-                    <img
-                        v-if="userInfo.avatar"
-                        :src="userInfo.avatar"
-                        :alt="userInfo.username"
-                        class="avatar-img"
-                        @error="handleAvatarError"
-                    />
-                    <div v-else class="avatar-placeholder">
-                      {{ userInfo.username?.charAt(0).toUpperCase() }}
-                    </div>
-                  </div>
-                  <div class="dropdown-info">
-                    <div class="dropdown-username">{{ userInfo.username }}</div>
-                    <div class="dropdown-level">{{ getUserLevelText(userInfo.level) }}</div>
-                  </div>
-                </div>
-
-                <div class="dropdown-divider"></div>
-
-                <div class="dropdown-items">
-                  <div class="dropdown-item" @click="goToProfile">
-                    <svg-icon name="user" :width="18" :height="18"/>
-                    <span>个人中心</span>
-                  </div>
-                  <div class="dropdown-item" @click="goToNotice">
-                    <svg-icon name="menu" :width="18" :height="18"/>
-                    <span>我的通知</span>
-                    <div v-if="unreadNoticeCount > 0" class="notice-dot"></div>
-                  </div>
-                  <div class="dropdown-item" @click="goToLibrary">
-                    <svg-icon name="home" :width="18" :height="18"/>
-                    <span>学习记录</span>
-                  </div>
-                  <div class="dropdown-divider"></div>
-                  <div class="dropdown-item logout" @click="handleLogout">
-                    <svg-icon name="menu" :width="18" :height="18"/>
-                    <span>退出登录</span>
-                  </div>
-                </div>
-              </div>
-            </transition>
-          </div>
-        </template>
-        <template v-else>
-          <div class="user-icon-wrapper" @click="goToLogin">
-            <svg-icon name="user" :width="30" height="30" style="cursor: pointer;"/>
-          </div>
-        </template>
-      </div>
-
       <div class="mobile-menu" @click="isMobileMenuOpen = !isMobileMenuOpen">
         <svg-icon name="menu" :width="30" height="30" />
       </div>
     </nav>
+
+    <div class="desktop-user">
+      <template v-if="isLoggedIn && userInfo">
+        <div
+            class="user-info-wrapper"
+            @mouseenter="showUserDropdown = true"
+            @mouseleave="showUserDropdown = false"
+        >
+          <div class="user-avatar">
+            <img
+                v-if="userInfo.avatar"
+                :src="userInfo.avatar"
+                :alt="userInfo.username"
+                class="avatar-img"
+                @error="handleAvatarError"
+            />
+            <div v-else class="avatar-placeholder">
+              {{ userInfo.username?.charAt(0).toUpperCase() }}
+            </div>
+          </div>
+          <span class="username-text">{{ userInfo.username }}</span>
+
+          <div v-if="unreadNoticeCount > 0" class="notice-badge">
+            {{ unreadNoticeCount > 9 ? '9+' : unreadNoticeCount }}
+          </div>
+
+          <transition name="dropdown-fade">
+            <div v-if="showUserDropdown" class="user-dropdown">
+              <div class="dropdown-header">
+                <div class="dropdown-avatar">
+                  <img
+                      v-if="userInfo.avatar"
+                      :src="userInfo.avatar"
+                      :alt="userInfo.username"
+                      class="avatar-img"
+                      @error="handleAvatarError"
+                  />
+                  <div v-else class="avatar-placeholder">
+                    {{ userInfo.username?.charAt(0).toUpperCase() }}
+                  </div>
+                </div>
+                <div class="dropdown-info">
+                  <div class="dropdown-username">{{ userInfo.username }}</div>
+                  <div class="dropdown-level">{{ getUserLevelText(userInfo.level) }}</div>
+                </div>
+              </div>
+
+              <div class="dropdown-divider"></div>
+
+              <div class="dropdown-items">
+                <div class="dropdown-item" @click="goToProfile">
+                  <svg-icon name="user" :width="18" :height="18"/>
+                  <span>个人中心</span>
+                </div>
+                <div class="dropdown-item" @click="goToNotice">
+                  <svg-icon name="menu" :width="18" :height="18"/>
+                  <span>我的通知</span>
+                  <div v-if="unreadNoticeCount > 0" class="notice-dot"></div>
+                </div>
+                <div class="dropdown-item" @click="goToLibrary">
+                  <svg-icon name="home" :width="18" :height="18"/>
+                  <span>学习记录</span>
+                </div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item logout" @click="handleLogout">
+                  <svg-icon name="menu" :width="18" :height="18"/>
+                  <span>退出登录</span>
+                </div>
+              </div>
+            </div>
+          </transition>
+        </div>
+      </template>
+      <template v-else>
+        <div class="user-icon-wrapper" @click="goToLogin">
+          <svg-icon name="user" :width="30" height="30" style="cursor: pointer;"/>
+        </div>
+      </template>
+    </div>
   </header>
 
   <Unmenu
@@ -479,22 +480,63 @@ const handleLogout = () => {
   z-index: 1000;
   backdrop-filter: blur(10px);
   background-color: rgba(1, 10, 14, 0.9);
-}
-.nav-container {
-  height: 80px;
-  padding: 0 5%;
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  height: 80px;
+  box-sizing: border-box;
+  padding: 0 60px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.logo-text {
+  display: block;
+  background: linear-gradient(110deg, #00d4ff 0%, #4fa3ff 40%, #a78bfa 80%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 24px rgba(0, 212, 255, 0.4));
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.nav-container {
+  position: static;
+  left: unset;
+  transform: none;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 80px;
+  padding: 0;
+  transition: all 0.3s ease;
+}
+
+.desktop-user {
+  display: flex;
   align-items: center;
   position: relative;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  padding-right: 0;
 }
+
 .nav-item {
   position: relative;
 }
+
 .nav-links {
   display: flex;
   gap: 4rem;
 }
+
 .nav-links a, .service-trigger {
   position: relative;
   color: #fff;
@@ -522,11 +564,7 @@ const handleLogout = () => {
   width: 100%;
 }
 
-.desktop-user {
-  display: flex;
-  align-items: center;
-  position: relative;
-}
+
 
 .search-container {
   position: relative;
@@ -738,6 +776,8 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   position: relative;
+  flex-shrink: 0;
+  padding-right: 60px;
 }
 
 .user-info-wrapper {
@@ -803,7 +843,7 @@ const handleLogout = () => {
 
 .username-text {
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 500;
   max-width: 100px;
   overflow: hidden;
@@ -977,13 +1017,17 @@ const handleLogout = () => {
   transition: background 0.3s;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
+  .nav-links {
+    gap: 2rem;
+  }
   .megamenu-container {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 768px) {
+
+@media (max-width: 950px) {
   .nav-links,
   .desktop-user {
     display: none;
@@ -993,16 +1037,23 @@ const handleLogout = () => {
     display: block;
   }
 
-  .nav-container {
-    padding: 0 20px;
-  }
-
   .search-container {
     display: none;
   }
 
   .course-megamenu {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 20px;
+  }
+
+  .logo {
+    width: auto;
+    min-width: 150px;
   }
 }
 </style>

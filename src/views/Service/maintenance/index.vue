@@ -63,7 +63,7 @@ const closeBookingModal = () => {
     <!-- 页面标题 -->
     <section class="hero-section">
       <div class="hero-image">
-        <img src="/service/Maintenance.jpg" alt="hero-img">
+        <img src="" alt="hero-img">
       </div>
       <div class="hero-text">
         <h1>专业保养服务</h1>

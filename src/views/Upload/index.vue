@@ -1,591 +1,823 @@
-<script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-
-interface UploadedFile {
-  file: File
-  preview: string | null
-  id: string
-}
-
-const form = ref({ title: '', description: '', category: '', tags: '', license: 'free' })
-const uploadedFiles = ref<UploadedFile[]>([])
-const isUploading = ref(false)
-const uploadProgress = ref(0)
-const isDragging = ref<boolean>(false)
-const notification = ref<{ show: boolean; text: string; type: 'success' | 'error' }>({ show: false, text: '', type: 'success' })
-const mouseX = ref(0)
-const mouseY = ref(0)
-const currentStep = ref(1)
-
-const categories = [
-  { value: 'notes', label: '课程笔记', emoji: '📝' },
-  { value: 'exam', label: '历年真题', emoji: '📋' },
-  { value: 'video', label: '视频资源', emoji: '🎬' },
-  { value: 'book', label: '电子书籍', emoji: '📚' },
-  { value: 'mind', label: '思维导图', emoji: '🗺️' },
-  { value: 'code', label: '代码项目', emoji: '💻' },
-]
-
-const licenses = [
-  { value: 'free', label: '完全免费', desc: '任何人均可免费下载' },
-  { value: 'share', label: '分享后可取', desc: '分享帖子后解锁下载' },
-  { value: 'points', label: '积分兑换', desc: '消耗积分下载' },
-]
-
-const isFormValid = computed(() =>
-    form.value.title.trim() && form.value.category && uploadedFiles.value.length > 0
-)
-
-const totalSize = computed(() =>
-    uploadedFiles.value.reduce((s, f) => s + f.file.size, 0)
-)
-
-const fmtSize = (b: number) => {
-  if (b >= 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB'
-  if (b >= 1024) return (b / 1024).toFixed(0) + ' KB'
-  return b + ' B'
-}
-
-const handleDrop = (e: DragEvent) => {
-  isDragging.value = false
-  const files = e.dataTransfer?.files
-  if (files) processFiles(Array.from(files))
-}
-
-const handleFileChange = (e: Event) => {
-  const files = (e.target as HTMLInputElement).files
-  if (files) processFiles(Array.from(files))
-  ;(e.target as HTMLInputElement).value = ''
-}
-
-const processFiles = (files: File[]) => {
-  files.forEach(file => {
-    const maxSize = 100 * 1024 * 1024
-    if (file.size > maxSize) { notify('文件不能超过 100MB', 'error'); return }
-
-    const id = Math.random().toString(36).slice(2)
-    const uploaded: UploadedFile = { file, preview: null, id }
-
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader()
-      reader.onload = e => { uploaded.preview = e.target?.result as string }
-      reader.readAsDataURL(file)
-    }
-
-    uploadedFiles.value.push(uploaded)
-  })
-}
-
-const removeFile = (id: string) => {
-  uploadedFiles.value = uploadedFiles.value.filter(f => f.id !== id)
-}
-
-const handleSubmit = async () => {
-  if (!isFormValid.value) return
-  isUploading.value = true
-  uploadProgress.value = 0
-
-  const interval = setInterval(() => {
-    uploadProgress.value = Math.min(uploadProgress.value + Math.random() * 12, 95)
-  }, 200)
-
-  await new Promise(r => setTimeout(r, 2800))
-  clearInterval(interval)
-  uploadProgress.value = 100
-
-  await new Promise(r => setTimeout(r, 400))
-  isUploading.value = false
-  notify('资料上传成功！审核后将公开发布 🎉', 'success')
-  resetForm()
-}
-
-const resetForm = () => {
-  form.value = { title: '', description: '', category: '', tags: '', license: 'free' }
-  uploadedFiles.value = []
-  uploadProgress.value = 0
-  currentStep.value = 1
-}
-
-const notify = (text: string, type: 'success' | 'error') => {
-  notification.value = { show: true, text, type }
-  setTimeout(() => { notification.value.show = false }, 4000)
-}
-
-const getFileIcon = (file: File) => {
-  if (file.type.startsWith('image/')) return '🖼️'
-  if (file.type.includes('pdf')) return '📄'
-  if (file.type.includes('zip') || file.type.includes('rar')) return '📦'
-  if (file.name.match(/\.(ppt|pptx)$/i)) return '📊'
-  if (file.name.match(/\.(doc|docx)$/i)) return '📝'
-  if (file.name.match(/\.(xls|xlsx)$/i)) return '📈'
-  if (file.name.match(/\.(mp4|mov|avi)$/i)) return '🎬'
-  return '📎'
-}
-
-const handleMouseMove = (e: MouseEvent) => {
-  mouseX.value = e.clientX
-  mouseY.value = e.clientY
-}
-onMounted(() => window.addEventListener('mousemove', handleMouseMove))
-onUnmounted(() => window.removeEventListener('mousemove', handleMouseMove))
-</script>
-
 <template>
   <div class="upload-root">
-    <div class="cursor-glow" :style="{ left: mouseX + 'px', top: mouseY + 'px' }" />
-    <div class="bg-grid" />
-    <div class="bg-orb o1" />
-    <div class="bg-orb o2" />
-    <div class="bg-orb o3" />
+    <canvas class="bg-canvas"></canvas>
+    <div class="noise-layer"></div>
+    <div class="cursor-glow" :style="{ left: mouseX + 'px', top: mouseY + 'px' }"></div>
 
-    <div class="page-wrap">
-      <!-- LEFT: FORM -->
-      <div class="form-side">
-        <!-- Step indicator -->
-        <div class="steps">
-          <div v-for="n in 3" :key="n" class="step" :class="{ active: currentStep >= n, done: currentStep > n }">
-            <div class="step-dot">
-              <span v-if="currentStep <= n">{{ n }}</span>
-              <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
-            </div>
-            <span class="step-label">{{ ['选择文件', '填写信息', '发布设置'][n-1] }}</span>
-            <div v-if="n < 3" class="step-line" :class="{ filled: currentStep > n }" />
-          </div>
+    <!-- 导航栏 -->
+    <nav class="top-nav">
+      <div class="nav-left">
+        <div class="nav-logo">
+          <svg viewBox="0 0 36 36" width="32" height="32">
+            <polygon points="18,2 32,10 32,26 18,34 4,26 4,10" fill="rgba(0,212,255,0.08)" stroke="#00d4ff" stroke-width="1.5"/>
+            <polygon points="18,8 27,13 27,23 18,28 9,23 9,13" fill="rgba(0,212,255,0.12)"/>
+            <circle cx="18" cy="18" r="3" fill="#00d4ff"/>
+          </svg>
+          <span class="logo-text">COURSENET<em>.io</em></span>
         </div>
-
-        <h1 class="page-title">上传学习资料</h1>
-        <p class="page-sub">分享你的笔记、真题和学习心得，帮助更多同学</p>
-
-        <!-- STEP 1: File Upload -->
-        <div class="section" v-show="currentStep === 1">
-          <div
-              class="drop-zone"
-              :class="{ dragging: isDragging, 'has-files': uploadedFiles.length > 0 }"
-              @dragover.prevent="isDragging = true"
-              @dragleave="isDragging = false"
-              @drop.prevent="handleDrop"
-          >
-            <label class="drop-label" for="file-inp">
-              <div class="drop-icon-wrap">
-                <div class="drop-ring" />
-                <div class="drop-ring r2" />
-                <svg class="drop-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-              </div>
-              <p class="drop-text">拖拽文件到此，或 <span class="drop-link">点击选择</span></p>
-              <p class="drop-hint">支持 PDF · Word · PPT · 图片 · 视频 · 压缩包 · 最大 100MB</p>
-            </label>
-            <input id="file-inp" type="file" multiple @change="handleFileChange" class="file-input" />
-          </div>
-
-          <!-- File list -->
-          <div v-if="uploadedFiles.length > 0" class="file-list">
-            <div class="file-list-header">
-              <span>已选文件 ({{ uploadedFiles.length }})</span>
-              <span class="total-size">共 {{ fmtSize(totalSize) }}</span>
-            </div>
-            <TransitionGroup name="flist" tag="div">
-              <div v-for="uf in uploadedFiles" :key="uf.id" class="file-item">
-                <div class="file-thumb">
-                  <img v-if="uf.preview" :src="uf.preview" alt="preview" />
-                  <span v-else class="file-emoji">{{ getFileIcon(uf.file) }}</span>
-                </div>
-                <div class="file-info">
-                  <span class="fname">{{ uf.file.name }}</span>
-                  <span class="fsize">{{ fmtSize(uf.file.size) }}</span>
-                </div>
-                <button class="rm-btn" @click="removeFile(uf.id)">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                </button>
-              </div>
-            </TransitionGroup>
-          </div>
-
-          <button class="next-btn" :disabled="uploadedFiles.length === 0" @click="currentStep = 2">
-            下一步：填写信息
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </button>
-        </div>
-
-        <!-- STEP 2: Info -->
-        <div class="section" v-show="currentStep === 2">
-          <div class="field">
-            <label>资料标题 <span class="req">*</span></label>
-            <input v-model="form.title" placeholder="例如：大学物理期末公式速查手册" maxlength="80" />
-            <span class="cc">{{ form.title.length }}/80</span>
-          </div>
-
-          <div class="field">
-            <label>资料类别 <span class="req">*</span></label>
-            <div class="cat-grid">
-              <button
-                  v-for="cat in categories" :key="cat.value"
-                  class="cat-option" :class="{ selected: form.category === cat.value }"
-                  @click="form.category = cat.value"
-              >
-                <span class="co-emoji">{{ cat.emoji }}</span>
-                {{ cat.label }}
-              </button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>内容简介</label>
-            <textarea v-model="form.description" placeholder="描述资料的内容、适用范围、使用方法等..." rows="4" />
-          </div>
-
-          <div class="field">
-            <label>标签（逗号分隔）</label>
-            <input v-model="form.tags" placeholder="如：高数, 期末, 大一" />
-          </div>
-
-          <div class="step-btns">
-            <button class="back-btn" @click="currentStep = 1">← 上一步</button>
-            <button class="next-btn" :disabled="!form.title.trim() || !form.category" @click="currentStep = 3">
-              下一步：发布设置
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- STEP 3: Publish settings -->
-        <div class="section" v-show="currentStep === 3">
-          <div class="field">
-            <label>下载权限</label>
-            <div class="license-list">
-              <div
-                  v-for="lic in licenses" :key="lic.value"
-                  class="license-opt" :class="{ selected: form.license === lic.value }"
-                  @click="form.license = lic.value"
-              >
-                <div class="lic-radio" :class="{ sel: form.license === lic.value }" />
-                <div>
-                  <div class="lic-label">{{ lic.label }}</div>
-                  <div class="lic-desc">{{ lic.desc }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Preview summary -->
-          <div class="summary">
-            <div class="summary-title">发布预览</div>
-            <div class="summary-row"><span>标题</span><strong>{{ form.title || '—' }}</strong></div>
-            <div class="summary-row"><span>类别</span><strong>{{ categories.find(c => c.value === form.category)?.label || '—' }}</strong></div>
-            <div class="summary-row"><span>文件数</span><strong>{{ uploadedFiles.length }} 个文件（{{ fmtSize(totalSize) }}）</strong></div>
-            <div class="summary-row"><span>权限</span><strong>{{ licenses.find(l => l.value === form.license)?.label }}</strong></div>
-          </div>
-
-          <!-- Upload progress -->
-          <div v-if="isUploading" class="progress-wrap">
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: uploadProgress + '%' }" />
-              <div class="progress-glow" :style="{ left: uploadProgress + '%' }" />
-            </div>
-            <div class="progress-text">正在上传... {{ Math.round(uploadProgress) }}%</div>
-          </div>
-
-          <div class="step-btns">
-            <button class="back-btn" @click="currentStep = 2">← 上一步</button>
-            <button class="submit-btn" :disabled="isUploading || !isFormValid" @click="handleSubmit">
-              <span v-if="!isUploading">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9l20-7z"/></svg>
-                立即发布
-              </span>
-              <span v-else class="uploading">
-                <span class="spin">⟳</span> 上传中...
-              </span>
-            </button>
-          </div>
-        </div>
+        <button class="back-btn" @click="goBack">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          返回
+        </button>
       </div>
+      <div class="nav-right">
+        <button class="compose-btn" @click="saveDraft">
+          <span class="cb-sweep"></span>
+          保存草稿
+        </button>
+        <button class="publish-btn" @click="publish">
+          <span class="cb-sweep"></span>
+          发布课程
+        </button>
+      </div>
+    </nav>
 
-      <!-- RIGHT: Info panel -->
-      <aside class="info-side">
-        <div class="info-card">
-          <div class="info-header">
-            <div class="info-icon">✨</div>
-            <h3>上传须知</h3>
+    <!-- 主体：上传表单 -->
+    <div class="upload-main">
+      <div class="upload-inner">
+        <!-- 左侧主要表单 -->
+        <div class="form-left">
+          <!-- 基本信息区块 -->
+          <div class="content-block fade-up">
+            <div class="cb-header">
+              <span class="cb-tag">[ BASIC ]</span>
+              <h2 class="cb-title">基本信息</h2>
+            </div>
+            <div class="form-group">
+              <label>课程标题 <span class="required">*</span></label>
+              <input type="text" v-model="form.title" placeholder="例：新手驾驶入门" class="form-input">
+            </div>
+            <div class="form-group">
+              <label>副标题</label>
+              <input type="text" v-model="form.subtitle" placeholder="简短有力的描述" class="form-input">
+            </div>
+            <div class="form-row">
+              <div class="form-group half">
+                <label>价格 (¥) <span class="required">*</span></label>
+                <input type="number" v-model="form.price" placeholder="299" class="form-input">
+              </div>
+              <div class="form-group half">
+                <label>原价</label>
+                <input type="number" v-model="form.originalPrice" placeholder="599" class="form-input">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>难度等级</label>
+              <div class="level-selector">
+                <button v-for="level in levels" :key="level" class="level-btn"
+                        :class="{ active: form.level === level }"
+                        @click="form.level = level">{{ level }}</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>课程描述</label>
+              <textarea v-model="form.description" rows="4" placeholder="详细介绍课程内容……" class="form-input"></textarea>
+            </div>
           </div>
-          <ul class="info-list">
-            <li>请上传原创或经授权的学习资料</li>
-            <li>禁止上传违规、侵权内容</li>
-            <li>资料通过审核后公开，通常 24h 内完成</li>
-            <li>每次上传最多 10 个文件</li>
-          </ul>
+
+          <!-- 课程大纲区块 (章节 + 视频) -->
+          <div class="content-block fade-up">
+            <div class="cb-header">
+              <span class="cb-tag">[ CURRICULUM ]</span>
+              <h2 class="cb-title">课程大纲</h2>
+            </div>
+            <div v-for="(chapter, cIdx) in form.chapters" :key="cIdx" class="chapter-card">
+              <div class="chapter-header">
+                <span class="chapter-number">第 {{ cIdx + 1 }} 章</span>
+                <input type="text" v-model="chapter.title" placeholder="章节标题" class="chapter-title-input">
+                <button class="remove-chapter" @click="removeChapter(cIdx)" v-if="form.chapters.length > 1">✕</button>
+              </div>
+              <div class="chapter-meta">
+                <span class="meta-item">课时数: {{ chapter.videos.length }}</span>
+                <span class="meta-item">总时长: {{ chapterTotalDuration(chapter) }}</span>
+              </div>
+              <div class="videos-list">
+                <div v-for="(video, vIdx) in chapter.videos" :key="vIdx" class="video-item">
+                  <span class="video-number">{{ cIdx + 1 }}.{{ vIdx + 1 }}</span>
+                  <input type="text" v-model="video.title" placeholder="视频标题" class="video-title-input">
+                  <input type="text" v-model="video.duration" placeholder="时长 (例：15:30)" class="video-duration-input">
+                  <label class="free-checkbox">
+                    <input type="checkbox" v-model="video.isFree">
+                    <span class="free-label">免费</span>
+                  </label>
+                  <button class="remove-video" @click="removeVideo(cIdx, vIdx)" v-if="chapter.videos.length > 1">✕</button>
+                </div>
+              </div>
+              <button class="add-video" @click="addVideo(cIdx)">+ 添加视频</button>
+            </div>
+            <button class="add-chapter" @click="addChapter">+ 添加章节</button>
+          </div>
         </div>
 
-        <div class="info-card reward">
-          <div class="info-header">
-            <div class="info-icon">🏆</div>
-            <h3>上传奖励</h3>
+        <!-- 右侧发布卡 -->
+        <aside class="sidebar-right">
+          <div class="sidebar-card fade-up">
+            <div class="sc-tag">[ PUBLISH ]</div>
+            <h3 class="sc-title">发布预览</h3>
+            <div class="price-preview">
+              <span class="preview-current">¥{{ form.price }}</span>
+              <span class="preview-original" v-if="form.originalPrice">¥{{ form.originalPrice }}</span>
+              <span class="preview-badge" v-if="form.originalPrice">{{ discount }}折</span>
+            </div>
+            <div class="preview-stats">
+              <div class="stat-item"><span class="stat-label">章节</span> {{ form.chapters.length }}</div>
+              <div class="stat-item"><span class="stat-label">视频</span> {{ totalVideos }}</div>
+              <div class="stat-item"><span class="stat-label">难度</span> {{ form.level }}</div>
+            </div>
+            <button class="publish-btn large" @click="publish">
+              <span class="cb-sweep"></span>
+              发布课程
+            </button>
+            <button class="draft-btn" @click="saveDraft">
+              保存草稿
+            </button>
+            <div class="sc-tip">
+              <span class="tip-icon">◉</span> 填写所有带 <span class="required">*</span> 的字段
+            </div>
           </div>
-          <div class="reward-list">
-            <div class="reward-item">
-              <span class="r-label">上传资料</span>
-              <span class="r-pts">+10 积分</span>
-            </div>
-            <div class="reward-item">
-              <span class="r-label">资料被下载</span>
-              <span class="r-pts">+2 积分/次</span>
-            </div>
-            <div class="reward-item">
-              <span class="r-label">获得点赞</span>
-              <span class="r-pts">+1 积分/个</span>
-            </div>
-            <div class="reward-item">
-              <span class="r-label">精选资料奖励</span>
-              <span class="r-pts hot">+50 积分</span>
-            </div>
-          </div>
-        </div>
 
-        <div class="info-card stats-card">
-          <div class="info-header">
-            <div class="info-icon">📊</div>
-            <h3>平台数据</h3>
+          <div class="sidebar-card fade-up">
+            <div class="sc-tag">[ TIPS ]</div>
+            <h3 class="sc-title">上传提示</h3>
+            <ul class="tip-list">
+              <li>✓ 标题建议 5-20 字</li>
+              <li>✓ 视频时长格式 mm:ss</li>
+              <li>✓ 免费课可以吸引学员</li>
+              <li>✓ 可随时保存草稿</li>
+            </ul>
           </div>
-          <div class="plat-stats">
-            <div class="pstat"><span class="ps-n">12,847</span><span class="ps-l">份资料</span></div>
-            <div class="pstat"><span class="ps-n">38,291</span><span class="ps-l">名用户</span></div>
-            <div class="pstat"><span class="ps-n">521k</span><span class="ps-l">次下载</span></div>
-          </div>
-        </div>
-      </aside>
+        </aside>
+      </div>
     </div>
-
-    <!-- NOTIFICATION -->
-    <Teleport to="body">
-      <Transition name="notif">
-        <div v-if="notification.show" class="notif" :class="notification.type">
-          <span class="notif-icon">{{ notification.type === 'success' ? '✓' : '✕' }}</span>
-          {{ notification.text }}
-        </div>
-      </Transition>
-    </Teleport>
   </div>
 </template>
 
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&display=swap');
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+const router = useRouter()
+const mouseX = ref(0)
+const mouseY = ref(0)
+let particleRafId: number | null = null
+let observers: IntersectionObserver[] = []
+
+const levels = ['初级', '中级', '高级']
+
+const form = ref({
+  title: '',
+  subtitle: '',
+  price: 299,
+  originalPrice: 599,
+  level: '初级',
+  description: '',
+  objectives: ['掌握车辆基本操控', '理解核心交通规则'],
+  requirements: ['年满 18 周岁', '持有学习驾照'],
+  chapters: [
+    {
+      title: '第一章：驾驶基础认知',
+      videos: [
+        { title: '车辆仪表盘逐项解读', duration: '15:30', isFree: true },
+        { title: '座椅与后视镜的精确调整', duration: '12:45', isFree: false },
+      ]
+    }
+  ],
+  instructor: {
+    name: '张教练',
+    title: '国家一级驾驶教练 · 前职业赛车手',
+    bio: '拥有 15 年驾驶教学经验，累计培训学员超过 5000 人。'
+  }
+})
+
+const discount = computed(() => {
+  if (!form.value.originalPrice) return ''
+  return ((form.value.price / form.value.originalPrice) * 10).toFixed(1)
+})
+
+const totalVideos = computed(() => {
+  return form.value.chapters.reduce((acc, ch) => acc + ch.videos.length, 0)
+})
+
+function chapterTotalDuration(chapter: any) {
+  // 简单模拟：返回总分钟数估算，实际可计算mm:ss总和
+  let totalSec = 0
+  chapter.videos.forEach((v: any) => {
+    const parts = v.duration.split(':')
+    if (parts.length === 2) {
+      totalSec += parseInt(parts[0]) * 60 + parseInt(parts[1])
+    }
+  })
+  const mins = Math.floor(totalSec / 60)
+  const secs = totalSec % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+function addObjective() { form.value.objectives.push('') }
+function removeObjective(idx: number) { form.value.objectives.splice(idx, 1) }
+function addRequirement() { form.value.requirements.push('') }
+function removeRequirement(idx: number) { form.value.requirements.splice(idx, 1) }
+
+function addChapter() {
+  form.value.chapters.push({ title: '新章节', videos: [{ title: '', duration: '', isFree: false }] })
+}
+function removeChapter(idx: number) { form.value.chapters.splice(idx, 1) }
+function addVideo(chapterIdx: number) {
+  form.value.chapters[chapterIdx].videos.push({ title: '', duration: '', isFree: false })
+}
+function removeVideo(chapterIdx: number, videoIdx: number) {
+  form.value.chapters[chapterIdx].videos.splice(videoIdx, 1)
+}
+
+function saveDraft() {
+  // 模拟保存草稿
+  alert('草稿已保存')
+}
+function publish() {
+  // 模拟发布
+  alert('课程发布成功！')
+}
+function goBack() { router.back() }
+
+// 初始化粒子背景（复制自课程详情页）
+function initParticles(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext('2d')!
+  let W = window.innerWidth, H = window.innerHeight
+  canvas.width = W; canvas.height = H
+  const count = Math.floor((W * H) / 12000)
+  const pts = Array.from({ length: count }, () => ({
+    x: Math.random() * W, y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 0.18, vy: (Math.random() - 0.5) * 0.18,
+    r: Math.random() * 1.1 + 0.3,
+    alpha: Math.random() * 0.35 + 0.08,
+    color: ['0,255,180', '0,200,255', '80,255,200'][Math.floor(Math.random() * 3)],
+  }))
+  function draw() {
+    ctx.clearRect(0, 0, W, H)
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y
+        const d = Math.sqrt(dx * dx + dy * dy)
+        if (d < 110) {
+          ctx.beginPath()
+          ctx.moveTo(pts[i].x, pts[i].y)
+          ctx.lineTo(pts[j].x, pts[j].y)
+          ctx.strokeStyle = `rgba(0,255,180,${0.04 * (1 - d / 110)})`
+          ctx.lineWidth = 0.4
+          ctx.stroke()
+        }
+      }
+      const p = pts[i]
+      p.x += p.vx; p.y += p.vy
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(${p.color},${p.alpha})`
+      ctx.fill()
+    }
+    particleRafId = requestAnimationFrame(draw)
+  }
+  draw()
+  window.addEventListener('resize', () => {
+    W = window.innerWidth; H = window.innerHeight
+    canvas.width = W; canvas.height = H
+  })
+}
+
+function initObservers(root: Element) {
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible') })
+  }, { threshold: 0.08 })
+  root.querySelectorAll('.fade-up').forEach(el => obs.observe(el))
+  observers.push(obs)
+}
+
+function onMouseMove(e: MouseEvent) {
+  mouseX.value = e.clientX
+  mouseY.value = e.clientY
+}
+
+onMounted(() => {
+  const root = document.querySelector('.upload-root')!
+  const canvas = root.querySelector('.bg-canvas') as HTMLCanvasElement
+  if (canvas) initParticles(canvas)
+  if (root) initObservers(root)
+  window.addEventListener('mousemove', onMouseMove)
+})
+
+onUnmounted(() => {
+  if (particleRafId) cancelAnimationFrame(particleRafId)
+  observers.forEach(o => o.disconnect())
+  window.removeEventListener('mousemove', onMouseMove)
+})
+</script>
+
+<style scoped>
+/* 完全复用课程详情页的基础样式，并添加表单特有样式 */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 .upload-root {
-  font-family: 'DM Sans', sans-serif;
+  background: #020b10;
+  color: #c8f0e0;
+  font-family: 'Noto Sans SC', sans-serif;
   min-height: 100vh;
-  background: #060912;
-  color: #dde1ed;
-  position: relative;
   overflow-x: hidden;
+  position: relative;
 }
 
-/* BG */
-.cursor-glow { position: fixed; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(0,201,167,0.065) 0%, transparent 65%); transform: translate(-50%,-50%); pointer-events: none; z-index: 0; transition: left 0.12s linear, top 0.12s linear; }
-.bg-grid { position: fixed; inset: 0; background-image: linear-gradient(rgba(108,99,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(108,99,255,0.03) 1px, transparent 1px); background-size: 56px 56px; z-index: 0; pointer-events: none; }
-.bg-orb { position: fixed; border-radius: 50%; filter: blur(130px); pointer-events: none; z-index: 0; animation: of 14s ease-in-out infinite alternate; }
-.o1 { width: 450px; height: 450px; background: rgba(108,99,255,0.1); top: -150px; left: -150px; }
-.o2 { width: 350px; height: 350px; background: rgba(0,201,167,0.08); bottom: -100px; right: 0; animation-delay: -5s; }
-.o3 { width: 300px; height: 300px; background: rgba(255,179,71,0.06); top: 40%; left: 40%; animation-delay: -10s; }
-@keyframes of { from { transform: translate(0,0) scale(1); } to { transform: translate(30px,25px) scale(1.12); } }
-
-/* PAGE LAYOUT */
-.page-wrap { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 320px; gap: 32px; max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
-
-/* FORM SIDE */
-.form-side {}
-
-/* STEPS */
-.steps { display: flex; align-items: center; margin-bottom: 36px; }
-.step { display: flex; align-items: center; gap: 8px; }
-.step-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.12); background: transparent; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; color: rgba(221,225,237,0.35); transition: all 0.35s ease; flex-shrink: 0; }
-.step.active .step-dot { border-color: #6C63FF; background: rgba(108,99,255,0.2); color: #a09fff; }
-.step.done .step-dot { border-color: #00C9A7; background: rgba(0,201,167,0.2); color: #00C9A7; }
-.step-label { font-size: 0.82rem; color: rgba(221,225,237,0.35); white-space: nowrap; transition: color 0.3s; }
-.step.active .step-label, .step.done .step-label { color: rgba(221,225,237,0.75); }
-.step-line { flex: 1; height: 1px; background: rgba(255,255,255,0.08); margin: 0 12px; min-width: 20px; transition: background 0.4s; }
-.step-line.filled { background: rgba(0,201,167,0.4); }
-
-.page-title { font-family: 'Syne', sans-serif; font-size: 2.2rem; font-weight: 800; color: #fff; letter-spacing: -0.03em; margin-bottom: 8px; }
-.page-sub { color: rgba(221,225,237,0.42); font-size: 0.95rem; font-weight: 300; margin-bottom: 36px; }
-
-/* SECTION */
-.section { display: flex; flex-direction: column; gap: 24px; animation: fadeIn 0.35s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-
-/* DROP ZONE */
-.drop-zone {
-  border: 2px dashed rgba(255,255,255,0.1); border-radius: 20px; padding: 56px 24px;
-  text-align: center; cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden;
-  background: rgba(255,255,255,0.015);
+/* 背景层 */
+.bg-canvas {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none; z-index: 0;
 }
-.drop-zone:hover, .drop-zone.dragging { border-color: rgba(108,99,255,0.5); background: rgba(108,99,255,0.04); }
-.drop-zone.has-files { border-color: rgba(0,201,167,0.3); }
-.drop-label { display: block; cursor: pointer; }
-.file-input { display: none; }
-
-.drop-icon-wrap { position: relative; width: 72px; height: 72px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; }
-.drop-ring { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(108,99,255,0.2); animation: ringPulse 2.5s ease-in-out infinite; }
-.drop-ring.r2 { animation-delay: 1.2s; inset: -8px; }
-@keyframes ringPulse { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.05); } }
-.drop-icon { color: rgba(108,99,255,0.7); position: relative; }
-
-.drop-text { font-size: 1.05rem; color: #dde1ed; margin-bottom: 8px; font-weight: 400; }
-.drop-link { color: #6C63FF; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
-.drop-hint { font-size: 0.82rem; color: rgba(221,225,237,0.3); font-weight: 300; }
-
-/* FILE LIST */
-.file-list { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; }
-.file-list-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: rgba(221,225,237,0.5); }
-.total-size { color: rgba(221,225,237,0.35); }
-.file-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.2s; }
-.file-item:last-child { border-bottom: none; }
-.file-item:hover { background: rgba(255,255,255,0.03); }
-.file-thumb { width: 38px; height: 38px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.06); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.file-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.file-emoji { font-size: 1.2rem; }
-.file-info { flex: 1; min-width: 0; }
-.fname { display: block; font-size: 0.87rem; color: #dde1ed; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fsize { font-size: 0.76rem; color: rgba(221,225,237,0.35); }
-.rm-btn { background: rgba(255,255,255,0.05); border: none; color: rgba(221,225,237,0.4); width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
-.rm-btn:hover { background: rgba(255,80,80,0.15); color: #ff6b6b; }
-
-/* FIELDS */
-.field { display: flex; flex-direction: column; gap: 8px; position: relative; }
-.field label { font-size: 0.85rem; font-weight: 500; color: rgba(221,225,237,0.65); }
-.req { color: #ff6b6b; }
-.cc { position: absolute; right: 12px; bottom: 12px; font-size: 0.74rem; color: rgba(221,225,237,0.28); }
-.field input, .field textarea {
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.085);
-  border-radius: 12px; padding: 12px 16px; color: #dde1ed;
-  font-family: 'DM Sans', sans-serif; font-size: 0.94rem; outline: none; transition: all 0.22s;
+.noise-layer {
+  position: fixed; inset: 0; z-index: 1;
+  pointer-events: none; opacity: 0.022;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px;
 }
-.field input:focus, .field textarea:focus { border-color: rgba(108,99,255,0.5); background: rgba(108,99,255,0.048); box-shadow: 0 0 0 3px rgba(108,99,255,0.1); }
-.field textarea { resize: vertical; line-height: 1.7; }
-
-/* CAT GRID */
-.cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.cat-option { background: rgba(255,255,255,0.038); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 10px; color: rgba(221,225,237,0.6); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: all 0.22s; }
-.cat-option:hover { background: rgba(255,255,255,0.07); color: #dde1ed; }
-.cat-option.selected { background: rgba(108,99,255,0.18); border-color: rgba(108,99,255,0.4); color: #a09fff; }
-.co-emoji { font-size: 1.3rem; }
-
-/* LICENSE */
-.license-list { display: flex; flex-direction: column; gap: 10px; }
-.license-opt { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; cursor: pointer; transition: all 0.22s; }
-.license-opt:hover { background: rgba(255,255,255,0.055); }
-.license-opt.selected { background: rgba(108,99,255,0.1); border-color: rgba(108,99,255,0.35); }
-.lic-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0; transition: all 0.2s; position: relative; }
-.lic-radio.sel { border-color: #6C63FF; background: rgba(108,99,255,0.3); }
-.lic-radio.sel::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: #6C63FF; }
-.lic-label { font-size: 0.9rem; font-weight: 500; color: #dde1ed; margin-bottom: 2px; }
-.lic-desc { font-size: 0.8rem; color: rgba(221,225,237,0.4); }
-
-/* SUMMARY */
-.summary { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; }
-.summary-title { padding: 14px 18px 12px; font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.9rem; color: rgba(221,225,237,0.7); border-bottom: 1px solid rgba(255,255,255,0.06); }
-.summary-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 18px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.87rem; }
-.summary-row:last-child { border-bottom: none; }
-.summary-row span { color: rgba(221,225,237,0.4); }
-.summary-row strong { color: #dde1ed; font-weight: 400; max-width: 60%; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* PROGRESS */
-.progress-wrap { display: flex; flex-direction: column; gap: 10px; }
-.progress-bar { height: 6px; background: rgba(255,255,255,0.07); border-radius: 100px; overflow: visible; position: relative; }
-.progress-fill { height: 100%; border-radius: 100px; background: linear-gradient(90deg, #6C63FF, #00C9A7); transition: width 0.25s ease; position: relative; }
-.progress-glow { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #00C9A7; box-shadow: 0 0 12px #00C9A7; transition: left 0.25s ease; }
-.progress-text { font-size: 0.82rem; color: rgba(221,225,237,0.5); text-align: center; }
-
-/* BUTTONS */
-.step-btns { display: flex; gap: 12px; }
-.back-btn { background: rgba(255,255,255,0.055); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; color: rgba(221,225,237,0.6); font-family: 'DM Sans', sans-serif; font-size: 0.94rem; padding: 12px 20px; cursor: pointer; transition: all 0.2s; }
-.back-btn:hover { background: rgba(255,255,255,0.09); color: #dde1ed; }
-.next-btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: linear-gradient(135deg, #6C63FF, #4ECDC4); border: none;
-  border-radius: 12px; color: #fff;
-  font-family: 'DM Sans', sans-serif; font-size: 0.94rem; font-weight: 500;
-  padding: 12px 24px; cursor: pointer; flex: 1; justify-content: center;
-  transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1);
-  box-shadow: 0 4px 20px rgba(108,99,255,0.28);
+.cursor-glow {
+  position: fixed; z-index: 1;
+  width: 500px; height: 500px;
+  transform: translate(-50%,-50%);
+  background: radial-gradient(circle, rgba(0,255,180,0.028) 0%, transparent 55%);
+  pointer-events: none;
+  transition: left 0.07s, top 0.07s;
 }
-.next-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(108,99,255,0.48); }
-.next-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
-.submit-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  background: linear-gradient(135deg, #00C9A7, #6C63FF);
-  border: none; border-radius: 12px; color: #fff;
-  font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 500;
-  padding: 14px 32px; cursor: pointer; flex: 1;
-  transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1);
-  box-shadow: 0 4px 24px rgba(0,201,167,0.3);
+
+/* 淡入动画 */
+.fade-up {
+  opacity: 0; transform: translateY(22px);
+  transition: opacity 0.7s cubic-bezier(0.25,1,0.5,1), transform 0.7s cubic-bezier(0.25,1,0.5,1);
 }
-.submit-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,201,167,0.5); }
-.submit-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
-.uploading { display: flex; align-items: center; gap: 6px; }
-.spin { display: inline-block; animation: spin 1s linear infinite; font-size: 1.1rem; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.fade-up.visible { opacity:1; transform:translateY(0); }
 
-/* INFO SIDE */
-.info-side { display: flex; flex-direction: column; gap: 16px; }
-.info-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 24px; }
-.info-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-.info-icon { font-size: 1.2rem; }
-.info-header h3 { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; color: #e8eaf0; }
-.info-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-.info-list li { font-size: 0.85rem; color: rgba(221,225,237,0.55); padding-left: 16px; position: relative; line-height: 1.5; }
-.info-list li::before { content: '·'; position: absolute; left: 4px; color: #6C63FF; font-weight: 700; }
-
-.reward.info-card { border-color: rgba(255,179,71,0.15); background: rgba(255,179,71,0.03); }
-.reward-list { display: flex; flex-direction: column; gap: 10px; }
-.reward-item { display: flex; justify-content: space-between; align-items: center; }
-.r-label { font-size: 0.85rem; color: rgba(221,225,237,0.55); }
-.r-pts { font-size: 0.85rem; font-weight: 600; color: #FFB347; font-family: 'Syne', sans-serif; }
-.r-pts.hot { color: #ff6b6b; }
-
-.stats-card { border-color: rgba(108,99,255,0.15); background: rgba(108,99,255,0.025); }
-.plat-stats { display: flex; justify-content: space-between; }
-.pstat { text-align: center; }
-.ps-n { display: block; font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
-.ps-l { font-size: 0.76rem; color: rgba(221,225,237,0.38); }
-
-/* FILE LIST TRANSITION */
-.flist-enter-active, .flist-leave-active { transition: all 0.3s ease; }
-.flist-enter-from { opacity: 0; transform: translateX(-12px); }
-.flist-leave-to { opacity: 0; transform: translateX(12px); }
-
-/* NOTIFICATION */
-.notif {
-  position: fixed; bottom: 32px; right: 32px; z-index: 2000;
-  display: flex; align-items: center; gap: 10px;
-  background: #0e1321; border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 14px; padding: 14px 20px;
-  font-size: 0.92rem; box-shadow: 0 16px 48px rgba(0,0,0,0.7);
-  max-width: 360px; backdrop-filter: blur(16px);
+/* 导航栏 (复用) */
+.top-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 48px;
+  background: rgba(2,4,8,0.82); backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(0,212,255,0.08);
 }
-.notif.success { border-color: rgba(0,201,167,0.35); }
-.notif.error { border-color: rgba(255,107,107,0.35); }
-.notif-icon { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; flex-shrink: 0; }
-.notif.success .notif-icon { background: rgba(0,201,167,0.18); color: #00C9A7; }
-.notif.error .notif-icon { background: rgba(255,107,107,0.15); color: #ff6b6b; }
-
-.notif-enter-active, .notif-leave-active { transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1); }
-.notif-enter-from, .notif-leave-to { opacity: 0; transform: translateY(20px) scale(0.9); }
-
-/* RESPONSIVE */
-@media (max-width: 900px) {
-  .page-wrap { grid-template-columns: 1fr; }
-  .info-side { order: -1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .stats-card { grid-column: 1/-1; }
+.nav-left { display: flex; align-items: center; gap: 18px; }
+.nav-logo { display: flex; align-items: center; gap: 10px; font-family: 'Orbitron', sans-serif; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.1em; color: #c8f0e0; flex-shrink: 0; }
+.logo-text em { font-style: normal; color: #00d4ff; }
+.back-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 9px;
+  background: rgba(0,212,255,0.06); border: 1px solid rgba(0,212,255,0.08);
+  color: rgba(150,210,180,0.35); font-family: 'Noto Sans SC', sans-serif; font-size: 0.84rem; cursor: pointer;
+  transition: all 0.2s;
 }
-@media (max-width: 600px) {
-  .page-wrap { padding: 32px 16px 60px; }
-  .page-title { font-size: 1.7rem; }
-  .cat-grid { grid-template-columns: repeat(2, 1fr); }
-  .info-side { grid-template-columns: 1fr; }
-  .stats-card { grid-column: auto; }
-  .topnav { padding: 0 20px; }
-  .nav-links { display: none; }
+.back-btn:hover { color: #c8f0e0; background: rgba(0,212,255,0.1); border-color: rgba(0,212,255,0.22); }
+.nav-right { display: flex; align-items: center; gap: 12px; }
+.compose-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 22px; border-radius: 9px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #0060cc, #00d4ff); color: #fff;
+  font-family: 'Noto Sans SC', sans-serif; font-size: 0.88rem; font-weight: 600;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,180,255,0.3); transition: all 0.25s;
+}
+.compose-btn:hover { box-shadow: 0 8px 30px rgba(0,180,255,0.5); transform: translateY(-1px); }
+.publish-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 22px; border-radius: 9px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #00a07a, #00ff9d); color: #000;
+  font-family: 'Noto Sans SC', sans-serif; font-size: 0.88rem; font-weight: 600;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,255,157,0.3); transition: all 0.25s;
+}
+.publish-btn:hover { box-shadow: 0 8px 30px rgba(0,255,157,0.5); transform: translateY(-1px); }
+.cb-sweep {
+  position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  transition: left 0.5s cubic-bezier(0.25,1,0.5,1);
+}
+.compose-btn:hover .cb-sweep,
+.publish-btn:hover .cb-sweep { left: 150%; }
+
+/* 主内容区域 */
+.upload-main {
+  position: relative; z-index: 2;
+  padding: 84px 48px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.upload-inner {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 32px;
+  align-items: start;
+}
+
+/* 左侧表单区域 */
+.form-left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 内容块 (复用课程详情页 .content-block) */
+.content-block {
+  background: rgba(8,20,44,0.6); border: 1px solid rgba(0,212,255,0.08);
+  border-radius: 12px; padding: 24px 28px; margin-bottom: 0;
+  transition: border-color 0.2s;
+}
+.content-block:hover { border-color: rgba(0,212,255,0.22); }
+.cb-header { margin-bottom: 18px; }
+.cb-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.14em; color: #00d4ff; opacity: 0.7; display: block; margin-bottom: 4px; }
+.cb-title { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.04em; color: #c8f0e0; }
+
+/* 表单元素 */
+.form-group {
+  margin-bottom: 20px;
+}
+.form-group label {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: rgba(150,210,180,0.35);
+  margin-bottom: 6px;
+  letter-spacing: 0.04em;
+}
+.required {
+  color: #ff6b6b;
+}
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 8px;
+  color: #c8f0e0;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+.form-input:focus {
+  outline: none;
+  border-color: rgba(0,212,255,0.4);
+  box-shadow: 0 0 0 2px rgba(0,212,255,0.1);
+}
+textarea.form-input {
+  resize: vertical;
+  line-height: 1.6;
+}
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+.half {
+  flex: 1;
+}
+
+/* 难度选择器 */
+.level-selector {
+  display: flex;
+  gap: 8px;
+}
+.level-btn {
+  flex: 1;
+  padding: 10px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 8px;
+  color: rgba(150,210,180,0.35);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.level-btn.active {
+  background: rgba(0,212,255,0.15);
+  border-color: rgba(0,212,255,0.4);
+  color: #00d4ff;
+  box-shadow: 0 0 10px rgba(0,212,255,0.2);
+}
+
+/* 列表项 (目标/要求) */
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.list-input {
+  flex: 1;
+}
+.remove-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255,107,107,0.1);
+  border: 1px solid rgba(255,107,107,0.2);
+  color: #ff8a8a;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.remove-btn:hover {
+  background: rgba(255,107,107,0.2);
+  border-color: rgba(255,107,107,0.4);
+  color: #ff6b6b;
+}
+.add-btn {
+  background: transparent;
+  border: 1px dashed rgba(0,212,255,0.2);
+  border-radius: 8px;
+  padding: 10px;
+  color: rgba(0,212,255,0.6);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  width: 100%;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+.add-btn:hover {
+  border-color: rgba(0,212,255,0.4);
+  color: #00d4ff;
+  background: rgba(0,212,255,0.02);
+}
+
+/* 章节卡片 */
+.chapter-card {
+  background: rgba(0,0,0,0.2);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(0,212,255,0.08);
+}
+.chapter-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.chapter-number {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #00d4ff;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  padding: 4px 10px;
+  background: rgba(0,212,255,0.08);
+  border-radius: 6px;
+  border: 1px solid rgba(0,212,255,0.15);
+}
+.chapter-title-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 6px;
+  color: #c8f0e0;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 0.85rem;
+}
+.remove-chapter {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255,107,107,0.1);
+  border: 1px solid rgba(255,107,107,0.2);
+  color: #ff8a8a;
+  cursor: pointer;
+}
+.chapter-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: rgba(150,210,180,0.35);
+}
+.videos-list {
+  margin-bottom: 12px;
+}
+.video-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.video-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: rgba(0,212,255,0.6);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  padding: 4px 8px;
+  background: rgba(0,212,255,0.04);
+  border-radius: 4px;
+  min-width: 42px;
+  text-align: center;
+}
+.video-title-input {
+  flex: 2;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 6px;
+  color: #c8f0e0;
+  font-size: 0.8rem;
+}
+.video-duration-input {
+  width: 70px;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 6px;
+  color: #c8f0e0;
+  font-size: 0.8rem;
+  text-align: center;
+}
+.free-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(150,210,180,0.35);
+  font-size: 0.75rem;
+}
+.free-label {
+  cursor: pointer;
+}
+.remove-video {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: rgba(255,107,107,0.1);
+  border: 1px solid rgba(255,107,107,0.2);
+  color: #ff8a8a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.add-video, .add-chapter {
+  background: transparent;
+  border: 1px dashed rgba(0,212,255,0.2);
+  border-radius: 6px;
+  padding: 8px;
+  color: rgba(0,212,255,0.6);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  width: 100%;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.add-video:hover, .add-chapter:hover {
+  border-color: rgba(0,212,255,0.4);
+  color: #00d4ff;
+}
+.add-chapter {
+  margin-top: 0;
+}
+
+/* 右侧发布卡 */
+.sidebar-right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 84px;
+}
+.sidebar-card {
+  background: rgba(8,20,44,0.6); border: 1px solid rgba(0,212,255,0.08);
+  border-radius: 12px; padding: 20px 22px; position: relative;
+}
+.sc-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.18em; color: #00d4ff; opacity: 0.65; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.sc-tag::before { content:''; display:block; width:14px; height:1px; background:#00d4ff; opacity:0.7; }
+.sc-title { font-family: 'Orbitron', sans-serif; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.06em; color: #c8f0e0; margin-bottom: 14px; }
+
+.price-preview {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.preview-current {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2rem;
+  color: #fff;
+}
+.preview-original {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  color: rgba(255,255,255,0.25);
+  text-decoration: line-through;
+}
+.preview-badge {
+  padding: 2px 8px;
+  background: rgba(255,107,53,0.15);
+  border: 1px solid rgba(255,107,53,0.3);
+  color: #ff8a4c;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+.preview-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  background: rgba(0,0,0,0.2);
+  padding: 12px;
+  border-radius: 8px;
+}
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  color: #c8f0e0;
+}
+.stat-label {
+  font-size: 0.6rem;
+  color: rgba(150,210,180,0.35);
+  letter-spacing: 0.06em;
+}
+.publish-btn.large {
+  width: 100%;
+  padding: 14px;
+  font-size: 1rem;
+  margin-bottom: 8px;
+  justify-content: center;
+}
+.draft-btn {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 8px;
+  color: rgba(0,212,255,0.6);
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.draft-btn:hover {
+  border-color: rgba(0,212,255,0.4);
+  color: #00d4ff;
+}
+.sc-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 0.7rem;
+  color: rgba(150,210,180,0.35);
+  font-family: 'JetBrains Mono', monospace;
+}
+.tip-icon {
+  color: #00d4ff;
+}
+.tip-list {
+  list-style: none;
+}
+.tip-list li {
+  font-size: 0.75rem;
+  color: rgba(150,210,180,0.6);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tip-list li::before {
+  content: "➤";
+  color: #00d4ff;
+  font-size: 0.6rem;
+}
+
+/* 响应式 */
+@media (max-width: 1100px) {
+  .upload-inner {
+    grid-template-columns: 1fr;
+  }
+  .sidebar-right {
+    position: static;
+  }
+}
+@media (max-width: 768px) {
+  .top-nav { padding: 0 20px; }
+  .upload-main { padding: 84px 20px 40px; }
+  .form-row { flex-direction: column; gap: 0; }
+  .video-item { flex-wrap: wrap; }
+  .video-title-input { flex: 1 1 100%; }
 }
 </style>

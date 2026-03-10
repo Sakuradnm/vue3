@@ -67,7 +67,7 @@ const closeConsultModal = () => {
     <!-- 页面标题 -->
     <section class="hero-section">
         <div class="hero-image">
-          <img src="/service/Finance.jpg" alt="hero-img">
+          <img src="" alt="hero-img">
         </div>
         <div class="hero-text">
           <h1>金融服务</h1>

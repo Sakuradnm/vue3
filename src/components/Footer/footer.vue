@@ -3,59 +3,6 @@
     <!-- 社区标签：用圆角标签展示主要社区入口，符合课程资源共享的社交属性 -->
 
     <div class="container">
-      <!-- 主要内容区域：平台标识 + 三列导航/联系信息 -->
-      <div class="footer-main">
-        <!-- 平台简介区：用 emoji 和标题强调资源共享理念 -->
-        <div class="brand">
-          <div class="logo">
-            <span class="logo-icon">📚</span>
-            <h2 class="logo-title">CourseShare</h2>
-          </div>
-          <p class="brand-slogan">汇聚优质课程 · 共享学习资源</p>
-          <p class="brand-description">
-            一个开放、协作的课程资源共享社区，帮助学习者更高效地获取知识。
-          </p>
-        </div>
-
-        <!-- 链接区块：分为课程分类、资源中心、联系我们三大块 -->
-        <div class="link-blocks">
-          <!-- 课程分类 -->
-          <div class="block">
-            <h3>课程分类</h3>
-            <ul>
-              <li><a href="#">前端开发</a></li>
-              <li><a href="#">后端开发</a></li>
-              <li><a href="#">移动开发</a></li>
-              <li><a href="#">人工智能</a></li>
-              <li><a href="#">产品/设计</a></li>
-            </ul>
-          </div>
-
-          <!-- 资源中心 -->
-          <div class="block">
-            <h3>资源中心</h3>
-            <ul>
-              <li><a href="#">学习路线</a></li>
-              <li><a href="#">项目实战</a></li>
-              <li><a href="#">题库/笔记</a></li>
-              <li><a href="#">开源资料</a></li>
-              <li><a href="#">推荐书单</a></li>
-            </ul>
-          </div>
-
-          <!-- 联系我们 -->
-          <div class="block contact-block">
-            <h3>联系我们</h3>
-            <ul>
-              <li><span>📧 邮箱：</span><a href="mailto:course@share.com">course@share.com</a></li>
-              <li><span>💬 QQ群：</span><span>123456789</span></li>
-              <li><span>📢 公众号：</span><span>课程共享平台</span></li>
-              <li><span>⏰ 在线时间：</span><span>9:00 - 22:00</span></li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
       <!-- 底部版权与法律链接 -->
       <div class="footer-bottom">
         <p class="copyright">© 2025 课程资源共享平台. 保留所有权利。</p>

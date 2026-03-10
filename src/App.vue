@@ -4,7 +4,7 @@
     <main>
       <router-view></router-view>
     </main>
-    <Footer />
+    <Footer v-if="!isLoginPage" />
   </template>
   <template v-else>
     <main class="admin-main">
@@ -15,12 +15,18 @@
 
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import Menu from "@/components/Menu/menu.vue";
 import Footer from "@/components/Footer/footer.vue";
 
+const route = useRoute()
+
 // 检查是否为管理员登录状态
 const isAdminLogin = ref(false)
+
+// 检查是否为登录页面
+const isLoginPage = computed(() => route.path === '/Users')
 
 const checkAdminStatus = () => {
   const storedUserInfo = localStorage.getItem('userInfo')

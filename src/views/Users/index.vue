@@ -23,6 +23,13 @@ export default {
     const isStudent = ref(true)
     // 倒计时相关
     const registerCountdown = ref(0)
+    // 密码显示/隐藏
+    const showPassword = ref(false)
+
+    // 切换密码显示/隐藏
+    const toggleShowPassword = () => {
+      showPassword.value = !showPassword.value
+    }
 
     const loginForm = reactive({
       username: '',
@@ -302,7 +309,8 @@ export default {
       sendVerificationCode,
       loginTypeTransition,
       transitionName,
-      registerCountdown
+      registerCountdown,
+      showPassword
     }
   }
 }
@@ -354,26 +362,32 @@ export default {
                 <!-- 学生登录表单 -->
                 <form v-if="isStudent" key="student" @submit.prevent="handleLogin">
                   <div class="form-group">
-                    <input
-                        type="text"
-                        v-model="loginForm.username"
-                        @input="handleUsernameInput"
-                        placeholder="手机号/邮箱/用户名"
-                        required
-                        pattern=".{3,}"
-                        title="请输入用户名/手机号/邮箱">
-                    <span class="clear-icon" @click="clearInput" v-if="loginForm.username" title="清空账号和密码">✕</span>
-                    <span class="error-message">{{ errors.username }}</span>
+                    <div class="input-wrapper">
+                      <input
+                          type="text"
+                          v-model="loginForm.username"
+                          @input="handleUsernameInput"
+                          placeholder="手机号/邮箱/用户名"
+                          required
+                          pattern=".{3,}"
+                          title="请输入用户名/手机号/邮箱">
+                      <span class="clear-icon" @click="clearInput" v-if="loginForm.username || loginForm.password" title="清空账号和密码">✕</span>
+                    </div>
                   </div>
                   <div class="form-group">
-                    <input
-                        type="password"
-                        v-model="loginForm.password"
-                        placeholder="密码"
-                        required
-                        pattern=".{6,}"
-                        title="密码至少 6 位">
-                    <span class="error-message">{{ errors.password }}</span>
+                    <div class="input-wrapper">
+                      <input
+                          :type="showPassword ? 'text' : 'password'"
+                          v-model="loginForm.password"
+                          placeholder="密码"
+                          required
+                          pattern=".{6,}"
+                          title="密码至少 6 位">
+                      <span class="toggle-password-icon" @click.stop="toggleShowPassword" :title="showPassword ? '隐藏密码' : '显示密码'">
+                        <svg-icon v-if="showPassword" name="eye-open" :width="20" height="20"/>
+                        <svg-icon v-else name="eye-close" :width="20" height="20"/>
+                      </span>
+                    </div>
                   </div>
 
                   <label class="checkbox-group">
@@ -400,26 +414,32 @@ export default {
                 <!-- 教师登录表单 -->
                 <form v-else key="teacher" @submit.prevent="handleLogin">
                   <div class="form-group">
-                    <input
-                        type="text"
-                        v-model="loginForm.username"
-                        @input="handleUsernameInput"
-                        placeholder="手机号/邮箱/用户名"
-                        required
-                        pattern=".{3,}"
-                        title="请输入用户名/手机号/邮箱">
-                    <span class="clear-icon" @click="clearInput" v-if="loginForm.username" title="清空账号和密码">✕</span>
-                    <span class="error-message">{{ errors.username }}</span>
+                    <div class="input-wrapper">
+                      <input
+                          type="text"
+                          v-model="loginForm.username"
+                          @input="handleUsernameInput"
+                          placeholder="手机号/邮箱/用户名"
+                          required
+                          pattern=".{3,}"
+                          title="请输入用户名/手机号/邮箱">
+                      <span class="clear-icon" @click="clearInput" v-if="loginForm.username || loginForm.password" title="清空账号和密码">✕</span>
+                    </div>
                   </div>
                   <div class="form-group">
-                    <input
-                        type="password"
-                        v-model="loginForm.password"
-                        placeholder="密码"
-                        required
-                        pattern=".{6,}"
-                        title="密码至少 6 位">
-                    <span class="error-message">{{ errors.password }}</span>
+                    <div class="input-wrapper">
+                      <input
+                          :type="showPassword ? 'text' : 'password'"
+                          v-model="loginForm.password"
+                          placeholder="密码"
+                          required
+                          pattern=".{6,}"
+                          title="密码至少 6 位">
+                      <span class="toggle-password-icon" @click.stop="toggleShowPassword" :title="showPassword ? '隐藏密码' : '显示密码'">
+                        <svg-icon v-if="showPassword" name="eye-open" :width="20" height="20"/>
+                        <svg-icon v-else name="eye-close" :width="20" height="20"/>
+                      </span>
+                    </div>
                   </div>
 
                   <label class="checkbox-group">
@@ -457,7 +477,6 @@ export default {
                     v-model="registerForm.username"
                     placeholder="用户名 (6-9 位字母数字)"
                     :class="{ 'error': errors.username }" required>
-                <span class="error-message">{{ errors.username }}</span>
               </div>
               <div class="form-group">
                 <input
@@ -465,7 +484,6 @@ export default {
                     v-model="registerForm.password"
                     placeholder="密码 (6-12 位字母数字)"
                     :class="{ 'error': errors.password }" required>
-                <span class="error-message">{{ errors.password }}</span>
               </div>
               <div class="form-group">
                 <input
@@ -473,7 +491,6 @@ export default {
                     v-model="registerForm.phone"
                     placeholder="手机号"
                     :class="{ 'error': errors.phone }" required>
-                <span class="error-message">{{ errors.phone }}</span>
               </div>
               <label class="checkbox-group">
                 <input type="checkbox" v-model="agreeToTerms">
@@ -566,13 +583,13 @@ export default {
 }
 
 .login-header {
-  margin-bottom: 1.5rem;
+  margin: 2rem 0;
 }
 
 .login-tabs {
   display: flex;
   justify-content: center;
-  gap: 2rem;
+  gap: 3rem;
 }
 
 .login-tabs h2 {
@@ -707,16 +724,23 @@ export default {
  * 输入表单样式
  ************************************************************/
 .form-group {
-  margin: 0.6rem 1rem;
+  margin: 0 3rem;
   position: relative;
-  min-height: 74px;
+  min-height: 80px;
 }
 
-/* 清空按钮样式 */
+/* 输入框包装器 */
+.input-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+/* 清空图标样式 */
 .clear-icon {
   position: absolute;
-  right: 15px;
-  top: 38%;
+  right: 12px;
+  top: 50%;
   transform: translateY(-50%);
   color: rgba(255, 255, 255, 0.5);
   font-size: 1.2rem;
@@ -724,6 +748,10 @@ export default {
   transition: all 0.3s ease;
   z-index: 10;
   padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
 }
 
 .clear-icon:hover {
@@ -731,8 +759,37 @@ export default {
   transform: translateY(-50%) scale(1.1);
 }
 
+/* 密码切换图标样式 */
+.toggle-password-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.toggle-password-icon:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.toggle-password-icon svg {
+  display: block;
+  margin: 0 auto;
+}
+
 input {
-  width: 90%;
+  width: 100%;
   padding: 1rem;
   padding-right: 3rem;
   background: rgba(255, 255, 255, 0.07);
@@ -741,6 +798,7 @@ input {
   color: white;
   font-size: 0.9rem;
   transition: all 0.5s ease;
+  box-sizing: border-box;
 }
 
 input:focus {
@@ -755,37 +813,10 @@ input.error {
   box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.15);
 }
 
-/************************************************************
- * 错误提示样式
- ************************************************************/
-.error-message {
-  display: block;           /* 独占一行，不被挤压 */
-  min-height: 1.1rem;       /* 占位：没有错误时也留出高度，防止表单跳动 */
-  color: #ff6b6b;           /* 红色提示 */
-  font-size: 0.75rem;
-  text-align: left;
-  padding: 3px 0 0 12px;
-  letter-spacing: 0.02em;
-  line-height: 1.3;
-  transition: opacity 0.2s ease;
-}
-
-/* 没有内容时保持占位但不显示 */
-.error-message:empty {
-  opacity: 0;
-}
-
 /* input 在 error 状态下高亮边框 */
 input.error {
   border-color: rgba(255, 107, 107, 0.6) !important;
   box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.15);
-}
-
-/* form-group 保持固定最小高度，防止错误出现时整体布局跳动 */
-.form-group {
-  margin: 0.6rem 1rem;       /* 覆盖原来的 margin: 1rem，稍微收紧给错误留空间 */
-  position: relative;
-  min-height: 74px;           /* input(约48px) + error(约18px) + padding */
 }
 
 .submit-btn {
@@ -814,9 +845,10 @@ input.error {
 .checkbox-group {
   display: flex;
   align-items: center;
-  margin-bottom: 0.8rem;
   cursor: pointer;
   padding-left: 13px;
+  margin: 0 1rem;       /* 覆盖原来的 margin: 1rem，稍微收紧给错误留空间 */
+  position: relative;
 }
 
 .checkbox-group input[type="checkbox"] {
@@ -988,8 +1020,9 @@ input.error {
   }
 
   input {
-    width: 80% !important;
+    width: 100% !important;
     padding: 1rem;
+    padding-right: 2.5rem;
     font-size: 16px;
   }
 

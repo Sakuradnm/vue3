@@ -106,7 +106,8 @@ const routes = [
     {
         path: '/Upload',
         name: 'Upload',
-        component: Upload
+        component: Upload,
+        meta: { requiresAuth: true }
     },
     {
         path: '/PersonalCenter',
