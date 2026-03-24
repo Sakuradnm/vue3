@@ -10,7 +10,6 @@ const service: AxiosInstance = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
     (config) => {
-        // 可以在这里添加 token 等认证信息
         const token = localStorage.getItem('token')
         if (token) {
             config.headers.Authorization = `Bearer ${token}`
@@ -28,19 +27,31 @@ service.interceptors.response.use(
     (response: AxiosResponse) => {
         const res = response.data
 
-        // 如果返回的状态码不是 200，说明接口有错误
-        if (res.code !== 200 && res.code !== 201) {
-            ElMessage.error(res.message || '请求失败')
-            return Promise.reject(new Error(res.message || '请求失败'))
+        // 如果是数组，直接返回（后端直接返回数据）
+        if (Array.isArray(res)) {
+            return res
         }
 
-        return response
+        // 如果是对象且包含 code 字段（统一格式）
+        if (res && typeof res === 'object' && res.code !== undefined) {
+            if (res.code !== 200 && res.code !== 201) {
+                ElMessage.error(res.message || '请求失败')
+                return Promise.reject(new Error(res.message || '请求失败'))
+            }
+            return res.data !== undefined ? res.data : res
+        }
+        
+        // 其他情况直接返回
+        return res
     },
     (error) => {
         console.error('响应错误:', error)
 
         if (error.response) {
-            switch (error.response.status) {
+            const status = error.response.status
+            const message = error.response.data?.message || error.response.data?.msg || '请求失败'
+            
+            switch (status) {
                 case 401:
                     ElMessage.error('未授权，请重新登录')
                     break
@@ -54,9 +65,10 @@ service.interceptors.response.use(
                     ElMessage.error('服务器内部错误')
                     break
                 default:
-                    ElMessage.error(error.response.data?.message || '请求失败')
+                    ElMessage.error(message)
             }
-        } else {
+        } else if (error.message) {
+            console.error('网络错误:', error.message)
             ElMessage.error('网络错误，请稍后重试')
         }
 

@@ -94,12 +94,12 @@ const routes = [
         component: Course
     },
     {
-        path: '/course/:id',
+        path: '/course.ts/:id',
         name: 'CourseDetail',
         component: CourseDetail
     },
     {
-        path: '/course/:id/learn',
+        path: '/course.ts/:id/learn',
         name: 'CourseLearn',
         component: CourseDetail
     },

@@ -1,61 +1,43 @@
 {
-  "hash": "b4695a04",
-  "configHash": "4e146195",
+  "hash": "0da7643e",
+  "configHash": "22df5076",
   "lockfileHash": "b54cf2a0",
-  "browserHash": "dffb6a22",
+  "browserHash": "d7dc02bd",
   "optimized": {
-    "@studio-freight/lenis": {
-      "src": "../../node_modules/@studio-freight/lenis/dist/lenis.mjs",
-      "file": "@studio-freight_lenis.js",
-      "fileHash": "eb5c53ff",
+    "@element-plus/icons-vue": {
+      "src": "../../node_modules/@element-plus/icons-vue/dist/index.js",
+      "file": "@element-plus_icons-vue.js",
+      "fileHash": "8e878720",
       "needsInterop": false
     },
     "axios": {
       "src": "../../node_modules/axios/index.js",
       "file": "axios.js",
-      "fileHash": "31378bd1",
+      "fileHash": "448d0abc",
       "needsInterop": false
     },
     "element-plus": {
       "src": "../../node_modules/element-plus/es/index.mjs",
       "file": "element-plus.js",
-      "fileHash": "d5475b5b",
-      "needsInterop": false
-    },
-    "gsap": {
-      "src": "../../node_modules/gsap/index.js",
-      "file": "gsap.js",
-      "fileHash": "f832e38c",
-      "needsInterop": false
-    },
-    "gsap/ScrollTrigger": {
-      "src": "../../node_modules/gsap/ScrollTrigger.js",
-      "file": "gsap_ScrollTrigger.js",
-      "fileHash": "7b3eec18",
-      "needsInterop": false
-    },
-    "vue": {
-      "src": "../../node_modules/vue/dist/vue.runtime.esm-bundler.js",
-      "file": "vue.js",
-      "fileHash": "3bdd1f05",
-      "needsInterop": false
-    },
-    "vue-router": {
-      "src": "../../node_modules/vue-router/dist/vue-router.mjs",
-      "file": "vue-router.js",
-      "fileHash": "4cc0ea55",
+      "fileHash": "1b44e706",
       "needsInterop": false
     },
     "element-plus/dist/locale/zh-cn.mjs": {
       "src": "../../node_modules/element-plus/dist/locale/zh-cn.mjs",
       "file": "element-plus_dist_locale_zh-cn__mjs.js",
-      "fileHash": "355491ec",
+      "fileHash": "67ad55a7",
       "needsInterop": false
     },
-    "@element-plus/icons-vue": {
-      "src": "../../node_modules/@element-plus/icons-vue/dist/index.js",
-      "file": "@element-plus_icons-vue.js",
-      "fileHash": "a082c32d",
+    "vue": {
+      "src": "../../node_modules/vue/dist/vue.runtime.esm-bundler.js",
+      "file": "vue.js",
+      "fileHash": "0dca05a9",
+      "needsInterop": false
+    },
+    "vue-router": {
+      "src": "../../node_modules/vue-router/dist/vue-router.mjs",
+      "file": "vue-router.js",
+      "fileHash": "d0a790b7",
       "needsInterop": false
     }
   },
@@ -66,8 +48,8 @@
     "chunk-DGEITL4N": {
       "file": "chunk-DGEITL4N.js"
     },
-    "chunk-DC5AMYBS": {
-      "file": "chunk-DC5AMYBS.js"
+    "chunk-G3PMV62Z": {
+      "file": "chunk-G3PMV62Z.js"
     }
   }
 }

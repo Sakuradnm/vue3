@@ -1,15 +1,53 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { getAllCategories, getSubCategoriesByCategoryId, getCoursesBySubCategoryId } from '@/api/course'
 
 const router = useRouter()
 const selectedCategory = ref(0)
+const selectedSubCategory = ref(0)
 const searchQuery = ref('')
 const hoveredCard = ref<number | null>(null)
 const mouseX = ref(0)
 const mouseY = ref(0)
-let particleRafId: number | null= null
+let particleRafId: number | null = null
 let observers: IntersectionObserver[] = []
+const categories = ref<any[]>([])
+const loading = ref(true)
+
+// 平台优势数据
+const features = ref([
+  {
+    icon: '📚',
+    title: '国家标准体系',
+    desc: '严格遵循GB/T 13745-2009学科分类，构建系统化知识框架'
+  },
+  {
+    icon: '🎓',
+    title: '权威师资团队',
+    desc: '来自顶尖院校的教授与行业专家联合授课'
+  },
+  {
+    icon: '📈',
+    title: '动态学习路径',
+    desc: 'AI智能推荐，根据学习进度实时调整课程安排'
+  },
+  {
+    icon: '🏆',
+    title: '认证证书体系',
+    desc: '完成课程可获得国家认可的学习证书'
+  },
+  {
+    icon: '🌐',
+    title: '跨学科融合',
+    desc: '打破学科壁垒，培养复合型知识结构'
+  },
+  {
+    icon: '⚡',
+    title: '实时更新',
+    desc: '紧跟学科前沿，课程内容每年动态迭代'
+  }
+])
 
 interface Course {
   id: number
@@ -28,145 +66,264 @@ interface Course {
   hot?: boolean
 }
 
-interface Category {
+interface SubCategory {
   id: number
   name: string
-  glyph: string
-  desc: string
+  code: string
   courses: Course[]
 }
 
-const categories = ref<Category[]>([
-  {
-    id: 1, name: '驾驶基础', glyph: '◎', desc: '从零开始，稳扎稳打',
-    courses: [
-      { id: 1, title: '新手驾驶入门', description: '从零开始学习驾驶基础知识，系统掌握车辆操控与道路常识', instructor: '张教练', duration: '8 课时', level: '初级', levelColor: '#06d6a0', students: 1250, rating: 4.8, lessons: 12, accent: '#4f6ef7', tag: '最受欢迎', hot: true },
-      { id: 2, title: '交通规则详解', description: '全面掌握交通法规和道路标识，理论与实践相结合', instructor: '李教官', duration: '6 课时', level: '初级', levelColor: '#06d6a0', students: 980, rating: 4.7, lessons: 9, accent: '#0ea5e9', tag: '必修课' },
-      { id: 3, title: '停车技巧大全', description: '侧方停车、倒车入库、坡道停车等实用场景全覆盖', instructor: '王教练', duration: '4 课时', level: '初级', levelColor: '#06d6a0', students: 1500, rating: 4.9, lessons: 8, accent: '#f59e0b', tag: '高好评', new: true },
-    ]
-  },
-  {
-    id: 2, name: '进阶驾驶', glyph: '◈', desc: '突破极限，精进技艺',
-    courses: [
-      { id: 4, title: '赛道驾驶技巧', description: '专业赛道驾驶技术与线路选择，让你的驾驶达到新高度', instructor: '刘车手', duration: '12 课时', level: '中级', levelColor: '#f59e0b', students: 650, rating: 4.9, lessons: 18, accent: '#ef4444', tag: '热门', hot: true },
-      { id: 5, title: '高性能车操控', description: '掌握大马力车辆的操控技巧，感受极致驾驶乐趣', instructor: '陈技师', duration: '10 课时', level: '中级', levelColor: '#f59e0b', students: 520, rating: 4.8, lessons: 14, accent: '#a855f7', tag: '进阶推荐' },
-      { id: 6, title: '雨天驾驶安全', description: '湿滑路面的驾驶技巧与安全要点，全天候驾驶无忧', instructor: '赵教练', duration: '5 课时', level: '中级', levelColor: '#f59e0b', students: 890, rating: 4.6, lessons: 10, accent: '#0ea5e9', tag: '安全必学' },
-    ]
-  },
-  {
-    id: 3, name: '车辆保养', glyph: '⬡', desc: '爱护座驾，延长车命',
-    courses: [
-      { id: 7, title: '日常保养知识', description: '学会基本的车辆检查和保养方法，做自己的汽车医生', instructor: '孙技师', duration: '6 课时', level: '初级', levelColor: '#06d6a0', students: 1100, rating: 4.7, lessons: 11, accent: '#06d6a0', tag: '实用必备' },
-      { id: 8, title: '故障诊断基础', description: '识别常见故障并进行初步判断，避免被坑修车', instructor: '周师傅', duration: '8 课时', level: '中级', levelColor: '#f59e0b', students: 750, rating: 4.8, lessons: 13, accent: '#f59e0b', tag: '省钱神课', new: true },
-    ]
-  },
-  {
-    id: 4, name: '特种驾驶', glyph: '◉', desc: '挑战极限，征服一切',
-    courses: [
-      { id: 9, title: '越野驾驶技术', description: '复杂地形的通过技巧和脱困方法，征服每一寸山野', instructor: '吴队长', duration: '15 课时', level: '高级', levelColor: '#ef4444', students: 420, rating: 4.9, lessons: 22, accent: '#84cc16', tag: '极限挑战', hot: true },
-      { id: 10, title: '防御性驾驶', description: '预见危险并提前规避，打造一道无形的安全屏障', instructor: '郑教官', duration: '10 课时', level: '高级', levelColor: '#ef4444', students: 680, rating: 4.9, lessons: 16, accent: '#f97316', tag: '安全进阶' },
-    ]
-  }
-])
+interface Category {
+  id: number
+  name: string
+  code: string
+  glyph: string
+  desc: string
+  subCategories: SubCategory[]
+}
 
+const glyphs = ['◈', '◉', '⬡', '◎', '◈', '⬟']
+const levelColors = ['#06d6a0', '#f59e0b', '#ef4444']
+const accents = ['#4f6ef7', '#0ea5e9', '#a855f7', '#ef4444', '#f97316', '#84cc16', '#06d6a0']
+
+const generateMockCourse = (name: string, cIndex: number): Course => ({
+  id: Math.random(),
+  title: name,
+  description: '系统化课程讲解，涵盖核心知识点与实战应用',
+  instructor: '名师主讲',
+  duration: '24 课时',
+  level: ['初级', '中级', '高级'][Math.floor(Math.random() * 3)],
+  levelColor: levelColors[Math.floor(Math.random() * levelColors.length)],
+  students: Math.floor(Math.random() * 5000) + 500,
+  rating: (4.5 + Math.random() * 0.5).toFixed(1),
+  lessons: Math.floor(Math.random() * 30) + 20,
+  accent: accents[cIndex % accents.length],
+  tag: '核心课程',
+  new: Math.random() > 0.7,
+  hot: Math.random() > 0.8
+})
+
+const loadCategories = async () => {
+  try {
+    const categoryData = await getAllCategories()
+    console.log('一级分类数据:', categoryData)
+
+    categories.value = await Promise.all(
+        categoryData.map(async (cat: any, index: number) => {
+          const subCategoryData = await getSubCategoriesByCategoryId(cat.id)
+          console.log(`分类 ${cat.name} 的二级分类:`, subCategoryData)
+
+          const subCategories: SubCategory[] = await Promise.all(
+              subCategoryData.map(async (sub: any) => {
+                const courseData = await getCoursesBySubCategoryId(sub.id)
+                console.log(`二级分类 ${sub.name} 的课程:`, courseData)
+
+                const courses: Course[] = courseData.map((course: any, cIndex: number) =>
+                    generateMockCourse(course.name, cIndex)
+                )
+
+                return {
+                  id: sub.id,
+                  name: sub.name,
+                  code: `${cat.id}.${sub.id}`,
+                  courses
+                }
+              })
+          )
+
+          return {
+            id: cat.id,
+            name: cat.name,
+            code: `${cat.id * 100}`,
+            glyph: glyphs[index % glyphs.length],
+            desc: cat.description || '探索学科奥秘',
+            subCategories
+          }
+        })
+    )
+    console.log('最终组装的分类数据:', categories.value)
+  } catch (error) {
+    console.error('加载分类失败:', error)
+    ElMessage.error('加载学科分类失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 当前大类的子分类列表
+const currentSubCategories = computed(() => {
+  if (!categories.value || !categories.value[selectedCategory.value]) {
+    return []
+  }
+  return categories.value[selectedCategory.value]?.subCategories || []
+})
+
+// 当前选中的子分类中的课程列表（原始）
+const currentSubCategoryCourses = computed(() => {
+  const subs = currentSubCategories.value
+  if (subs.length && selectedSubCategory.value < subs.length) {
+    return subs[selectedSubCategory.value].courses
+  }
+  return []
+})
+
+// 搜索过滤后的课程
 const filteredCourses = computed(() => {
-  const cat = categories.value[selectedCategory.value]
-  if (!searchQuery.value.trim()) return cat.courses
+  const courses = currentSubCategoryCourses.value
+  if (!searchQuery.value.trim()) return courses
   const q = searchQuery.value.toLowerCase()
-  return cat.courses.filter(c =>
+  return courses.filter(c =>
       c.title.toLowerCase().includes(q) ||
       c.instructor.toLowerCase().includes(q) ||
       c.description.toLowerCase().includes(q)
   )
 })
 
-const allStats = computed(() => ({
-  totalCourses: categories.value.reduce((s, c) => s + c.courses.length, 0),
-  totalStudents: categories.value.reduce((s, c) => s + c.courses.reduce((ss, cc) => ss + cc.students, 0), 0),
-  avgRating: (categories.value.reduce((s, c) => s + c.courses.reduce((ss, cc) => ss + cc.rating, 0), 0) /
-      categories.value.reduce((s, c) => s + c.courses.length, 0)).toFixed(1)
-}))
-
-const features = [
-  { icon: '🎯', title: '精准课程匹配', desc: 'AI 智能推荐，按需学习' },
-  { icon: '🏅', title: '官方认证证书', desc: '完成后颁发权威证书' },
-  { icon: '🔄', title: '终身有效学习', desc: '购买后永久回看复习' },
-  { icon: '💬', title: '1v1 答疑服务', desc: '教练在线解答疑问' },
-]
-
-const goToCourse = (id: number) => router.push(`/course/${id}`)
-
-function initParticles(canvas: HTMLCanvasElement) {
-  const ctx = canvas.getContext('2d')!
-  let W = window.innerWidth, H = window.innerHeight
-  canvas.width = W; canvas.height = H
-  const count = Math.floor((W * H) / 12000)
-  const pts = Array.from({ length: count }, () => ({
-    x: Math.random() * W, y: Math.random() * H,
-    vx: (Math.random() - 0.5) * 0.18, vy: (Math.random() - 0.5) * 0.18,
-    r: Math.random() * 1.1 + 0.3,
-    alpha: Math.random() * 0.35 + 0.08,
-    color: ['0,255,180', '0,200,255', '80,255,200'][Math.floor(Math.random() * 3)],
-  }))
-  function draw() {
-    ctx.clearRect(0, 0, W, H)
-    for (let i = 0; i < pts.length; i++) {
-      for (let j = i + 1; j < pts.length; j++) {
-        const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y
-        const d = Math.sqrt(dx * dx + dy * dy)
-        if (d < 110) {
-          ctx.beginPath()
-          ctx.moveTo(pts[i].x, pts[i].y)
-          ctx.lineTo(pts[j].x, pts[j].y)
-          ctx.strokeStyle = `rgba(0,255,180,${0.04 * (1 - d / 110)})`
-          ctx.lineWidth = 0.4
-          ctx.stroke()
-        }
-      }
-      const p = pts[i]
-      p.x += p.vx; p.y += p.vy
-      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0
-      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(${p.color},${p.alpha})`
-      ctx.fill()
+// 全局统计数据（基于所有学科分类）
+const allStats = computed(() => {
+  if (!categories.value || categories.value.length === 0) {
+    return {
+      totalCourses: 0,
+      totalStudents: 0,
+      avgRating: '0.0'
     }
-    particleRafId = requestAnimationFrame(draw)
   }
-  draw()
-  window.addEventListener('resize', () => {
-    W = window.innerWidth; H = window.innerHeight
-    canvas.width = W; canvas.height = H
+
+  let totalCourses = 0
+  let totalStudents = 0
+  let totalRatingSum = 0
+  categories.value.forEach(cat => {
+    cat.subCategories.forEach(sub => {
+      sub.courses.forEach(course => {
+        totalCourses++
+        totalStudents += course.students
+        totalRatingSum += course.rating
+      })
+    })
   })
+  return {
+    totalCourses,
+    totalStudents,
+    avgRating: totalCourses ? (totalRatingSum / totalCourses).toFixed(1) : '0.0'
+  }
+})
+
+const goToCourse = (courseId: number) => {
+  router.push(`/course/${courseId}`)
 }
 
-function initObservers(root: Element) {
-  const obs = new IntersectionObserver(entries => {
-    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible') })
-  }, { threshold: 0.08 })
-  root.querySelectorAll('.fade-up').forEach(el => obs.observe(el))
-  observers.push(obs)
-}
-
-function onMouseMove(e: MouseEvent) {
+const onMouseMove = (e: MouseEvent) => {
   mouseX.value = e.clientX
   mouseY.value = e.clientY
 }
 
+// 粒子系统（带连线效果）
+const initParticles = (canvas) => {
+  let W = window.innerWidth, H = window.innerHeight;
+  canvas.width = W;
+  canvas.height = H;
+
+  const count = Math.floor((W * H) / 12000);
+  const pts = Array.from({ length: count }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 0.18,
+    vy: (Math.random() - 0.5) * 0.18,
+    r: Math.random() * 1.1 + 0.3,
+    alpha: Math.random() * 0.35 + 0.08,
+    color: ['0,255,180', '0,200,255', '80,255,200'][Math.floor(Math.random() * 3)],
+  }));
+
+  const draw = () => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, W, H);
+
+    // 连线
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 110) {
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x, pts[i].y);
+          ctx.lineTo(pts[j].x, pts[j].y);
+          ctx.strokeStyle = `rgba(0,255,180,${0.04 * (1 - d / 110)})`;
+          ctx.lineWidth = 0.4;
+          ctx.stroke();
+        }
+      }
+
+      // 移动 & 绘制粒子
+      const p = pts[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0) p.x = W;
+      if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H;
+      if (p.y > H) p.y = 0;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.color},${p.alpha})`;
+      ctx.fill();
+    }
+
+    particleRafId = requestAnimationFrame(draw);
+  };
+
+  draw();
+
+  const onResize = () => {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W;
+    canvas.height = H;
+  };
+  window.addEventListener('resize', onResize);
+
+  // 返回清理函数
+  return () => {
+    window.removeEventListener('resize', onResize);
+    if (particleRafId) cancelAnimationFrame(particleRafId);
+  };
+};
+
+const initObservers = (root: Element) => {
+  const elements = root.querySelectorAll('.fade-up')
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible')
+        observer.unobserve(entry.target)
+      }
+    })
+  }, { threshold: 0.1 })
+
+  elements.forEach(el => observer.observe(el))
+  observers.push(observer)
+}
+let cleanupParticles = null;
+
 onMounted(() => {
-  const root = document.querySelector('.cp-root')!
-  const canvas = root.querySelector('.bg-canvas') as HTMLCanvasElement
-  if (canvas) initParticles(canvas)
-  if (root) initObservers(root)
-  window.addEventListener('mousemove', onMouseMove)
-})
+  loadCategories();
+
+  setTimeout(() => {
+    const root = document.querySelector('.cp-root');
+    const canvas = root?.querySelector('.bg-canvas');
+    if (canvas) cleanupParticles = initParticles(canvas);
+    if (root) initObservers(root);
+  }, 100);
+
+  window.addEventListener('mousemove', onMouseMove);
+});
 
 onUnmounted(() => {
-  if (particleRafId) cancelAnimationFrame(particleRafId)
-  observers.forEach(o => o.disconnect())
-  window.removeEventListener('mousemove', onMouseMove)
-})
+  if (cleanupParticles) cleanupParticles();
+  observers.forEach(o => o.disconnect());
+  window.removeEventListener('mousemove', onMouseMove);
+});
+
 </script>
 
 <template>
@@ -175,37 +332,33 @@ onUnmounted(() => {
     <div class="noise-layer"></div>
     <div class="cursor-glow" :style="`left:${mouseX}px;top:${mouseY}px`"></div>
 
-    <!-- ░░ Background ░░ -->
-
     <!-- ═══════════ HERO ═══════════ -->
     <section class="hero">
       <div class="hero-inner">
         <div class="hero-label">
-          <span class="pulse-dot" />知识星图 · 课程资源共享平台
+          <span class="pulse-dot" />GB/T 13745-2009 · 学科分类与代码
         </div>
         <h1 class="hero-title">
-          解锁你的<br />
-          <span class="title-gradient">无限知识边界</span>
+          探索学科<br />
+          <span class="title-gradient">知识体系全景</span>
         </h1>
         <p class="hero-desc">
-          探索知识 · 学习技能 · 提升未来
+          中华人民共和国学科分类标准 · 系统化学习路径
         </p>
 
-        <!-- Search -->
         <div class="hero-search">
           <svg class="s-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input v-model="searchQuery" class="search-inp" placeholder="搜索课程、教练名…" />
+          <input v-model="searchQuery" class="search-inp" placeholder="在当前学科分类中搜索课程..." />
           <button class="search-btn">搜索</button>
         </div>
 
-        <!-- Platform stats -->
         <div class="hero-stats">
           <div class="hstat" v-for="s in [
-            { val: allStats.totalCourses + '门', lbl: '精品课程' },
-            { val: (allStats.totalStudents/1000).toFixed(0)+'K+', lbl: '注册学员' },
-            { val: allStats.avgRating, lbl: '平均评分' },
+            { val: (allStats.totalCourses || 0) + '门', lbl: '全学科课程' },
+            { val: ((allStats.totalStudents || 0)/1000).toFixed(0)+'K+', lbl: '注册学员' },
+            { val: allStats.avgRating || '0.0', lbl: '平均评分' },
             { val: '100%', lbl: '证书认可率' },
           ]" :key="s.lbl">
             <span class="hstat-val">{{ s.val }}</span>
@@ -214,53 +367,71 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- decorative floating cards -->
       <div class="hero-deco">
         <div class="deco-card dc1">
-          <span class="dc-icon">🏎️</span>
-          <span class="dc-text">赛道专业课</span>
+          <span class="dc-icon">📐</span>
+          <span class="dc-text">数学 · 110.11</span>
         </div>
         <div class="deco-card dc2">
           <div class="dc-progress">
-            <div class="dc-bar" style="width:72%"/>
+            <div class="dc-bar" style="width:68%"/>
           </div>
-          <span class="dc-text">学习进度 72%</span>
+          <span class="dc-text">学习进度 68%</span>
         </div>
         <div class="deco-card dc3">
           <span class="dc-star">★★★★★</span>
-          <span class="dc-text">满分好评</span>
+          <span class="dc-text">权威学科体系</span>
         </div>
       </div>
     </section>
 
-    <!-- ═══════════ CATEGORY NAV ═══════════ -->
+    <!-- ═══════════ 一级学科导航（大类）═══════════ -->
     <section class="cat-section">
       <div class="cat-inner">
         <div class="cat-tabs">
           <button
-              v-for="(cat, idx) in categories"
+              v-for="(cat, idx) in (categories || [])"
               :key="cat.id"
               class="cat-btn"
               :class="{ active: selectedCategory === idx }"
               @click="selectedCategory = idx"
           >
-            <span class="cat-glyph">{{ cat.glyph }}</span>
+            <span class="cat-glyph">{{ cat.glyph || '◈' }}</span>
             <div class="cat-text">
               <span class="cat-name">{{ cat.name }}</span>
-              <span class="cat-desc">{{ cat.desc }}</span>
+              <span class="cat-desc">{{ cat.code }} · {{ cat.desc }}</span>
             </div>
-            <span class="cat-count">{{ cat.courses.length }}</span>
+            <span class="cat-count">{{ cat.subCategories?.reduce((acc, sub) => acc + (sub.courses?.length || 0), 0) || 0 }}</span>
           </button>
         </div>
       </div>
     </section>
 
-    <!-- ═══════════ COURSE GRID ═══════════ -->
+    <!-- ═══════════ 二级学科导航（小类）═══════════ -->
+    <section class="subcat-section">
+      <div class="subcat-inner">
+        <div class="subcat-tabs">
+          <button
+              v-for="(sub, idx) in (currentSubCategories || [])"
+              :key="sub.id"
+              class="subcat-btn"
+              :class="{ active: selectedSubCategory === idx }"
+              @click="selectedSubCategory = idx"
+          >
+            <span class="subcat-code">{{ sub.code }}</span>
+            <span class="subcat-name">{{ sub.name }}</span>
+            <span class="subcat-count">{{ sub.courses?.length || 0 }}</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 课程网格 ═══════════ -->
     <section class="courses-section">
       <div class="courses-inner">
         <div class="section-head">
-          <h2 class="section-title">
-            {{ categories[selectedCategory].name }}
+          <h2 class="section-title" v-if="categories[selectedCategory]">
+            {{ categories[selectedCategory].name }} · {{ currentSubCategories[selectedSubCategory]?.name || '' }}
             <span class="section-sub">· {{ filteredCourses.length }} 门课程</span>
           </h2>
           <div class="sort-wrap">
@@ -283,10 +454,9 @@ onUnmounted(() => {
                 @mouseenter="hoveredCard = course.id"
                 @mouseleave="hoveredCard = null"
             >
-              <!-- Thumbnail zone -->
               <div class="card-thumb" :style="{ background: `linear-gradient(135deg, ${course.accent}28, ${course.accent}0a)` }">
                 <div class="thumb-glyph" :style="{ color: course.accent + '55' }">
-                  {{ categories[selectedCategory].glyph }}
+                  {{ categories[selectedCategory]?.glyph }}
                 </div>
                 <div class="thumb-overlay">
                   <button class="preview-btn">
@@ -296,7 +466,6 @@ onUnmounted(() => {
                     预览课程
                   </button>
                 </div>
-                <!-- Badges -->
                 <div class="badge-group">
                   <span class="level-badge" :style="{ background: course.levelColor + '22', color: course.levelColor, borderColor: course.levelColor + '44' }">
                     {{ course.level }}
@@ -304,11 +473,9 @@ onUnmounted(() => {
                   <span v-if="course.hot" class="hot-badge">🔥 热门</span>
                   <span v-if="course.new" class="new-badge">✦ 新上</span>
                 </div>
-                <!-- Accent line -->
                 <div class="accent-line" :style="{ background: course.accent }" />
               </div>
 
-              <!-- Card body -->
               <div class="card-body">
                 <div class="card-tag">{{ course.tag }}</div>
                 <h3 class="card-title">{{ course.title }}</h3>
@@ -358,7 +525,6 @@ onUnmounted(() => {
             </div>
           </TransitionGroup>
 
-          <!-- Empty state -->
           <div v-if="filteredCourses.length === 0" class="empty-state">
             <div class="empty-glyph">◌</div>
             <p>未找到匹配课程</p>
@@ -371,7 +537,7 @@ onUnmounted(() => {
     <section class="features-section">
       <div class="feat-inner">
         <div class="feat-label">平台优势</div>
-        <h2 class="feat-title">为什么选择我们</h2>
+        <h2 class="feat-title">为什么选择国家标准学科体系</h2>
         <div class="feat-grid">
           <div class="feat-card" v-for="(f, i) in features" :key="i" :style="{ animationDelay: i * 0.1 + 's' }">
             <div class="feat-icon">{{ f.icon }}</div>
@@ -385,8 +551,8 @@ onUnmounted(() => {
     <!-- ═══════════ CTA BANNER ═══════════ -->
     <section class="cta-banner">
       <div class="cta-inner">
-        <h2 class="cta-title">准备好开始你的驾驶旅程了吗？</h2>
-        <p class="cta-sub">加入 {{ (allStats.totalStudents / 1000).toFixed(0) }}K+ 学员，今天开始第一节课</p>
+        <h2 class="cta-title">开启你的学科探索之旅</h2>
+        <p class="cta-sub">加入 {{ (allStats.totalStudents / 1000).toFixed(0) }}K+ 学员，依据国家标准构建知识体系</p>
         <div class="cta-btns">
           <button class="cta-primary">免费试学</button>
           <button class="cta-ghost">查看全部课程</button>
@@ -396,7 +562,8 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
 /* ══ DESIGN TOKENS ══ */
 *,
@@ -782,6 +949,65 @@ onUnmounted(() => {
 .cat-btn.active .cat-count {
   background: rgba(0, 212, 255, 0.2);
   color: #00d4ff;
+}
+
+/* ─── 二级学科导航（小类）样式 ─────────────────────────── */
+.subcat-section {
+  position: relative;
+  z-index: 1;
+  background: rgba(2, 10, 18, 0.8);
+  border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+  backdrop-filter: blur(12px);
+  margin-top: -1px;
+}
+.subcat-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 48px;
+}
+.subcat-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.subcat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(0, 212, 255, 0.05);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  color: rgba(200, 240, 224, 0.7);
+  font-size: 0.8rem;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.subcat-btn:hover {
+  background: rgba(0, 212, 255, 0.12);
+  border-color: rgba(0, 212, 255, 0.35);
+  color: #c8f0e0;
+}
+.subcat-btn.active {
+  background: rgba(0, 212, 255, 0.2);
+  border-color: #00d4ff;
+  color: #00d4ff;
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.2);
+}
+.subcat-code {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+.subcat-name {
+  font-weight: 500;
+}
+.subcat-count {
+  font-size: 0.7rem;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 6px;
+  border-radius: 999px;
+  margin-left: 4px;
 }
 
 /* ─── COURSES ─────────────────────────────────────────── */

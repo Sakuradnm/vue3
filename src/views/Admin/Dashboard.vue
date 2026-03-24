@@ -170,7 +170,7 @@ interface Notification {
 const notifications = ref<Notification[]>([
   {
     id: 1,
-    type: 'course',
+    type: 'course.ts',
     title: '新课程待审核',
     content: '张老师提交了新课程"Vue 3 高级实战课程"',
     time: '5分钟前',
@@ -194,7 +194,7 @@ const notifications = ref<Notification[]>([
   },
   {
     id: 4,
-    type: 'course',
+    type: 'course.ts',
     title: '课程评价提醒',
     content: '"Python 基础教程"收到新的用户评价',
     time: '2小时前',
@@ -746,7 +746,7 @@ const checkLoginStatus = () => {
               @click="markAsRead(notification)"
           >
             <div class="notification-icon" :class="`type-${notification.type}`">
-              <VideoCamera v-if="notification.type === 'course'" />
+              <VideoCamera v-if="notification.type === 'course.ts'" />
               <User v-else-if="notification.type === 'user'" />
               <Bell v-else />
             </div>

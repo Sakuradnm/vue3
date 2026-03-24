@@ -155,7 +155,7 @@ onUnmounted(() => {
       <div class="hero-inner">
         <div class="hero-left">
           <div class="breadcrumb">
-            <span class="bc-link" @click="router.push('/course')">返回《</span>
+            <span class="bc-link" @click="router.push('/course.ts')">返回《</span>
             <span class="bc-sep">›</span>
             <span class="bc-link">驾驶课程</span>
             <span class="bc-sep">›</span>
@@ -429,7 +429,7 @@ onUnmounted(() => {
               <div class="related-item" v-for="item in [
                 { title: '交通规则详解', instructor: '李教官', rating: 4.7, color: '#00d4ff' },
                 { title: '停车技巧大全', instructor: '王教练', rating: 4.9, color: '#a259ff' },
-              ]" :key="item.title" @click="router.push('/course/2')">
+              ]" :key="item.title" @click="router.push('/course.ts/2')">
                 <div class="ri-thumb" :style="`color:${item.color};border-color:${item.color}33;background:${item.color}0d`">◎</div>
                 <div class="ri-info">
                   <p class="ri-title">{{ item.title }}</p>
