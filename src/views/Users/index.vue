@@ -144,8 +144,9 @@ export default {
           data: loginData
         })
 
-        if (response.data.code === 200) {
-          const user = response.data.data
+        // response 已经是用户数据对象（由 request 拦截器处理过）
+        if (response && typeof response === 'object' && response.id) {
+          const user = response
           const userLevel = user.level
           const inputLabel = inputType.value === 'phone' ? '手机号' : inputType.value === 'email' ? '邮箱' : '用户名'
 
@@ -156,9 +157,9 @@ export default {
               localStorage.setItem('rememberedUsername', loginForm.username)
             }
             localStorage.setItem('userInfo', JSON.stringify(user))
-            window.dispatchEvent(new Event('userLogin')) // 触发事件通知 App.vue
+            window.dispatchEvent(new Event('userLogin'))
             ElMessage.success('管理员登录成功！即将进入后台管理系统')
-            await router.push('/Admin') // 立即跳转，不使用延迟
+            await router.push('/Admin')
             return
           }
 
@@ -195,6 +196,7 @@ export default {
         }
       } catch (error) {
         console.error('登录失败:', error)
+        ElMessage.error(error.response?.data?.message || error.message || '登录失败，请检查网络连接')
       }
     }
 
@@ -242,14 +244,14 @@ export default {
 
         const response = await registerUser(userData)
 
-        if (response.data.code === 201) {
+        if (response && response.code === 201) {
           ElMessage.success('注册成功！请登录')
           Object.keys(registerForm).forEach(key => { registerForm[key] = '' })
           isLogin.value = true
           transitionName.value = 'slide-left'
-        } else if (response.data.code === 400) {
+        } else if (response && response.code === 400) {
           // 区分用户名还是手机号冲突
-          const msg = response.data.message || '注册失败'
+          const msg = response.message || '注册失败'
           if (msg.includes('用户名')) {
             errors.username = msg
           } else if (msg.includes('手机号')) {
@@ -257,7 +259,7 @@ export default {
           }
           ElMessage.error(msg)
         } else {
-          ElMessage.error(response.data.message || '注册失败')
+          ElMessage.error(response?.message || '注册失败')
         }
       } catch (error) {
         if (error.response?.data?.code === 400) {
@@ -265,6 +267,8 @@ export default {
           if (msg.includes('用户名')) errors.username = msg
           else if (msg.includes('手机号')) errors.phone = msg
           ElMessage.error(msg)
+        } else {
+          ElMessage.error(error.message || '注册失败')
         }
       }
     }

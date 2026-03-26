@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router'
 import { getAllCategories, getSubCategoriesByCategoryId, getCoursesBySubCategoryId } from '@/api/course'
 
 const router = useRouter()
-const selectedCategory = ref(0)
-const selectedSubCategory = ref(0)
+const selectedCategory = ref(-1) // 修改：初始值改为 -1，表示未选择任何分类
+const selectedSubCategory = ref(-1)
 const searchQuery = ref('')
 const hoveredCard = ref<number | null>(null)
 const mouseX = ref(0)
@@ -71,6 +71,7 @@ interface SubCategory {
   name: string
   code: string
   courses: Course[]
+  groupIndex?: number
 }
 
 interface Category {
@@ -111,12 +112,44 @@ const loadCategories = async () => {
     categories.value = await Promise.all(
         categoryData.map(async (cat: any, index: number) => {
           const subCategoryData = await getSubCategoriesByCategoryId(cat.id)
-          console.log(`分类 ${cat.name} 的二级分类:`, subCategoryData)
+          console.log(`分类 ${cat.name} (ID=${cat.id}) 请求到的二级分类原始数据:`, subCategoryData)
+
+          // 新增：检查返回数据的 categoryId
+          if (cat.id === 2) {
+            console.log('=== 工学数据检查 ===')
+            console.log('返回的二级分类数量:', subCategoryData.length)
+            subCategoryData.forEach((sub, idx) => {
+              console.log(`[${idx}] id=${sub.id}, name=${sub.name}, categoryId=${sub.categoryId}`)
+            })
+          }
+
+          // 关键修复：严格过滤，只保留 categoryId 匹配的二级分类
+          const filteredSubs = subCategoryData.filter((sub: any) => sub.categoryId === cat.id)
+
+          if (filteredSubs.length !== subCategoryData.length) {
+            console.warn(`分类 ${cat.name}: 发现 ${subCategoryData.length - filteredSubs.length} 条数据 categoryId 不匹配，已过滤`)
+            console.log(`过滤前：${subCategoryData.length} 条，过滤后：${filteredSubs.length} 条`)
+          }
+
+          // 根据 sub.id 去重（防止数据库有重复记录）
+          const uniqueSubsMap = new Map<number, any>()
+          filteredSubs.forEach((sub: any) => {
+            if (!uniqueSubsMap.has(sub.id)) {
+              uniqueSubsMap.set(sub.id, sub)
+            }
+          })
+
+          const uniqueSubCategoryData = Array.from(uniqueSubsMap.values())
+          console.log(`分类 ${cat.name} 最终有效的二级分类数量：${uniqueSubCategoryData.length}`, uniqueSubCategoryData)
 
           const subCategories: SubCategory[] = await Promise.all(
-              subCategoryData.map(async (sub: any) => {
+              uniqueSubCategoryData.map(async (sub: any, subIndex: number) => {
                 const courseData = await getCoursesBySubCategoryId(sub.id)
-                console.log(`二级分类 ${sub.name} 的课程:`, courseData)
+                if (courseData.length > 0) {
+                  console.log(`二级分类 ${sub.name} (ID=${sub.id}) 的课程数量:`, courseData.length)
+                } else {
+                  console.warn(`⚠️ 二级分类 ${sub.name} (ID=${sub.id}) 没有课程数据!`)
+                }
 
                 const courses: Course[] = courseData.map((course: any, cIndex: number) =>
                     generateMockCourse(course.name, cIndex)
@@ -125,7 +158,9 @@ const loadCategories = async () => {
                 return {
                   id: sub.id,
                   name: sub.name,
-                  code: `${cat.id}.${sub.id}`,
+                  code: `${cat.id}.${subIndex + 1}`,
+                  categoryId: cat.id,
+                  groupIndex: subIndex + 1,
                   courses
                 }
               })
@@ -141,7 +176,10 @@ const loadCategories = async () => {
           }
         })
     )
-    console.log('最终组装的分类数据:', categories.value)
+    console.log('✅ 最终组装完成 - 大类数量:', categories.value.length)
+    categories.value.forEach((cat, idx) => {
+      console.log(`大类${idx}: ${cat.name} - 二级分类数量：${cat.subCategories.length}`)
+    })
   } catch (error) {
     console.error('加载分类失败:', error)
     ElMessage.error('加载学科分类失败，请稍后重试')
@@ -161,15 +199,61 @@ const currentSubCategories = computed(() => {
 // 当前选中的子分类中的课程列表（原始）
 const currentSubCategoryCourses = computed(() => {
   const subs = currentSubCategories.value
-  if (subs.length && selectedSubCategory.value < subs.length) {
+  if (subs.length && selectedSubCategory.value >= 0 && selectedSubCategory.value < subs.length) {
     return subs[selectedSubCategory.value].courses
   }
   return []
 })
 
+// 显示全部课程（仅在未选择任何大类时使用）
+const allCourses = computed(() => {
+  if (!categories.value || categories.value.length === 0) {
+    return []
+  }
+
+  let courses: Course[] = []
+
+  // 只有当未选择任何大类时，才返回所有课程
+  if (selectedCategory.value < 0) {
+    categories.value.forEach(cat => {
+      cat.subCategories.forEach(sub => {
+        courses = [...courses, ...sub.courses]
+      })
+    })
+  }
+
+  return courses
+})
+
 // 搜索过滤后的课程
 const filteredCourses = computed(() => {
-  const courses = currentSubCategoryCourses.value
+  // 根据选择的子分类决定数据源
+  let courses: Course[]
+
+  if (selectedSubCategory.value >= 0) {
+    // 选中了具体小类，只显示该小类的课程
+    courses = currentSubCategoryCourses.value
+  } else if (selectedCategory.value >= 0) {
+    // 选中了大类但未选小类，显示该大类下所有课程
+    const cat = categories.value[selectedCategory.value]
+    if (cat) {
+      courses = []
+      cat.subCategories.forEach(sub => {
+        courses = [...courses, ...sub.courses]
+      })
+    } else {
+      courses = []
+    }
+  } else {
+    // 未选择任何大类，显示全部课程
+    courses = []
+    categories.value.forEach(cat => {
+      cat.subCategories.forEach(sub => {
+        courses = [...courses, ...sub.courses]
+      })
+    })
+  }
+
   if (!searchQuery.value.trim()) return courses
   const q = searchQuery.value.toLowerCase()
   return courses.filter(c =>
@@ -210,6 +294,29 @@ const allStats = computed(() => {
 
 const goToCourse = (courseId: number) => {
   router.push(`/course/${courseId}`)
+}
+
+// 处理大类点击
+const handleCategoryClick = (idx: number) => {
+  if (selectedCategory.value === idx && selectedSubCategory.value >= 0 && idx >= 0) {
+    // 如果点击的是已选中的大类，且当前已选择了小类，则清除小类选择，保留大类选择
+    // 这样会显示该大类下的所有课程
+    selectedSubCategory.value = -1
+  } else if (selectedCategory.value === idx && idx >= 0) {
+    // 如果点击的是已选中的大类，且未选择小类，则取消选择，回到全部
+    selectedCategory.value = -1
+    selectedSubCategory.value = -1
+  } else {
+    // 点击新大类，选中该大类并清除子分类选择（显示该大类全部课程）
+    selectedCategory.value = idx
+    selectedSubCategory.value = -1
+  }
+}
+
+// 清除选择，回到全部课程
+const handleClearSelection = () => {
+  selectedCategory.value = -1
+  selectedSubCategory.value = -1
 }
 
 const onMouseMove = (e: MouseEvent) => {
@@ -385,151 +492,197 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <!-- ═══════════ 一级学科导航（大类）═══════════ -->
-    <section class="cat-section">
-      <div class="cat-inner">
-        <div class="cat-tabs">
-          <button
-              v-for="(cat, idx) in (categories || [])"
-              :key="cat.id"
-              class="cat-btn"
-              :class="{ active: selectedCategory === idx }"
-              @click="selectedCategory = idx"
-          >
-            <span class="cat-glyph">{{ cat.glyph || '◈' }}</span>
-            <div class="cat-text">
-              <span class="cat-name">{{ cat.name }}</span>
-              <span class="cat-desc">{{ cat.code }} · {{ cat.desc }}</span>
-            </div>
-            <span class="cat-count">{{ cat.subCategories?.reduce((acc, sub) => acc + (sub.courses?.length || 0), 0) || 0 }}</span>
-          </button>
-        </div>
-      </div>
-    </section>
+    <!-- ═══════════ 主要内容区域 ═══════════ -->
+    <section class="main-content">
+      <div class="content-wrapper">
 
-    <!-- ═══════════ 二级学科导航（小类）═══════════ -->
-    <section class="subcat-section">
-      <div class="subcat-inner">
-        <div class="subcat-tabs">
-          <button
-              v-for="(sub, idx) in (currentSubCategories || [])"
-              :key="sub.id"
-              class="subcat-btn"
-              :class="{ active: selectedSubCategory === idx }"
-              @click="selectedSubCategory = idx"
-          >
-            <span class="subcat-code">{{ sub.code }}</span>
-            <span class="subcat-name">{{ sub.name }}</span>
-            <span class="subcat-count">{{ sub.courses?.length || 0 }}</span>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ═══════════ 课程网格 ═══════════ -->
-    <section class="courses-section">
-      <div class="courses-inner">
-        <div class="section-head">
-          <h2 class="section-title" v-if="categories[selectedCategory]">
-            {{ categories[selectedCategory].name }} · {{ currentSubCategories[selectedSubCategory]?.name || '' }}
-            <span class="section-sub">· {{ filteredCourses.length }} 门课程</span>
-          </h2>
-          <div class="sort-wrap">
-            <select class="sort-sel">
-              <option>综合排序</option>
-              <option>评分最高</option>
-              <option>最多学员</option>
-              <option>最新上线</option>
-            </select>
+        <!-- ═══════════ 左侧一级学科导航（大类）═══════════ -->
+        <aside class="category-sidebar">
+          <div class="sidebar-header">
+            <span class="sidebar-icon">◈</span>
+            <span class="sidebar-title">学科分类</span>
           </div>
-        </div>
 
-        <div class="courses-grid">
-          <TransitionGroup name="fade">
-            <div
-                v-for="course in filteredCourses"
-                :key="course.id"
-                class="course-card"
-                @click="goToCourse(course.id)"
-                @mouseenter="hoveredCard = course.id"
-                @mouseleave="hoveredCard = null"
+          <!-- 全部分类选项 -->
+          <button
+              class="category-item"
+              :class="{ active: selectedCategory === -1 }"
+              @click="handleCategoryClick(-1)"
+          >
+            <span class="cat-glyph">◎</span>
+            <div class="cat-info">
+              <span class="cat-name">全部分类</span>
+              <span class="cat-code">ALL</span>
+            </div>
+            <span class="cat-count">{{ categories.reduce((acc, cat) => acc + cat.subCategories?.reduce((a, s) => a + (s.courses?.length || 0), 0), 0) }}</span>
+          </button>
+
+          <div class="category-list">
+            <button
+                v-for="(cat, idx) in (categories || [])"
+                :key="`cat-${cat.id}`"
+                class="category-item"
+                :class="{ active: selectedCategory === idx }"
+                @click="handleCategoryClick(idx)"
             >
-              <div class="card-thumb" :style="{ background: `linear-gradient(135deg, ${course.accent}28, ${course.accent}0a)` }">
-                <div class="thumb-glyph" :style="{ color: course.accent + '55' }">
-                  {{ categories[selectedCategory]?.glyph }}
+              <span class="cat-glyph">{{ cat.glyph || '◈' }}</span>
+              <div class="cat-info">
+                <span class="cat-name">{{ cat.name }}</span>
+                <span class="cat-code">{{ cat.code }}</span>
+              </div>
+              <span class="cat-count">{{ cat.subCategories?.reduce((acc, sub) => acc + (sub.courses?.length || 0), 0) || 0 }}</span>
+            </button>
+
+
+          </div>
+        </aside>
+
+        <!-- ═══════════ 右侧内容区 ═══════════ -->
+        <main class="content-area">
+
+          <!-- ═══════════ 二级学科导航（小类）═══════════ -->
+          <section class="subcat-section" v-if="selectedCategory >= 0 && currentSubCategories.length > 0">
+            <div class="subcat-header">
+              <h3 class="subcat-title">{{ categories[selectedCategory]?.name }} · 细分方向</h3>
+              <button
+                class="clear-btn"
+                @click="handleClearSelection"
+                v-if="selectedSubCategory >= 0"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+                清除选择
+              </button>
+            </div>
+
+            <div class="subcat-tabs">
+              <button
+                  v-for="(sub, idx) in (currentSubCategories || [])"
+                  :key="`sub-${sub.id}`"
+                  class="subcat-btn"
+                  :class="{ active: selectedSubCategory === idx }"
+                  @click="selectedSubCategory = idx"
+              >
+                <span class="subcat-code">{{ sub.code }}</span>
+                <span class="subcat-name">{{ sub.name }}</span>
+                <span class="subcat-count">{{ sub.courses?.length || 0 }}</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- ═══════════ 课程网格 ═══════════ -->
+          <section class="courses-section">
+            <div class="courses-inner">
+              <div class="section-head">
+                <h2 class="section-title">
+                  {{ selectedCategory < 0 ? '全部课程' :
+                     selectedSubCategory >= 0
+                       ? `${categories[selectedCategory]?.name} · ${currentSubCategories[selectedSubCategory]?.name}`
+                       : `${categories[selectedCategory]?.name} · 全部课程`
+                  }}
+                  <span class="section-sub">· {{ filteredCourses.length }} 门课程</span>
+                </h2>
+                <div class="sort-wrap">
+                  <select class="sort-sel">
+                    <option>综合排序</option>
+                    <option>评分最高</option>
+                    <option>最多学员</option>
+                    <option>最新上线</option>
+                  </select>
                 </div>
-                <div class="thumb-overlay">
-                  <button class="preview-btn">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <polygon points="5 3 19 12 5 21 5 3"/>
-                    </svg>
-                    预览课程
-                  </button>
-                </div>
-                <div class="badge-group">
-                  <span class="level-badge" :style="{ background: course.levelColor + '22', color: course.levelColor, borderColor: course.levelColor + '44' }">
-                    {{ course.level }}
-                  </span>
-                  <span v-if="course.hot" class="hot-badge">🔥 热门</span>
-                  <span v-if="course.new" class="new-badge">✦ 新上</span>
-                </div>
-                <div class="accent-line" :style="{ background: course.accent }" />
               </div>
 
-              <div class="card-body">
-                <div class="card-tag">{{ course.tag }}</div>
-                <h3 class="card-title">{{ course.title }}</h3>
-                <p class="card-desc">{{ course.description }}</p>
-
-                <div class="card-meta">
-                  <div class="meta-pill">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                    </svg>
-                    {{ course.instructor }}
-                  </div>
-                  <div class="meta-pill">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                    {{ course.duration }}
-                  </div>
-                  <div class="meta-pill">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/>
-                      <path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-                      <path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/>
-                      <path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/>
-                      <path d="M14 14.5c0-.83.67-1.5 1.5-1.5h5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5H15.5c-.83 0-1.5-.67-1.5-1.5z"/>
-                      <path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/>
-                      <path d="M10 9.5C10 8.67 9.33 8 8.5 8H3.5C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11H8.5c.83 0 1.5-.67 1.5-1.5z"/>
-                      <path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/>
-                    </svg>
-                    {{ course.lessons }} 节
-                  </div>
-                </div>
-
-                <div class="card-footer">
-                  <div class="footer-left">
-                    <div class="rating-row">
-                      <span class="stars" :style="{ color: '#f59e0b' }">★★★★★</span>
-                      <span class="rating-num">{{ course.rating }}</span>
+              <div class="courses-grid">
+                <TransitionGroup name="fade">
+                  <div
+                      v-for="course in filteredCourses"
+                      :key="course.id"
+                      class="course-card"
+                      @click="goToCourse(course.id)"
+                      @mouseenter="hoveredCard = course.id"
+                      @mouseleave="hoveredCard = null"
+                  >
+                    <div class="card-thumb" :style="{ background: `linear-gradient(135deg, ${course.accent}28, ${course.accent}0a)` }">
+                      <div class="thumb-glyph" :style="{ color: course.accent + '55' }">
+                        {{ categories[selectedCategory]?.glyph }}
+                      </div>
+                      <div class="thumb-overlay">
+                        <button class="preview-btn">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                          </svg>
+                          预览课程
+                        </button>
+                      </div>
+                      <div class="badge-group">
+                        <span class="level-badge" :style="{ background: course.levelColor + '22', color: course.levelColor, borderColor: course.levelColor + '44' }">
+                          {{ course.level }}
+                        </span>
+                        <span v-if="course.hot" class="hot-badge">🔥 热门</span>
+                        <span v-if="course.new" class="new-badge">✦ 新上</span>
+                      </div>
+                      <div class="accent-line" :style="{ background: course.accent }" />
                     </div>
-                    <span class="students-count">{{ course.students.toLocaleString() }} 人</span>
+
+                    <div class="card-body">
+                      <div class="card-tag">{{ course.tag }}</div>
+                      <h3 class="card-title">{{ course.title }}</h3>
+                      <p class="card-desc">{{ course.description }}</p>
+
+                      <div class="card-meta">
+                        <div class="meta-pill">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                          </svg>
+                          {{ course.instructor }}
+                        </div>
+                        <div class="meta-pill">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                          </svg>
+                          {{ course.duration }}
+                        </div>
+                        <div class="meta-pill">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/>
+                            <path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                            <path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/>
+                            <path d="3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/>
+                            <path d="M14 14.5c0-.83.67-1.5 1.5-1.5h5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5H15.5c-.83 0-1.5-.67-1.5-1.5z"/>
+                            <path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/>
+                            <path d="M10 9.5C10 8.67 9.33 8 8.5 8H3.5C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11H8.5c.83 0 1.5-.67 1.5-1.5z"/>
+                            <path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/>
+                          </svg>
+                          {{ course.lessons }} 节
+                        </div>
+                      </div>
+
+                      <div class="card-footer">
+                        <div class="footer-left">
+                          <div class="rating-row">
+                            <span class="stars" :style="{ color: '#f59e0b' }">★★★★★</span>
+                            <span class="rating-num">{{ course.rating }}</span>
+                          </div>
+                          <span class="students-count">{{ course.students.toLocaleString() }} 人</span>
+                        </div>
+                        <button class="card-cta" :style="{ background: course.accent, boxShadow: `0 4px 16px ${course.accent}44` }">
+                          立即学习
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <button class="card-cta" :style="{ background: course.accent, boxShadow: `0 4px 16px ${course.accent}44` }">
-                    立即学习
-                  </button>
+                </TransitionGroup>
+
+                <div v-if="filteredCourses.length === 0" class="empty-state">
+                  <div class="empty-glyph">◌</div>
+                  <p>未找到匹配课程</p>
                 </div>
               </div>
             </div>
-          </TransitionGroup>
+          </section>
 
-          <div v-if="filteredCourses.length === 0" class="empty-state">
-            <div class="empty-glyph">◌</div>
-            <p>未找到匹配课程</p>
-          </div>
-        </div>
+        </main>
       </div>
     </section>
 
@@ -847,134 +1000,219 @@ onUnmounted(() => {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* ─── CATEGORY NAV ────────────────────────────────────── */
-.cat-section {
+/* ─── 主要内容布局 ─────────────────────────────────────── */
+.main-content {
   position: relative;
-  z-index: 2;
-  background: rgba(2, 6, 14, 0.95);
-  border-top: 1px solid rgba(0, 212, 255, 0.08);
-  border-bottom: 1px solid rgba(0, 212, 255, 0.08);
-  backdrop-filter: blur(24px);
-}
-.cat-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 48px;
-}
-.cat-tabs {
-  display: flex;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.cat-tabs::-webkit-scrollbar {
-  display: none;
+  z-index: 1;
+  padding: 60px 80px;
+  background: rgba(2, 10, 18, 0.5);
 }
 
-.cat-btn {
+.content-wrapper {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+/* ─── 左侧分类侧边栏 ─────────────────────────────────────── */
+.category-sidebar {
+  position: sticky;
+  top: 80px;
+  background: rgba(8, 20, 44, 0.6);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 16px;
+  padding: 20px 16px;
+  backdrop-filter: blur(20px);
+  max-height: fit-content;
+  overflow-y: visible;
+}
+
+.sidebar-header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  flex: 1;
-  min-width: 140px;
-  padding: 18px 22px;
-  border: none;
-  border-right: 1px solid rgba(0, 212, 255, 0.08);
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  color: rgba(150, 210, 180, 0.5);
-  font-family: 'Noto Sans SC', sans-serif;
-  transition: all 0.25s;
-  position: relative;
-}
-.cat-btn:last-child {
-  border-right: none;
-}
-.cat-btn:hover {
-  color: #c8f0e0;
-  background: rgba(0, 212, 255, 0.04);
-}
-.cat-btn.active {
-  color: #00d4ff;
-  border-bottom-color: #00d4ff;
-  background: rgba(0, 212, 255, 0.05);
+  gap: 12px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.15);
 }
 
-/* Icon-wrap for glyph */
-.cat-glyph {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+.sidebar-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #00d4ff;
+}
+
+.sidebar-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #c8f0e0;
+  letter-spacing: 0.04em;
+}
+
+.category-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 212, 255, 0.03);
+  border: 1px solid rgba(0, 212, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.25s;
+  text-align: left;
+  width: 100%;
+}
+
+.category-item:hover {
+  background: rgba(0, 212, 255, 0.08);
+  border-color: rgba(0, 212, 255, 0.2);
+  transform: translateX(4px);
+}
+
+.category-item.active {
+  background: rgba(0, 212, 255, 0.12);
+  border-color: rgba(0, 212, 255, 0.35);
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+}
+
+.category-item .cat-glyph {
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
   background: rgba(0, 212, 255, 0.06);
   border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 6px;
+  font-size: 1rem;
+  color: #00d4ff;
   transition: all 0.25s;
 }
-.cat-btn.active .cat-glyph {
+
+.category-item.active .cat-glyph {
   background: rgba(0, 212, 255, 0.14);
-  border-color: rgba(0, 212, 255, 0.35);
-  box-shadow: 0 0 18px rgba(0, 212, 255, 0.5);
+  border-color: rgba(0, 212, 255, 0.4);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.4);
 }
-.cat-text {
+
+.category-item .cat-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  text-align: left;
-  flex: 1;
-}
-.cat-name {
-  font-size: 0.88rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.cat-desc {
-  font-size: 0.72rem;
-  opacity: 0.6;
-}
-.cat-count {
-  margin-left: auto;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: rgba(0, 212, 255, 0.1);
-  border: 1px solid rgba(0, 212, 255, 0.15);
-  color: rgba(150, 210, 180, 0.5);
-  flex-shrink: 0;
-}
-.cat-btn.active .cat-count {
-  background: rgba(0, 212, 255, 0.2);
-  color: #00d4ff;
+  min-width: 0;
 }
 
-/* ─── 二级学科导航（小类）样式 ─────────────────────────── */
+.category-item .cat-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #c8f0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-item .cat-code {
+  font-size: 0.65rem;
+  color: rgba(150, 210, 180, 0.6);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.category-item .cat-count {
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  color: rgba(150, 210, 180, 0.7);
+}
+
+.category-item.active .cat-count {
+  background: rgba(0, 212, 255, 0.18);
+  color: #00d4ff;
+  border-color: rgba(0, 212, 255, 0.3);
+}
+
+/* ─── 右侧内容区 ─────────────────────────────────────── */
+.content-area {
+  min-width: 0;
+}
+
+/* ─── 二级分类区域 ─────────────────────────────────────── */
 .subcat-section {
-  position: relative;
-  z-index: 1;
-  background: rgba(2, 10, 18, 0.8);
-  border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+  margin-bottom: 40px;
+  background: rgba(8, 20, 44, 0.5);
+  border: 1px solid rgba(0, 212, 255, 0.1);
+  border-radius: 14px;
+  padding: 20px 24px;
   backdrop-filter: blur(12px);
-  margin-top: -1px;
 }
-.subcat-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 12px 48px;
+
+.subcat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
+
+.subcat-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #c8f0e0;
+  margin: 0;
+}
+
+.clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: rgba(255, 107, 107, 0.9);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.clear-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 .subcat-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
+
 .subcat-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 18px;
+  padding: 10px 16px;
   border-radius: 999px;
   background: rgba(0, 212, 255, 0.05);
   border: 1px solid rgba(0, 212, 255, 0.15);
@@ -984,24 +1222,29 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.2s;
 }
+
 .subcat-btn:hover {
   background: rgba(0, 212, 255, 0.12);
   border-color: rgba(0, 212, 255, 0.35);
   color: #c8f0e0;
 }
+
 .subcat-btn.active {
   background: rgba(0, 212, 255, 0.2);
   border-color: #00d4ff;
   color: #00d4ff;
   box-shadow: 0 0 12px rgba(0, 212, 255, 0.2);
 }
+
 .subcat-code {
   font-size: 0.7rem;
   opacity: 0.7;
 }
+
 .subcat-name {
   font-weight: 500;
 }
+
 .subcat-count {
   font-size: 0.7rem;
   background: rgba(0, 0, 0, 0.4);
@@ -1010,7 +1253,7 @@ onUnmounted(() => {
   margin-left: 4px;
 }
 
-/* ─── COURSES ─────────────────────────────────────────── */
+/* ─── 课程区域 ─────────────────────────────────────── */
 .courses-section {
   position: relative;
   z-index: 1;
@@ -1606,50 +1849,56 @@ onUnmounted(() => {
 
 /* ─── RESPONSIVE ──────────────────────────────────────── */
 @media (max-width: 1024px) {
-  .hero {
-    padding: 100px 40px 60px;
+  .main-content {
+    padding: 40px 40px;
   }
-  .hero-deco {
-    display: none;
-  }
-  .cat-tabs {
-    overflow-x: auto;
-  }
-  .cat-btn {
-    min-width: 140px;
-  }
-  .courses-inner,
-  .feat-inner {
-    padding: 0 24px;
-  }
-}
-@media (max-width: 768px) {
-  .hero {
-    padding: 80px 24px 48px;
-  }
-  .courses-inner,
-  .feat-inner {
-    padding: 0 20px;
-  }
-  .cta-banner {
-    margin: 0 20px 60px;
-  }
-  .cta-inner {
-    padding: 48px 24px;
-  }
-  .cta-title {
-    font-size: 1.8rem;
-  }
-  .cta-btns {
-    flex-direction: column;
-    align-items: center;
-  }
-  .courses-grid {
+
+  .content-wrapper {
     grid-template-columns: 1fr;
   }
-  .hstat {
-    padding-right: 20px;
-    margin-right: 20px;
+
+  .category-sidebar {
+    position: relative;
+    top: 0;
+    max-height: none;
+  }
+
+  .category-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+
+  .category-item {
+    width: 100%;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 30px 20px;
+  }
+
+  .category-sidebar {
+    padding: 16px;
+  }
+
+  .sidebar-header {
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+  }
+
+  .category-item {
+    padding: 10px 12px;
+  }
+
+  .subcat-section {
+    padding: 16px;
+  }
+
+  .subcat-title {
+    font-size: 0.9rem;
   }
 }
 </style>
