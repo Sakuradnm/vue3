@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { getCourseDetail } from '@/api/course'
 
 const route = useRoute()
 const router = useRouter()
 const courseId = computed(() => Number(route.params.id))
+
+const loading = ref(true)
 const isEnrolled = ref(false)
 const activeModule = ref<number | null>(1)
 const activeTab = ref<'overview' | 'curriculum' | 'reviews'>('overview')
@@ -14,75 +18,190 @@ const mouseY = ref(0)
 let particleRafId: number | null = null
 let observers: IntersectionObserver[] = []
 
-const course = ref({
-  id: 1, title: '新手驾驶入门',
-  subtitle: '从零基础到独立上路，系统化驾驶技能培训',
-  description: '本课程专为完全零基础的驾驶学员设计，由拥有 15 年教学经验的张教练主讲。通过系统性的理论讲解与实操演示，帮助学员在最短时间内掌握安全驾驶的核心技能。',
-  instructor: '张教练', instructorTitle: '国家一级驾驶教练 · 前职业赛车手',
-  instructorBio: '拥有 15 年驾驶教学经验，持有国家一级赛车手证书，累计培训学员超过 5000 人。擅长因材施教，以直观易懂的方式诠释复杂驾驶技巧。',
-  instructorInitial: '张', duration: '8 课时', level: '初级', levelColor: '#00ff9d',
-  students: 1250, rating: 4.8, reviews: 328, accent: '#00d4ff', price: 299, originalPrice: 599,
-  objectives: [
-    '掌握车辆基本操控：方向盘、油门、刹车的协调运用',
-    '理解并熟记核心交通规则与常见道路标识',
-    '独立完成起步、停车、转弯、变道等基础动作',
-    '掌握停车场景：侧方停车、倒车入库、坡道停车',
-    '建立安全驾驶意识，学会危险预判与规避',
-    '完成城市道路、高速公路等多场景驾驶实践'
-  ],
-  requirements: ['年满 18 周岁，持有学习驾照', '身体健康，无色盲色弱', '具备基本的汽车认知（非必须）'],
-  modules: [
-    { id: 1, title: '第一章：驾驶基础认知', duration: '2 课时', videoCount: 3, videos: [
-        { id: 1, title: '车辆仪表盘逐项解读', duration: '15:30', isFree: true },
-        { id: 2, title: '座椅与后视镜的精确调整', duration: '12:45', isFree: true },
-        { id: 3, title: '方向盘握法与转向规范', duration: '10:20', isFree: false },
-      ]},
-    { id: 2, title: '第二章：起步与停车', duration: '2 课时', videoCount: 3, videos: [
-        { id: 4, title: '手动挡平地起步全流程', duration: '18:00', isFree: false },
-        { id: 5, title: '自动挡起步与换挡时机', duration: '14:30', isFree: false },
-        { id: 6, title: '坡道起步：半坡不溜车', duration: '16:45', isFree: false },
-      ]},
-    { id: 3, title: '第三章：转向与变道', duration: '2 课时', videoCount: 3, videos: [
-        { id: 7, title: '转弯时机的精准判断', duration: '13:20', isFree: false },
-        { id: 8, title: '变道完整操作流程', duration: '17:15', isFree: false },
-        { id: 9, title: '盲区识别与安全检查', duration: '11:50', isFree: false },
-      ]},
-    { id: 4, title: '第四章：综合路况实践', duration: '2 课时', videoCount: 3, videos: [
-        { id: 10, title: '城市道路综合驾驶', duration: '25:00', isFree: false },
-        { id: 11, title: '高速公路驾驶要领', duration: '20:30', isFree: false },
-        { id: 12, title: '夜间与雨天驾驶技巧', duration: '19:45', isFree: false },
-      ]},
-  ],
-  reviewList: [
-    { id: 1, name: '李明', initial: '李', color: '#00c8ff', rating: 5, date: '2024-03-01', comment: '张教练讲得非常详细，零基础也能轻松跟上！已经成功上路了，特别推荐。', helpful: 45 },
-    { id: 2, name: '王芳', initial: '王', color: '#a259ff', rating: 5, date: '2024-02-28', comment: '课程内容很系统，从理论到实操都有涵盖，尤其是倒车入库那节课反复看了好几遍，终于学会了！', helpful: 32 },
-    { id: 3, name: '张伟', initial: '张', color: '#ff6b35', rating: 4, date: '2024-02-25', comment: '整体质量很好，教学节奏适中。如果能再增加一些雨天驾驶的内容就更完美了。', helpful: 28 },
-  ]
+interface Video {
+  id: number
+  title: string
+  duration: string
+  isFree: boolean
+}
+
+interface Module {
+  id: number
+  title: string
+  duration: string
+  videoCount: number
+  videos: Video[]
+}
+
+interface Review {
+  id: number
+  name: string
+  initial: string
+  color: string
+  rating: number
+  date: string
+  comment: string
+  helpful: number
+}
+
+const courseDetail = ref<any>(null)
+
+const mockModules: Module[] = [
+  {
+    id: 1,
+    title: '第一章：基础概念与概述',
+    duration: '2 课时',
+    videoCount: 3,
+    videos: [
+      { id: 1, title: '课程导论与学习目标', duration: '15:30', isFree: true },
+      { id: 2, title: '核心概念解析', duration: '12:45', isFree: true },
+      { id: 3, title: '实践案例介绍', duration: '10:20', isFree: false },
+    ]
+  },
+  {
+    id: 2,
+    title: '第二章：进阶技能训练',
+    duration: '2 课时',
+    videoCount: 3,
+    videos: [
+      { id: 4, title: '高级技巧讲解', duration: '18:00', isFree: false },
+      { id: 5, title: '实战演练', duration: '14:30', isFree: false },
+      { id: 6, title: '常见问题解答', duration: '16:45', isFree: false },
+    ]
+  },
+  {
+    id: 3,
+    title: '第三章：综合应用实践',
+    duration: '2 课时',
+    videoCount: 3,
+    videos: [
+      { id: 7, title: '项目实战（上）', duration: '13:20', isFree: false },
+      { id: 8, title: '项目实战（下）', duration: '17:15', isFree: false },
+      { id: 9, title: '总结与展望', duration: '11:50', isFree: false },
+    ]
+  }
+]
+
+const mockReviews: Review[] = [
+  {
+    id: 1,
+    name: '李明',
+    initial: '李',
+    color: '#00c8ff',
+    rating: 5,
+    date: '2024-03-01',
+    comment: '课程内容非常系统，老师讲解清晰易懂，强烈推荐！',
+    helpful: 45
+  },
+  {
+    id: 2,
+    name: '王芳',
+    initial: '王',
+    color: '#a259ff',
+    rating: 5,
+    date: '2024-02-28',
+    comment: '学到了很多实用的知识，对提升技能很有帮助。',
+    helpful: 32
+  },
+  {
+    id: 3,
+    name: '张伟',
+    initial: '张',
+    color: '#ff6b35',
+    rating: 4,
+    date: '2024-02-25',
+    comment: '整体质量很好，教学节奏适中，希望能增加更多实战案例。',
+    helpful: 28
+  }
+]
+
+const course = computed(() => {
+  if (!courseDetail.value) return null
+
+  const detail = courseDetail.value
+  return {
+    id: detail.courseId,
+    title: detail.courseName,
+    subtitle: detail.overview || '系统化专业课程',
+    description: detail.courseDescription || detail.overview || '暂无详细描述',
+    instructor: detail.teacher || '专业讲师',
+    instructorTitle: '资深教育专家',
+    instructorBio: '拥有丰富的教学经验和行业实践经验，致力于为学生提供优质的学习体验。',
+    instructorInitial: (detail.teacher || '讲')[0],
+    duration: `${Math.floor((detail.totalDuration || 480) / 60)} 小时`,
+    level: '中级',
+    levelColor: '#00ff9d',
+    students: Math.floor(Math.random() * 5000) + 500,
+    rating: detail.rating || 4.5,
+    reviews: mockReviews.length,
+    accent: '#00d4ff',
+    price: 299,
+    originalPrice: 599,
+    modules: mockModules,
+    reviewList: mockReviews
+  }
 })
 
-const totalVideos = computed(() => course.value.modules.reduce((s, m) => s + m.videos.length, 0))
-const toggleModule = (id: number) => { activeModule.value = activeModule.value === id ? null : id }
-const toggleLike = (id: number) => { if (likedReviews.value.has(id)) likedReviews.value.delete(id); else likedReviews.value.add(id) }
-const enroll = () => { isEnrolled.value = true }
+const totalVideos = computed(() =>
+  course.value?.modules.reduce((s: number, m: Module) => s + m.videos.length, 0) || 0
+)
+
+const toggleModule = (id: number) => {
+  activeModule.value = activeModule.value === id ? null : id
+}
+
+const toggleLike = (id: number) => {
+  if (likedReviews.value.has(id)) {
+    likedReviews.value.delete(id)
+  } else {
+    likedReviews.value.add(id)
+  }
+}
+
+const enroll = () => {
+  isEnrolled.value = true
+  ElMessage.success('报名成功！开始学习吧~')
+}
+
 const goBack = () => router.back()
 
 const ratingBars = [
-  { stars: 5, pct: 78 }, { stars: 4, pct: 15 },
-  { stars: 3, pct: 5 }, { stars: 2, pct: 1 }, { stars: 1, pct: 1 },
+  { stars: 5, pct: 78 },
+  { stars: 4, pct: 15 },
+  { stars: 3, pct: 5 },
+  { stars: 2, pct: 1 },
+  { stars: 1, pct: 1 }
 ]
+
+async function loadCourseDetail() {
+  try {
+    loading.value = true
+    const data = await getCourseDetail(courseId.value)
+    courseDetail.value = data
+  } catch (error) {
+    console.error('加载课程详情失败:', error)
+    ElMessage.error('加载课程详情失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
 
 function initParticles(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext('2d')!
   let W = window.innerWidth, H = window.innerHeight
-  canvas.width = W; canvas.height = H
+  canvas.width = W
+  canvas.height = H
   const count = Math.floor((W * H) / 12000)
   const pts = Array.from({ length: count }, () => ({
-    x: Math.random() * W, y: Math.random() * H,
-    vx: (Math.random() - 0.5) * 0.18, vy: (Math.random() - 0.5) * 0.18,
+    x: Math.random() * W,
+    y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 0.18,
+    vy: (Math.random() - 0.5) * 0.18,
     r: Math.random() * 1.1 + 0.3,
     alpha: Math.random() * 0.35 + 0.08,
-    color: ['0,255,180', '0,200,255', '80,255,200'][Math.floor(Math.random() * 3)],
+    color: ['0,255,180', '0,200,255', '80,255,200'][Math.floor(Math.random() * 3)]
   }))
+
   function draw() {
     ctx.clearRect(0, 0, W, H)
     for (let i = 0; i < pts.length; i++) {
@@ -99,9 +218,12 @@ function initParticles(canvas: HTMLCanvasElement) {
         }
       }
       const p = pts[i]
-      p.x += p.vx; p.y += p.vy
-      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0
-      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0
+      p.x += p.vx
+      p.y += p.vy
+      if (p.x < 0) p.x = W
+      if (p.x > W) p.x = 0
+      if (p.y < 0) p.y = H
+      if (p.y > H) p.y = 0
       ctx.beginPath()
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
       ctx.fillStyle = `rgba(${p.color},${p.alpha})`
@@ -111,14 +233,18 @@ function initParticles(canvas: HTMLCanvasElement) {
   }
   draw()
   window.addEventListener('resize', () => {
-    W = window.innerWidth; H = window.innerHeight
-    canvas.width = W; canvas.height = H
+    W = window.innerWidth
+    H = window.innerHeight
+    canvas.width = W
+    canvas.height = H
   })
 }
 
 function initObservers(root: Element) {
   const obs = new IntersectionObserver(entries => {
-    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible') })
+    entries.forEach(e => {
+      if (e.isIntersecting) e.target.classList.add('visible')
+    })
   }, { threshold: 0.08 })
   root.querySelectorAll('.fade-up').forEach(el => obs.observe(el))
   observers.push(obs)
@@ -130,10 +256,15 @@ function onMouseMove(e: MouseEvent) {
 }
 
 onMounted(() => {
-  const root = document.querySelector('.cd-root')!
-  const canvas = root.querySelector('.bg-canvas') as HTMLCanvasElement
-  if (canvas) initParticles(canvas)
-  if (root) initObservers(root)
+  loadCourseDetail()
+
+  setTimeout(() => {
+    const root = document.querySelector('.cd-root')!
+    const canvas = root.querySelector('.bg-canvas') as HTMLCanvasElement
+    if (canvas) initParticles(canvas)
+    if (root) initObservers(root)
+  }, 100)
+
   window.addEventListener('mousemove', onMouseMove)
 })
 
@@ -149,297 +280,311 @@ onUnmounted(() => {
     <canvas class="bg-canvas"></canvas>
     <div class="noise-layer"></div>
     <div class="cursor-glow" :style="{ left: mouseX + 'px', top: mouseY + 'px' }"></div>
-    <!-- ══ HERO BANNER ══ -->
-    <section class="course-hero fade-up">
-      <div class="hero-bg-grid"></div>
-      <div class="hero-inner">
-        <div class="hero-left">
-          <div class="breadcrumb">
-            <span class="bc-link" @click="router.push('/course.ts')">返回《</span>
-            <span class="bc-sep">›</span>
-            <span class="bc-link">驾驶课程</span>
-            <span class="bc-sep">›</span>
-            <span class="bc-link">{{ course.level }}课程</span>
-            <span class="bc-sep">›</span>
-            <span class="bc-current">{{ course.title }}</span>
-          </div>
 
-          <div class="hero-badges">
-            <span class="level-tag" :style="`color:${course.levelColor};border-color:${course.levelColor}44;background:${course.levelColor}10`">
-              {{ course.level }}
-            </span>
-            <span class="students-tag">◆ {{ course.students.toLocaleString() }} 名学员</span>
-          </div>
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>加载中...</p>
+    </div>
 
-          <h1 class="course-title">{{ course.title }}</h1>
-          <p class="course-subtitle">{{ course.subtitle }}</p>
-
-          <div class="rating-row">
-            <span class="stars-display">
-              <span v-for="i in 5" :key="i" :style="{ color: i <= Math.floor(course.rating) ? '#ffd93d' : 'rgba(255,255,255,.15)' }">★</span>
-            </span>
-            <span class="rating-val">{{ course.rating }}</span>
-            <span class="review-count">({{ course.reviews }} 条评价)</span>
-          </div>
-
-          <div class="hero-instructor">
-            <div class="inst-avatar" :style="`background:linear-gradient(135deg,#00d4ff,#4fa3ff)`">
-              <span>{{ course.instructorInitial }}</span>
+    <!-- Content -->
+    <template v-else-if="course">
+      <!-- ══ HERO BANNER ══ -->
+      <section class="course-hero fade-up">
+        <div class="hero-bg-grid"></div>
+        <div class="hero-inner">
+          <div class="hero-left">
+            <div class="breadcrumb">
+              <span class="bc-link" @click="goBack">返回《</span>
+              <span class="bc-sep">›</span>
+              <span class="bc-link">课程列表</span>
+              <span class="bc-sep">›</span>
+              <span class="bc-current">{{ course.title }}</span>
             </div>
-            <div>
-              <span class="inst-name">{{ course.instructor }}</span>
-              <span class="inst-title">{{ course.instructorTitle }}</span>
-            </div>
-          </div>
 
-          <div class="meta-chips">
-            <div class="chip" v-for="c in [
-              { icon: '◎', text: course.duration },
-              { icon: '▷', text: totalVideos + ' 节视频' },
-              { icon: '◆', text: course.level + '难度' },
-              { icon: '◈', text: '结课证书' },
-            ]" :key="c.text">
-              <span class="chip-icon">{{ c.icon }}</span>
-              <span>{{ c.text }}</span>
+            <div class="hero-badges">
+              <span class="level-tag" :style="`color:${course.levelColor};border-color:${course.levelColor}44;background:${course.levelColor}10`">
+                {{ course.level }}
+              </span>
+              <span class="students-tag">◆ {{ course.students.toLocaleString() }} 名学员</span>
             </div>
-          </div>
-        </div>
 
-        <!-- Enroll card -->
-        <div class="enroll-card">
-          <div class="ec-thumb">
-            <div class="ec-thumb-grid"></div>
-            <div class="ec-thumb-glyph" :style="`color:${course.accent}20`">◎</div>
-            <div class="ec-thumb-title">{{ course.title }}</div>
-            <div class="ec-accent-line" :style="`background:${course.accent};box-shadow:0 0 14px ${course.accent}`"></div>
-          </div>
-          <div class="ec-body">
-            <div class="price-row">
-              <span class="price-current">¥{{ course.price }}</span>
-              <span class="price-orig">¥{{ course.originalPrice }}</span>
-              <span class="price-badge">5折</span>
+            <h1 class="course-title">{{ course.title }}</h1>
+            <p class="course-subtitle">{{ course.subtitle }}</p>
+
+            <div class="rating-row">
+              <span class="stars-display">
+                <span v-for="i in 5" :key="i" :style="{ color: i <= Math.floor(course.rating) ? '#ffd93d' : 'rgba(255,255,255,.15)' }">★</span>
+              </span>
+              <span class="rating-val">{{ course.rating }}</span>
+              <span class="review-count">({{ course.reviews }} 条评价)</span>
             </div>
-            <p class="price-note">限时优惠 · 随时可退款</p>
-            <button class="enroll-btn" :class="{ enrolled: isEnrolled }" @click="enroll">
-              <span class="cb-sweep"></span>
-              {{ isEnrolled ? '继续学习 →' : '立即报名' }}
-            </button>
-            <div class="ec-features">
-              <div class="ecf-item" v-for="f in ['终身有效访问','三端同步','结课颁发证书','30天无理由退款']" :key="f">
-                <span class="ecf-check">✓</span>{{ f }}
+
+            <div class="hero-instructor">
+              <div class="inst-avatar" :style="`background:linear-gradient(135deg,#00d4ff,#4fa3ff)`">
+                <span>{{ course.instructorInitial }}</span>
+              </div>
+              <div>
+                <span class="inst-name">{{ course.instructor }}</span>
+                <span class="inst-title">{{ course.instructorTitle }}</span>
+              </div>
+            </div>
+
+            <div class="meta-chips">
+              <div class="chip" v-for="c in [
+                { icon: '◎', text: course.duration },
+                { icon: '▷', text: totalVideos + ' 节视频' },
+                { icon: '◆', text: course.level + '难度' },
+                { icon: '◈', text: '结课证书' },
+              ]" :key="c.text">
+                <span class="chip-icon">{{ c.icon }}</span>
+                <span>{{ c.text }}</span>
               </div>
             </div>
           </div>
-          <div class="ec-corner tl"></div>
-          <div class="ec-corner br"></div>
-        </div>
-      </div>
-    </section>
 
-    <!-- ══ MAIN ══ -->
-    <div class="course-main">
-      <div class="main-inner">
-        <!-- Left -->
-        <div class="content-left">
-          <!-- Tab nav -->
-          <div class="tab-nav">
-            <button v-for="t in [
-              { key:'overview', label:'课程介绍' },
-              { key:'curriculum', label:'课程大纲' },
-              { key:'reviews', label:`评价 (${course.reviews})` },
-            ]" :key="t.key"
-                    class="tab-btn" :class="{ active: activeTab === t.key }"
-                    @click="activeTab = t.key as any">
-              {{ t.label }}
-              <div class="tab-bar"></div>
-            </button>
-          </div>
-
-          <!-- ── Overview ── -->
-          <div v-show="activeTab === 'overview'">
-            <div class="content-block fade-up">
-              <div class="cb-header">
-                <span class="cb-tag">[ DETAILS ]</span>
-                <h2 class="cb-title">课程详情</h2>
-              </div>
-              <p class="block-text">{{ course.description }}</p>
+          <!-- Enroll card -->
+          <div class="enroll-card">
+            <div class="ec-thumb">
+              <div class="ec-thumb-grid"></div>
+              <div class="ec-thumb-glyph" :style="`color:${course.accent}20`">◎</div>
+              <div class="ec-thumb-title">{{ course.title }}</div>
+              <div class="ec-accent-line" :style="`background:${course.accent};box-shadow:0 0 14px ${course.accent}`"></div>
             </div>
-
-            <div class="content-block fade-up">
-              <div class="cb-header">
-                <span class="cb-tag">[ INSTRUCTOR ]</span>
-                <h2 class="cb-title">关于讲师</h2>
+            <div class="ec-body">
+              <div class="price-row">
+                <span class="price-current">¥{{ course.price }}</span>
+                <span class="price-orig">¥{{ course.originalPrice }}</span>
+                <span class="price-badge">5折</span>
               </div>
-              <div class="instructor-card">
-                <div class="inst-card-avatar" :style="`background:linear-gradient(135deg,${course.accent},#4fa3ff)`">
-                  {{ course.instructorInitial }}
+              <p class="price-note">限时优惠 · 随时可退款</p>
+              <button class="enroll-btn" :class="{ enrolled: isEnrolled }" @click="enroll">
+                <span class="cb-sweep"></span>
+                {{ isEnrolled ? '继续学习 →' : '立即报名' }}
+              </button>
+              <div class="ec-features">
+                <div class="ecf-item" v-for="f in ['终身有效访问','三端同步','结课颁发证书','30天无理由退款']" :key="f">
+                  <span class="ecf-check">✓</span>{{ f }}
                 </div>
-                <div class="inst-card-info">
-                  <h3 class="inst-card-name">{{ course.instructor }}</h3>
-                  <p class="inst-card-title">{{ course.instructorTitle }}</p>
-                  <div class="inst-stats">
-                    <span>◉ 4.9 评分</span>
-                    <span>· 5000+ 学员</span>
-                    <span>· 15年经验</span>
+              </div>
+            </div>
+            <div class="ec-corner tl"></div>
+            <div class="ec-corner br"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ MAIN ══ -->
+      <div class="course-main">
+        <div class="main-inner">
+          <!-- Left -->
+          <div class="content-left">
+            <!-- Tab nav -->
+            <div class="tab-nav">
+              <button v-for="t in [
+                { key:'overview', label:'课程介绍' },
+                { key:'curriculum', label:'课程大纲' },
+                { key:'reviews', label:`评价 (${course.reviews})` },
+              ]" :key="t.key"
+                      class="tab-btn" :class="{ active: activeTab === t.key }"
+                      @click="activeTab = t.key as any">
+                {{ t.label }}
+                <div class="tab-bar"></div>
+              </button>
+            </div>
+
+            <!-- ── Overview ── -->
+            <div v-show="activeTab === 'overview'">
+              <div class="content-block fade-up">
+                <div class="cb-header">
+                  <span class="cb-tag">[ DETAILS ]</span>
+                  <h2 class="cb-title">课程详情</h2>
+                </div>
+                <p class="block-text">{{ course.description }}</p>
+              </div>
+
+              <div class="content-block fade-up">
+                <div class="cb-header">
+                  <span class="cb-tag">[ INSTRUCTOR ]</span>
+                  <h2 class="cb-title">关于讲师</h2>
+                </div>
+                <div class="instructor-card">
+                  <div class="inst-card-avatar" :style="`background:linear-gradient(135deg,${course.accent},#4fa3ff)`">
+                    {{ course.instructorInitial }}
                   </div>
-                  <p class="inst-bio">{{ course.instructorBio }}</p>
+                  <div class="inst-card-info">
+                    <h3 class="inst-card-name">{{ course.instructor }}</h3>
+                    <p class="inst-card-title">{{ course.instructorTitle }}</p>
+                    <div class="inst-stats">
+                      <span>◉ 4.9 评分</span>
+                      <span>· 5000+ 学员</span>
+                      <span>· 15年经验</span>
+                    </div>
+                    <p class="inst-bio">{{ course.instructorBio }}</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- ── Curriculum ── -->
-          <div v-show="activeTab === 'curriculum'">
-            <div class="content-block fade-up">
-              <div class="cb-header">
-                <div>
-                  <span class="cb-tag">[ CURRICULUM ]</span>
-                  <h2 class="cb-title">课程大纲</h2>
+            <!-- ── Curriculum ── -->
+            <div v-show="activeTab === 'curriculum'">
+              <div class="content-block fade-up">
+                <div class="cb-header">
+                  <div>
+                    <span class="cb-tag">[ CURRICULUM ]</span>
+                    <h2 class="cb-title">课程大纲</h2>
+                  </div>
+                  <span class="curriculum-meta">{{ course.modules.length }} 章 · {{ totalVideos }} 节视频</span>
                 </div>
-                <span class="curriculum-meta">{{ course.modules.length }} 章 · {{ totalVideos }} 节视频</span>
-              </div>
-              <div class="modules-list">
-                <div v-for="module in course.modules" :key="module.id"
-                     class="module-wrap" :class="{ open: activeModule === module.id }">
-                  <button class="module-header" @click="toggleModule(module.id)">
-                    <div class="mh-left">
-                      <div class="module-num">{{ String(module.id).padStart(2,'0') }}</div>
-                      <div class="mh-text">
-                        <span class="module-title">{{ module.title }}</span>
-                        <span class="module-meta">{{ module.videoCount }} 节 · {{ module.duration }}</span>
+                <div class="modules-list">
+                  <div v-for="module in course.modules" :key="module.id"
+                       class="module-wrap" :class="{ open: activeModule === module.id }">
+                    <button class="module-header" @click="toggleModule(module.id)">
+                      <div class="mh-left">
+                        <div class="module-num">{{ String(module.id).padStart(2,'0') }}</div>
+                        <div class="mh-text">
+                          <span class="module-title">{{ module.title }}</span>
+                          <span class="module-meta">{{ module.videoCount }} 节 · {{ module.duration }}</span>
+                        </div>
                       </div>
-                    </div>
-                    <svg class="chevron" :class="{ rotated: activeModule === module.id }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                  </button>
-                  <Transition name="expand">
-                    <div v-if="activeModule === module.id" class="module-videos">
-                      <div v-for="video in module.videos" :key="video.id"
-                           class="video-row" :class="{ locked: !isEnrolled && !video.isFree }">
-                        <div class="vr-left">
-                          <div class="vr-icon">
-                            <svg v-if="isEnrolled || video.isFree" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                            <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      <svg class="chevron" :class="{ rotated: activeModule === module.id }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
+                    </button>
+                    <Transition name="expand">
+                      <div v-if="activeModule === module.id" class="module-videos">
+                        <div v-for="video in module.videos" :key="video.id"
+                             class="video-row" :class="{ locked: !isEnrolled && !video.isFree }">
+                          <div class="vr-left">
+                            <div class="vr-icon">
+                              <svg v-if="isEnrolled || video.isFree" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                              <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            </div>
+                            <span class="vr-title">{{ video.title }}</span>
+                            <span v-if="video.isFree" class="free-pill">免费试看</span>
                           </div>
-                          <span class="vr-title">{{ video.title }}</span>
-                          <span v-if="video.isFree" class="free-pill">免费试看</span>
+                          <div class="vr-right">
+                            <span class="vr-dur">{{ video.duration }}</span>
+                            <button class="vr-btn" :disabled="!isEnrolled && !video.isFree">
+                              {{ isEnrolled || video.isFree ? '播放' : '解锁' }}
+                            </button>
+                          </div>
                         </div>
-                        <div class="vr-right">
-                          <span class="vr-dur">{{ video.duration }}</span>
-                          <button class="vr-btn" :disabled="!isEnrolled && !video.isFree">
-                            {{ isEnrolled || video.isFree ? '播放' : '解锁' }}
-                          </button>
+                      </div>
+                    </Transition>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Reviews ── -->
+            <div v-show="activeTab === 'reviews'">
+              <div class="content-block fade-up">
+                <div class="cb-header">
+                  <span class="cb-tag">[ REVIEWS ]</span>
+                  <h2 class="cb-title">学员评价</h2>
+                </div>
+                <div class="rating-summary">
+                  <div class="rating-big">
+                    <span class="big-num">{{ course.rating }}</span>
+                    <div class="big-stars">
+                      <span v-for="i in 5" :key="i" :style="{ color: i <= Math.floor(course.rating) ? '#ffd93d' : 'rgba(255,255,255,.15)' }">★</span>
+                    </div>
+                    <span class="big-label">课程评分</span>
+                  </div>
+                  <div class="rating-bars">
+                    <div v-for="bar in ratingBars" :key="bar.stars" class="bar-row">
+                      <span class="bar-stars">{{ bar.stars }} ★</span>
+                      <div class="bar-track"><div class="bar-fill" :style="`width:${bar.pct}%`"></div></div>
+                      <span class="bar-pct">{{ bar.pct }}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="reviews-list">
+                  <div v-for="review in course.reviewList" :key="review.id" class="review-card">
+                    <div class="review-top">
+                      <div class="reviewer-avatar" :style="`background:linear-gradient(135deg,${review.color},${review.color}88)`">{{ review.initial }}</div>
+                      <div class="reviewer-info">
+                        <span class="reviewer-name">{{ review.name }}</span>
+                        <div class="reviewer-meta">
+                          <span class="r-stars" style="color:#ffd93d">{{ '★'.repeat(review.rating) }}</span>
+                          <span class="r-date">{{ review.date }}</span>
                         </div>
                       </div>
                     </div>
-                  </Transition>
+                    <p class="review-text">{{ review.comment }}</p>
+                    <button class="helpful-btn" :class="{ liked: likedReviews.has(review.id) }" @click="toggleLike(review.id)">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="likedReviews.has(review.id) ? '#00d4ff' : 'currentColor'" stroke-width="2">
+                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+                        <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+                      </svg>
+                      {{ review.helpful + (likedReviews.has(review.id) ? 1 : 0) }} 人觉得有用
+                    </button>
+                    <div class="rc-corner tl"></div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- ── Reviews ── -->
-          <div v-show="activeTab === 'reviews'">
-            <div class="content-block fade-up">
-              <div class="cb-header">
-                <span class="cb-tag">[ REVIEWS ]</span>
-                <h2 class="cb-title">学员评价</h2>
-              </div>
-              <div class="rating-summary">
-                <div class="rating-big">
-                  <span class="big-num">{{ course.rating }}</span>
-                  <div class="big-stars">
-                    <span v-for="i in 5" :key="i" :style="{ color: i <= Math.floor(course.rating) ? '#ffd93d' : 'rgba(255,255,255,.15)' }">★</span>
-                  </div>
-                  <span class="big-label">课程评分</span>
-                </div>
-                <div class="rating-bars">
-                  <div v-for="bar in ratingBars" :key="bar.stars" class="bar-row">
-                    <span class="bar-stars">{{ bar.stars }} ★</span>
-                    <div class="bar-track"><div class="bar-fill" :style="`width:${bar.pct}%`"></div></div>
-                    <span class="bar-pct">{{ bar.pct }}%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="reviews-list">
-                <div v-for="review in course.reviewList" :key="review.id" class="review-card">
-                  <div class="review-top">
-                    <div class="reviewer-avatar" :style="`background:linear-gradient(135deg,${review.color},${review.color}88)`">{{ review.initial }}</div>
-                    <div class="reviewer-info">
-                      <span class="reviewer-name">{{ review.name }}</span>
-                      <div class="reviewer-meta">
-                        <span class="r-stars" style="color:#ffd93d">{{ '★'.repeat(review.rating) }}</span>
-                        <span class="r-date">{{ review.date }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <p class="review-text">{{ review.comment }}</p>
-                  <button class="helpful-btn" :class="{ liked: likedReviews.has(review.id) }" @click="toggleLike(review.id)">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="likedReviews.has(review.id) ? '#00d4ff' : 'currentColor'" stroke-width="2">
-                      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
-                      <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
-                    </svg>
-                    {{ review.helpful + (likedReviews.has(review.id) ? 1 : 0) }} 人觉得有用
-                  </button>
-                  <div class="rc-corner tl"></div>
+          <!-- Right Sidebar -->
+          <aside class="sidebar-right">
+            <div class="sidebar-card fade-up">
+              <div class="sc-tag">[ OVERVIEW ]</div>
+              <h3 class="sc-title">课程概览</h3>
+              <div class="overview-grid">
+                <div class="ov-item" v-for="s in [
+                  { val: course.modules.length, lbl: '章节数', icon: '◈' },
+                  { val: totalVideos, lbl: '视频节数', icon: '▷' },
+                  { val: course.duration, lbl: '总时长', icon: '◎' },
+                  { val: course.level, lbl: '难度', icon: '◉' },
+                ]" :key="s.lbl">
+                  <span class="ov-icon">{{ s.icon }}</span>
+                  <span class="ov-val">{{ s.val }}</span>
+                  <span class="ov-lbl">{{ s.lbl }}</span>
                 </div>
               </div>
             </div>
-          </div>
+
+            <!-- Mobile enroll -->
+            <div class="sidebar-card enroll-mobile fade-up">
+              <div class="price-row">
+                <span class="price-current">¥{{ course.price }}</span>
+                <span class="price-orig">¥{{ course.originalPrice }}</span>
+                <span class="price-badge">5折</span>
+              </div>
+              <button class="enroll-btn" :class="{ enrolled: isEnrolled }" @click="enroll">
+                <span class="cb-sweep"></span>
+                {{ isEnrolled ? '继续学习 →' : '立即报名' }}
+              </button>
+            </div>
+
+            <div class="sidebar-card fade-up">
+              <div class="sc-tag">[ RELATED ]</div>
+              <h3 class="sc-title">同类推荐</h3>
+              <div class="related-list">
+                <div class="related-item" v-for="item in [
+                  { title: '进阶课程A', instructor: '李老师', rating: 4.7, color: '#00d4ff' },
+                  { title: '进阶课程B', instructor: '王老师', rating: 4.9, color: '#a259ff' },
+                ]" :key="item.title">
+                  <div class="ri-thumb" :style="`color:${item.color};border-color:${item.color}33;background:${item.color}0d`">◎</div>
+                  <div class="ri-info">
+                    <p class="ri-title">{{ item.title }}</p>
+                    <p class="ri-meta">{{ item.instructor }} · <span style="color:#ffd93d">★</span> {{ item.rating }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
-
-        <!-- Right Sidebar -->
-        <aside class="sidebar-right">
-          <div class="sidebar-card fade-up">
-            <div class="sc-tag">[ OVERVIEW ]</div>
-            <h3 class="sc-title">课程概览</h3>
-            <div class="overview-grid">
-              <div class="ov-item" v-for="s in [
-                { val: course.modules.length, lbl: '章节数', icon: '◈' },
-                { val: totalVideos, lbl: '视频节数', icon: '▷' },
-                { val: course.duration, lbl: '总时长', icon: '◎' },
-                { val: course.level, lbl: '难度', icon: '◉' },
-              ]" :key="s.lbl">
-                <span class="ov-icon">{{ s.icon }}</span>
-                <span class="ov-val">{{ s.val }}</span>
-                <span class="ov-lbl">{{ s.lbl }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Mobile enroll -->
-          <div class="sidebar-card enroll-mobile fade-up">
-            <div class="price-row">
-              <span class="price-current">¥{{ course.price }}</span>
-              <span class="price-orig">¥{{ course.originalPrice }}</span>
-              <span class="price-badge">5折</span>
-            </div>
-            <button class="enroll-btn" :class="{ enrolled: isEnrolled }" @click="enroll">
-              <span class="cb-sweep"></span>
-              {{ isEnrolled ? '继续学习 →' : '立即报名' }}
-            </button>
-          </div>
-
-          <div class="sidebar-card fade-up">
-            <div class="sc-tag">[ RELATED ]</div>
-            <h3 class="sc-title">同类推荐</h3>
-            <div class="related-list">
-              <div class="related-item" v-for="item in [
-                { title: '交通规则详解', instructor: '李教官', rating: 4.7, color: '#00d4ff' },
-                { title: '停车技巧大全', instructor: '王教练', rating: 4.9, color: '#a259ff' },
-              ]" :key="item.title" @click="router.push('/course.ts/2')">
-                <div class="ri-thumb" :style="`color:${item.color};border-color:${item.color}33;background:${item.color}0d`">◎</div>
-                <div class="ri-info">
-                  <p class="ri-title">{{ item.title }}</p>
-                  <p class="ri-meta">{{ item.instructor }} · <span style="color:#ffd93d">★</span> {{ item.rating }}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </aside>
       </div>
+    </template>
+
+    <!-- Error State -->
+    <div v-else class="error-container">
+      <p>课程不存在或加载失败</p>
+      <button @click="goBack" class="back-btn">返回列表</button>
     </div>
   </div>
 </template>
@@ -447,7 +592,6 @@ onUnmounted(() => {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
-/* ══ DESIGN TOKENS ══ */
 *,
 *::before,
 *::after {
@@ -465,7 +609,46 @@ onUnmounted(() => {
   position: relative;
 }
 
-/* ─── BACKGROUND EFFECTS ─────────────────────────────────────── */
+/* Loading & Error States */
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(0, 212, 255, 0.2);
+  border-top-color: #00d4ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.back-btn {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #0060cc, #00d4ff);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s;
+}
+
+.back-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 180, 255, 0.4);
+}
+
 .bg-canvas {
   position: fixed; inset: 0;
   width: 100%; height: 100%;
@@ -486,20 +669,17 @@ onUnmounted(() => {
   transition: left 0.07s, top 0.07s;
 }
 
-/* ─── FADE UP ─────────────────────────────────────────── */
 .fade-up {
   opacity: 0; transform: translateY(22px);
   transition: opacity 0.7s cubic-bezier(0.25,1,0.5,1), transform 0.7s cubic-bezier(0.25,1,0.5,1);
 }
 .fade-up.visible { opacity:1; transform:translateY(0); }
 
-/* ══ HERO ══ */
 .course-hero {
   position: relative; z-index: 2;
   padding: 84px 48px 56px;
   border-bottom: 1px solid rgba(0,212,255,0.08); overflow: hidden;
 }
-/* Dot grid bg for hero */
 .hero-bg-grid {
   position: absolute; inset: 0;
   background-image: radial-gradient(circle, rgba(0,212,255,0.08) 1px, transparent 1px);
@@ -513,7 +693,6 @@ onUnmounted(() => {
 }
 .hero-left { display: flex; flex-direction: column; gap: 16px; }
 
-/* Breadcrumb */
 .breadcrumb { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.73rem; letter-spacing: 0.06em; }
 .bc-link { color: rgba(150,210,180,0.35); cursor: pointer; transition: color 0.2s; }
 .bc-link:hover { color: #00d4ff; }
@@ -522,7 +701,6 @@ onUnmounted(() => {
 .bc-sep { color: rgba(0,212,255,0.2); }
 .bc-current { color: #00d4ff; }
 
-/* Hero badges */
 .hero-badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .level-tag {
   display: inline-flex; align-items: center;
@@ -536,7 +714,6 @@ onUnmounted(() => {
   background: rgba(0,212,255,0.06); border: 1px solid rgba(0,212,255,0.08);
 }
 
-/* Title */
 .course-title {
   font-family: 'Orbitron', sans-serif;
   font-size: clamp(1.8rem, 3vw, 2.8rem); font-weight: 700; line-height: 1.08;
@@ -547,13 +724,11 @@ onUnmounted(() => {
 }
 .course-subtitle { font-size: 0.95rem; color: rgba(200,240,224,0.85); line-height: 1.7; }
 
-/* Rating row */
 .rating-row { display: flex; align-items: center; gap: 10px; }
 .stars-display { display: flex; gap: 2px; font-size: 1rem; }
 .rating-val { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 700; color: #ffd93d; filter: drop-shadow(0 0 6px #ffd93d); }
 .review-count { font-size: 0.8rem; color: rgba(150,210,180,0.35); }
 
-/* Instructor row */
 .hero-instructor { display: flex; align-items: center; gap: 12px; }
 .inst-avatar {
   width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
@@ -563,7 +738,6 @@ onUnmounted(() => {
 .inst-name { display: block; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 600; color: #c8f0e0; letter-spacing: 0.04em; margin-bottom: 2px; }
 .inst-title { display: block; font-size: 0.75rem; color: rgba(150,210,180,0.35); }
 
-/* Meta chips */
 .meta-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
   display: flex; align-items: center; gap: 7px;
@@ -573,7 +747,6 @@ onUnmounted(() => {
 }
 .chip-icon { color: #00d4ff; font-size: 0.85rem; }
 
-/* ══ ENROLL CARD ══ */
 .enroll-card {
   background: rgba(8,20,44,0.96);
   border: 1px solid rgba(0,212,255,0.22); border-radius: 12px;
@@ -620,11 +793,9 @@ onUnmounted(() => {
 .ecf-item { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: rgba(150,210,180,0.35); }
 .ecf-check { color: #00ff9d; font-weight: 700; }
 
-/* ══ MAIN LAYOUT ══ */
 .course-main { position: relative; z-index: 2; padding: 40px 48px 80px; max-width: 1280px; margin: 0 auto; }
 .main-inner { display: grid; grid-template-columns: 1fr 300px; gap: 32px; }
 
-/* Tab nav */
 .tab-nav { display: flex; border-bottom: 1px solid rgba(0,212,255,0.08); margin-bottom: 24px; }
 .tab-btn {
   padding: 12px 22px; border: none; background: transparent; cursor: pointer;
@@ -641,7 +812,6 @@ onUnmounted(() => {
 }
 .tab-btn.active .tab-bar { transform: scaleX(1); }
 
-/* Content blocks */
 .content-block {
   background: rgba(8,20,44,0.6); border: 1px solid rgba(0,212,255,0.08);
   border-radius: 12px; padding: 24px 28px; margin-bottom: 16px;
@@ -649,22 +819,9 @@ onUnmounted(() => {
 }
 .content-block:hover { border-color: rgba(0,212,255,0.22); }
 .cb-header { margin-bottom: 18px; }
-
-/* When cb-header is flex (for curriculum) */
-.content-block .cb-header[style*="flex"],
-.content-block .cb-header > div { display: flex; flex-direction: column; }
-
 .cb-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.14em; color: #00d4ff; opacity: 0.7; display: block; margin-bottom: 4px; }
 .cb-title { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.04em; color: #c8f0e0; }
 .block-text { font-size: 0.87rem; color: rgba(200,240,224,0.85); line-height: 1.85; }
-
-.objectives-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.obj-item { display: flex; align-items: flex-start; gap: 8px; font-size: 0.82rem; line-height: 1.55; color: rgba(200,225,255,0.72); }
-.obj-check { color: #00d4ff; font-size: 0.7rem; flex-shrink: 0; margin-top: 2px; filter: drop-shadow(0 0 5px #00d4ff); }
-
-.req-list { display: flex; flex-direction: column; gap: 10px; }
-.req-item { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: rgba(200,240,224,0.85); }
-.req-dot { width: 6px; height: 6px; border-radius: 50%; background: #00d4ff; flex-shrink: 0; box-shadow: 0 0 8px #00d4ff; }
 
 .instructor-card { display: flex; gap: 18px; align-items: flex-start; }
 .inst-card-avatar {
@@ -677,7 +834,6 @@ onUnmounted(() => {
 .inst-stats { display: flex; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #00d4ff; opacity: 0.85; margin-bottom: 10px; }
 .inst-bio { font-size: 0.82rem; color: rgba(200,240,224,0.85); line-height: 1.75; }
 
-/* Curriculum */
 .curriculum-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.73rem; color: rgba(150,210,180,0.35); }
 .modules-list { display: flex; flex-direction: column; gap: 4px; }
 .module-wrap { border: 1px solid rgba(0,212,255,0.08); border-radius: 10px; overflow: hidden; transition: border-color 0.25s; }
@@ -727,7 +883,6 @@ onUnmounted(() => {
 .vr-btn:not(:disabled):hover { background: rgba(0,212,255,0.14); border-color: rgba(0,212,255,0.22); color: #00d4ff; }
 .vr-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-/* Reviews */
 .rating-summary {
   display: flex; gap: 32px; align-items: center;
   background: rgba(0,0,0,0.2); border: 1px solid rgba(0,212,255,0.08); border-radius: 10px;
@@ -773,7 +928,6 @@ onUnmounted(() => {
 }
 .helpful-btn:hover, .helpful-btn.liked { background: rgba(0,212,255,0.1); border-color: rgba(0,212,255,0.22); color: #00d4ff; }
 
-/* ══ SIDEBAR ══ */
 .sidebar-right { display: flex; flex-direction: column; gap: 14px; }
 .sidebar-card {
   background: rgba(8,20,44,0.6); border: 1px solid rgba(0,212,255,0.08);
@@ -810,30 +964,23 @@ onUnmounted(() => {
 .ri-title { font-size: 0.82rem; font-weight: 600; color: #c8f0e0; margin-bottom: 2px; }
 .ri-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: rgba(150,210,180,0.35); }
 
-/* ══ TRANSITIONS ══ */
 .expand-enter-active, .expand-leave-active { transition: all 0.32s cubic-bezier(0.25,1,0.5,1); overflow: hidden; }
 .expand-enter-from, .expand-leave-to { opacity: 0; transform: translateY(-8px); }
-.pill-fade-enter-active, .pill-fade-leave-active { transition: all 0.3s; }
-.pill-fade-enter-from, .pill-fade-leave-to { opacity: 0; transform: scale(0.88); }
 
-/* ══ SCROLLBAR ══ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
 ::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.2); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,0.4); }
 
-/* ══ RESPONSIVE ══ */
 @media (max-width: 1100px) {
   .hero-inner { grid-template-columns: 1fr; }
   .enroll-card { display: none; }
   .enroll-mobile { display: block !important; }
   .main-inner { grid-template-columns: 1fr; }
   .sidebar-right { order: -1; display: grid; grid-template-columns: 1fr 1fr; }
-  .objectives-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 768px) {
   .course-hero, .course-main { padding-left: 20px; padding-right: 20px; }
-  .top-nav { padding: 0 20px; }
   .sidebar-right { grid-template-columns: 1fr; }
   .rating-summary { flex-direction: column; gap: 20px; }
 }

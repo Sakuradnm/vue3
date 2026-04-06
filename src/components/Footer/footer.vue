@@ -1,17 +1,20 @@
 <template>
-  <footer class="footer">
-    <!-- 社区标签：用圆角标签展示主要社区入口，符合课程资源共享的社交属性 -->
-
-    <div class="container">
-      <!-- 底部版权与法律链接 -->
-      <div class="footer-bottom">
-        <p class="copyright">© 2025 课程资源共享平台. 保留所有权利。</p>
-        <div class="legal-links">
-          <router-link to="/sitemap">网站地图</router-link>
-          <router-link to="/terms">使用条款</router-link>
-          <router-link to="/privacy">隐私政策</router-link>
-          <router-link to="/help">帮助中心</router-link>
-        </div>
+  <footer class="site-footer">
+    <div class="sf-line"></div>
+    <div class="sf-row">
+      <div class="sf-brand">
+        <svg viewBox="0 0 32 32" fill="none" width="22" height="22">
+          <polygon points="16,2 30,10 30,22 16,30 2,22 2,10"
+                   stroke="#00ffb4" stroke-width="1.5" fill="rgba(0,255,180,0.06)"/>
+          <circle cx="16" cy="16" r="3" fill="#00ffb4"/>
+        </svg>
+        <span class="sf-name">COURSHARE<em>.io</em></span>
+      </div>
+      <span class="sf-copy">© 2025 COURSHARE.io — OPEN KNOWLEDGE, FOREVER</span>
+      <div class="sf-links">
+        <router-link to="/privacy">隐私政策</router-link>
+        <router-link to="/terms">使用条款</router-link>
+        <router-link to="/help">联系我们</router-link>
       </div>
     </div>
   </footer>
@@ -22,225 +25,48 @@
 </script>
 
 <style scoped>
-/* ========== 基础重置 & 字体 ========== */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
-.footer {
-  background-color: #0b0f17; /* 深色背景，突出科技感/专业感 */
-  color: #e0e4f0;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  line-height: 1.5;
+/* ─── FOOTER ──────────────────────────────────────────── */
+.site-footer{
+  position: relative; z-index: 2;
+  padding: 2rem 6vw;
+  border-top: 1px solid rgba(0,255,180,0.08);
+  background: #020b10;
 }
-
-/* ========== 主容器 ========== */
-.container {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2.5rem 2rem 1.5rem;
+.sf-line{
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #00ffb4, transparent);
+  margin-bottom: 1.5rem; opacity: 0.2;
 }
-
-/* ========== 主要内容区域（品牌 + 三列链接） ========== */
-.footer-main {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3rem 4rem;
-  margin-bottom: 3rem;
-}
-
-/* 品牌区域 */
-.brand {
-  flex: 1 1 260px;
-  min-width: 240px;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.logo-icon {
-  font-size: 2.4rem;
-  line-height: 1;
-}
-
-.logo-title {
-  font-size: 1.8rem;
-  font-weight: 600;
-  color: #fff;
-  letter-spacing: 1px;
-  white-space: nowrap;
-}
-
-.brand-slogan {
-  font-size: 1.2rem;
-  font-weight: 500;
-  color: #a5b4fc; /* 淡紫色点缀，增加层次 */
-  margin-bottom: 0.75rem;
-}
-
-.brand-description {
-  color: #a0a8c0;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  max-width: 300px;
-}
-
-/* 链接区块容器 */
-.link-blocks {
-  flex: 3;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem 3rem;
+.sf-row{
+  display: flex; align-items: center;
   justify-content: space-between;
 }
-
-/* 单个链接块 */
-.block {
-  flex: 1 1 160px;
-  min-width: 150px;
+.sf-brand{
+  display: flex; align-items: center; gap: 0.6rem;
+  font-family: 'Orbitron', sans-serif; font-size: 0.72rem;
+  font-weight: 700; letter-spacing: 0.16em; color: #fff;
 }
-
-.block h3 {
-  color: #fff;
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-bottom: 1.2rem;
-  letter-spacing: 0.5px;
-  border-left: 4px solid #a5b4fc;
-  padding-left: 0.75rem;
+.sf-brand em{ font-style: normal; color: #00ffb4; }
+.sf-copy{
+  font-family: 'JetBrains Mono', monospace; font-size: 0.52rem;
+  letter-spacing: 0.1em; color: rgba(0,255,180,0.18);
 }
-
-.block ul {
-  list-style: none;
+.sf-links{ display: flex; gap: 1.5rem; }
+.sf-links a{
+  font-family: 'JetBrains Mono', monospace; font-size: 0.56rem;
+  letter-spacing: 0.1em; color: rgba(150,210,180,0.35);
+  text-decoration: none; transition: color 0.25s;
 }
+.sf-links a:hover{ color: #00ffb4; }
 
-.block li {
-  margin-bottom: 0.7rem;
-  font-size: 0.95rem;
-}
-
-.block a {
-  color: #b0b8d0;
-  text-decoration: none;
-  transition: color 0.2s, padding-left 0.2s;
-  display: inline-block;
-}
-
-.block a:hover {
-  color: #fff;
-  padding-left: 5px;
-}
-
-/* 联系块特殊处理：有些行不是链接，需要保持颜色 */
-.contact-block li {
-  display: flex;
-  flex-wrap: wrap;
-  color: #b0b8d0;
-}
-
-.contact-block li span:first-child {
-  width: 70px;          /* 使标签对齐更美观 */
-  color: #a0a8c0;
-  flex-shrink: 0;
-}
-
-.contact-block li span:last-child {
-  color: #e0e4f0;
-  word-break: break-word;
-  flex: 1;
-}
-
-.contact-block a {
-  color: #b0b8d0;
-  text-decoration: none;
-  border-bottom: 1px dotted transparent;
-  transition: color 0.2s, border-color 0.2s;
-}
-
-.contact-block a:hover {
-  color: #fff;
-  border-bottom-color: #a5b4fc;
-}
-
-/* ========== 底部版权区域 ========== */
-.footer-bottom {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1.2rem 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.9rem;
-}
-
-.copyright {
-  color: #8e96b0;
-}
-
-.legal-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.2rem 2rem;
-}
-
-.legal-links a {
-  color: #b0b8d0;
-  text-decoration: none;
-  transition: color 0.2s;
-  font-size: 0.9rem;
-}
-
-.legal-links a:hover {
-  color: #fff;
-}
-
-/* ========== 响应式优化 ========== */
-@media (max-width: 900px) {
-  .footer-main {
-    gap: 2.5rem;
-  }
-
-  .brand {
-    flex-basis: 100%;
-  }
-
-  .brand-description {
-    max-width: none;
-  }
-}
-
-@media (max-width: 600px) {
-  .community-tags {
-    gap: 0.8rem;
-  }
-
-  .tag {
-    padding: 0.4rem 1.2rem;
-    font-size: 0.9rem;
-  }
-
-  .container {
-    padding: 2rem 1.2rem 1rem;
-  }
-
-  .footer-bottom {
+/* ─── RESPONSIVE ──────────────────────────────────────── */
+@media(max-width:860px){
+  .sf-row{
     flex-direction: column;
+    gap: 1rem;
     text-align: center;
-  }
-
-  .legal-links {
-    justify-content: center;
-  }
-
-  .block h3 {
-    font-size: 1.1rem;
   }
 }
 </style>

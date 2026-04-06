@@ -242,7 +242,7 @@
         <p>免费注册，立即访问 2,400+ 门课程资料</p>
         <div class="cta-input-row">
           <input type="email" placeholder="输入你的邮箱地址" class="cta-email-input" />
-          <button class="btn-primary">
+          <button class="btn-primary" @click="handleCtaClick">
             <span>免费开始</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
@@ -335,6 +335,14 @@ export default {
         return
       }
       this.$router.push('/upload')
+    },
+    handleCtaClick() {
+      const userInfoStr = localStorage.getItem('userInfo')
+      if (userInfoStr) {
+        this.$router.push('/Course')
+      } else {
+        this.$router.push('/Users')
+      }
     },
     setupObservers() {
       const opts = { threshold: 0.15 }

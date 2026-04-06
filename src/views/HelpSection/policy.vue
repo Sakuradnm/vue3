@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { ref } from 'vue';
+
 interface PolicySection {
   title: string;
   content: string[];
 }
 
-const policySections: PolicySection[] = [
+const policySections = ref<PolicySection[]>([
   {
     title: '适用范围',
     content: [
@@ -67,100 +69,333 @@ const policySections: PolicySection[] = [
       '(b)本公司保留随时修改本政策的权利，因此请经常查看。如对本政策作出重大更改，本公司会通过网站通知的形式告知。'
     ]
   }
-];
+]);
+
+const handlePrint = () => {
+  window.print();
+};
+
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 </script>
 
 <template>
+  <!-- 背景视频 -->
+  <video class="bg-video" autoplay loop muted playsinline>
+    <source src="/videos/home1.mp4" type="video/mp4">
+  </video>
+
+  <!-- 主容器 -->
   <div class="policy-container">
-    <h1 class="policy-title">隐私政策</h1>
-    <div class="policy-update-time">最后更新时间：2025年3月24日</div>
-    <div class="policy-intro">
-      <p>感谢您使用我们的服务。我们重视您的隐私保护，并致力于保护您的个人信息安全。</p>
-      本隐私政策说明了我们如何收集、使用和保护您的信息。
-      为了给您提供更准确、更有个性化的服务，我们会按照本隐私权政策的规定使用和披露您的个人信息。
-      除本隐私权政策另有规定外，在未征得您事先许可的情况下，本应用不会将这些信息对外披露或向第三方提供。
-      本应用会不时更新本隐私权政策。 您在同意本应用服务使用协议之时，即视为您已经同意本隐私权政策全部内容。
-      <p>本隐私权政策属于本应用服务使用协议不可分割的一部分。</p>
-    </div>
+    <div class="content-wrapper">
+      <!-- 返回按钮 -->
+      <div class="back-section">
+        <router-link to="/" class="back-button">
+          <svg-icon name="home" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5"></path>
+            <path d="M12 19l-7-7 7-7"></path>
+          </svg-icon>
+          返回
+        </router-link>
+      </div>
 
-    <div class="policy-content">
-      <section v-for="(section, index) in policySections" :key="index" class="policy-section">
-        <h2>{{ section.title }}</h2>
-        <div class="section-content">
-          <p v-for="(text, idx) in section.content" :key="idx">{{ text }}</p>
+      <!-- 协议内容区域 -->
+      <div class="policy-content">
+        <div class="policy-header">
+          <h1>隐私政策</h1>
+          <p class="last-updated">最后更新时间：2025年3月24日</p>
+
+          <div class="controls">
+            <button class="print-btn" @click="handlePrint">
+              打印政策
+            </button>
+          </div>
         </div>
-      </section>
+
+        <div class="policy-intro">
+          <p>感谢您使用我们的服务。我们重视您的隐私保护，并致力于保护您的个人信息安全。</p>
+          <p>本隐私政策说明了我们如何收集、使用和保护您的信息。为了给您提供更准确、更有个性化的服务，我们会按照本隐私权政策的规定使用和披露您的个人信息。</p>
+          <p>除本隐私权政策另有规定外，在未征得您事先许可的情况下，本应用不会将这些信息对外披露或向第三方提供。本应用会不时更新本隐私权政策。您在同意本应用服务使用协议之时，即视为您已经同意本隐私权政策全部内容。</p>
+          <p>本隐私权政策属于本应用服务使用协议不可分割的一部分。</p>
+        </div>
+
+        <div class="policy-sections">
+          <section v-for="(section, index) in policySections" :key="index" class="policy-section">
+            <div class="section-header">
+              <h2>{{ section.title }}</h2>
+            </div>
+            <div class="section-content">
+              <p v-for="(text, idx) in section.content" :key="idx">{{ text }}</p>
+            </div>
+          </section>
+        </div>
+
+        <div class="policy-footer">
+          <p>请您妥善保护自己的个人信息，仅在必要的情形下向他人提供。</p>
+          <p>如您发现个人信息泄密，请您立即联络本应用客服，以便本应用采取相应措施。</p>
+        </div>
+      </div>
     </div>
 
-    <div class="policy-footer">
-      <p>请您妥善保护自己的个人信息，仅在必要的情形下向他人提供。</p>
-      <p>如您发现个人信息泄密，请您立即联络本应用客服，以便本应用采取相应措施。</p>
-    </div>
+    <!-- 返回顶部按钮 -->
+    <button class="back-to-top" @click="scrollToTop">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 19V5"></path>
+        <path d="M5 12l7-7 7 7"></path>
+      </svg>
+    </button>
   </div>
 </template>
 
 <style scoped>
+/* 容器基础样式 */
 .policy-container {
-  max-width: 800px;
-  margin: 72px auto 0 auto;
-  padding: 20px;
-  color: #333;
-  background: white;
+  min-height: 100vh;
+  padding: 0;
+  position: relative;
 }
-.policy-title {
-  font-size: 28px;
-  color: #2c3e50;
-  text-align: center;
-  margin-bottom: 10px;
+
+/* 背景视频样式 */
+.bg-video {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
 }
-.policy-update-time {
-  text-align: center;
-  color: #666;
-  margin-bottom: 30px;
-  font-size: 14px;
+
+/* 主要内容框架样式 */
+.content-wrapper {
+  width: 90%;
+  max-width: 1200px;
+  margin: 2rem auto;
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(15px);
+  border-radius: 20px;
+  padding: 2rem;
+  position: relative;
+  box-shadow: 0 15px 30px 0 rgba(51, 88, 104, 0.27);
 }
-.policy-intro {
-  background-color: #f8f9fa;
-  padding: 20px;
+
+/* 返回按钮区域 */
+.back-section {
+  margin-bottom: 1.5rem;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: white;
+  text-decoration: none;
+  font-size: 1rem;
+  width: fit-content;
+  padding: 0.5rem 1rem;
   border-radius: 8px;
-  margin-bottom: 30px;
-  line-height: 1.6;
+  transition: all 0.3s ease;
 }
+
+.back-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 协议内容区域 */
+.policy-content {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 2rem;
+  color: white;
+}
+
+.policy-header {
+  margin-bottom: 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 1rem;
+}
+
+.policy-header h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.last-updated {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.print-btn {
+  background: rgba(100, 104, 111, 0.3);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.print-btn:hover {
+  background: rgba(100, 104, 111, 0.6);
+}
+
+.policy-intro {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  line-height: 1.8;
+  border-left: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.policy-intro p {
+  margin-bottom: 0.8rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.policy-intro p:last-child {
+  margin-bottom: 0;
+}
+
+.policy-sections {
+  margin-bottom: 2rem;
+}
+
 .policy-section {
-  margin-bottom: 30px;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 1.5rem;
 }
-.policy-section h2 {
-  color: #2c3e50;
-  font-size: 20px;
-  margin-bottom: 15px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #eee;
+
+.policy-section:last-child {
+  border-bottom: none;
 }
+
+.section-header h2 {
+  color: white;
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+}
+
 .section-content {
   line-height: 1.8;
+  color: rgba(255, 255, 255, 0.8);
 }
+
 .section-content p {
-  margin-bottom: 10px;
+  margin-bottom: 1rem;
 }
 
 .policy-footer {
-  margin-top: 40px;
-  padding: 20px;
-  background-color: #f8f9fa;
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
-  color: #666;
+  border-left: 3px solid rgba(255, 255, 255, 0.3);
 }
 
+.policy-footer p {
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
 
+.policy-footer p:last-child {
+  margin-bottom: 0;
+}
+
+/* 返回顶部按钮 */
+.back-to-top {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 100;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.back-to-top:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: translateY(-3px);
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
-  .policy-container {
-    padding: 15px;
+  .content-wrapper {
+    width: 95%;
+    padding: 1.5rem;
+    margin: 1rem auto;
   }
-  .policy-title {
-    font-size: 24px;
+
+  .policy-content {
+    padding: 1.5rem;
   }
-  .policy-section h2 {
-    font-size: 18px;
+
+  .policy-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .section-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .back-to-top {
+    width: 40px;
+    height: 40px;
+    bottom: 1rem;
+    right: 1rem;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .bg-video, .back-section, .controls, .back-to-top {
+    display: none;
+  }
+
+  .content-wrapper {
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+  }
+
+  .policy-content {
+    background: none;
+    color: black;
+    padding: 0;
+  }
+
+  .section-content {
+    color: black;
+    display: block !important;
+  }
+
+  .policy-section {
+    break-inside: avoid;
   }
 }
 </style>

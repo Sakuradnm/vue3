@@ -272,7 +272,7 @@ const handleLogout = () => {
   <header class="header">
     <div class="logo">
       <svg-icon name="courseShare" :width="70" height="70"/>
-      <span class="logo-text">CourseShare</span>
+      <span class="logo-text">CourShare</span>
     </div>
 
     <nav class="nav-container" @mouseleave="hideSubMenu">

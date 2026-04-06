@@ -139,7 +139,7 @@ const tabs = [
 const tabContents = [
   {
     title: '打破知识壁垒',
-    body: '我们相信，优质的学习资源不应被价格或渠道所限制。CourseNet 的核心使命是建立一个开放、透明、持续生长的知识共享网络——让每一位学习者都能平等地获取、贡献并传播知识。',
+    body: '我们相信，优质的学习资源不应被价格或渠道所限制。COURSHAR 的核心使命是建立一个开放、透明、持续生长的知识共享网络——让每一位学习者都能平等地获取、贡献并传播知识。',
     items: ['开放访问，永久免费', '知识民主化', '打破信息不对称'],
   },
   {
@@ -206,7 +206,7 @@ onUnmounted(() => {
                    stroke="#00ffb4" stroke-width="1.5" fill="rgba(0,255,180,0.06)"/>
           <circle cx="16" cy="16" r="3" fill="#00ffb4"/>
         </svg>
-        <span>COURSENET<em>.io</em></span>
+        <span>COURSHAR<em>.io</em></span>
       </div>
       <div class="nav-breadcrumb">
         <a href="#">首页</a>
@@ -237,7 +237,7 @@ onUnmounted(() => {
           <span class="h1-line line-a fade-in">我们是谁</span>
           <span class="h1-line line-b fade-in">WE ARE</span>
           <span class="h1-line line-c fade-in">
-            <span class="glitch" data-text="COURSENET">COURSENET</span>
+            <span class="glitch" data-text="COURSHAR">COURSHAR</span>
           </span>
         </h1>
 
@@ -263,11 +263,11 @@ onUnmounted(() => {
       <div class="float-cards">
         <div class="fc fc-1 fade-in">
           <div class="fc-label">FOUNDED</div>
-          <div class="fc-val">2021.Q4</div>
+          <div class="fc-val">2026.Q1</div>
         </div>
         <div class="fc fc-2 fade-in">
           <div class="fc-label">TEAM SIZE</div>
-          <div class="fc-val">24</div>
+          <div class="fc-val">1</div>
         </div>
         <div class="fc fc-3 fade-in">
           <div class="fc-label">MISSION</div>
@@ -312,14 +312,14 @@ onUnmounted(() => {
             2021 年末，三位程序员在深圳的一家 24 小时咖啡馆里，喝着第三杯美式，抱怨着同一个问题：为什么网上到处都是碎片化的课程资料，却没有一个地方能把它们系统地汇聚起来？
           </p>
           <p class="sl-item story-p">
-            那晚，我们在餐巾纸上画出了 CourseNet 的第一个原型。不是为了商业，而是因为我们切实地需要它——相信还有无数像我们一样的学习者，同样需要它。
+            那晚，我们在餐巾纸上画出了 COURSHAR 的第一个原型。不是为了商业，而是因为我们切实地需要它——相信还有无数像我们一样的学习者，同样需要它。
           </p>
           <p class="sl-item story-p">
             三年后，这个「疯狂想法」演变成了一个拥有 12800+ 资源、4200+ 学习者的开放知识网络。而我们的目标，从未改变。
           </p>
           <div class="sl-item story-sig">
             <div class="sig-line"></div>
-            <span>— The CourseNet Founders, 2021</span>
+            <span>— The COURSHAR Founders, 2021</span>
           </div>
         </div>
       </div>
@@ -469,7 +469,7 @@ onUnmounted(() => {
           我们是<span class="gt">开放的</span>
         </h2>
         <p class="oss-desc">
-          CourseNet 的核心模块已在 GitHub 开源。我们相信透明是信任的基础——<br/>
+          COURSHAR 的核心模块已在 GitHub 开源。我们相信透明是信任的基础——<br/>
           欢迎 PR、Issue、Fork，共同构建更好的知识共享基础设施。
         </p>
         <div class="oss-stats">
@@ -483,12 +483,12 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="oss-btns">
-          <a href="#" class="btn-primary">
+          <a href="https://github.com/Sakuradnm/vue3" class="btn-primary" target="_blank" rel="noopener noreferrer">
             <span class="bp-sweep"></span>
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.96.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
             查看源码
           </a>
-          <a href="#" class="btn-ghost">贡献指南 →</a>
+          <a href="https://developer.mozilla.org/zh-CN/docs/Learn_web_development/Core/Frameworks_libraries/Vue_getting_started" class="btn-ghost" target="_blank" rel="noopener noreferrer">贡献指南 →</a>
         </div>
         <div class="oss-grid-deco"></div>
       </div>
@@ -508,42 +508,21 @@ onUnmounted(() => {
           每一位参与者都是这个开放知识网络的共同缔造者。
         </p>
         <div class="js-btns">
-          <a href="#" class="btn-primary lg">
+          <router-link to="/Forum" class="btn-primary lg">
             <span class="bp-sweep"></span>
             开始共享资料
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="5" y1="12" x2="19" y2="12"/>
               <polyline points="12 5 19 12 12 19"/>
             </svg>
-          </a>
-          <a href="#" class="btn-ghost lg">
+          </router-link>
+          <router-link to="/Users" class="btn-ghost lg">
             加入我们的团队
-          </a>
+          </router-link>
         </div>
       </div>
       <div class="js-hex-ring"></div>
     </section>
-
-    <!-- ══ FOOTER ══════════════════════════════════════════ -->
-    <footer class="site-footer">
-      <div class="sf-line"></div>
-      <div class="sf-row">
-        <div class="sf-brand">
-          <svg viewBox="0 0 32 32" fill="none" width="22" height="22">
-            <polygon points="16,2 30,10 30,22 16,30 2,22 2,10"
-                     stroke="#00ffb4" stroke-width="1.5" fill="rgba(0,255,180,0.06)"/>
-            <circle cx="16" cy="16" r="3" fill="#00ffb4"/>
-          </svg>
-          <span class="sf-name">COURSENET<em>.io</em></span>
-        </div>
-        <span class="sf-copy">© 2024 COURSENET.io — OPEN KNOWLEDGE, FOREVER</span>
-        <div class="sf-links">
-          <a href="#">隐私政策</a>
-          <a href="#">使用条款</a>
-          <a href="#">联系我们</a>
-        </div>
-      </div>
-    </footer>
   </div>
 </template>
 
@@ -1441,39 +1420,6 @@ onUnmounted(() => {
   border: 1px solid rgba(0,255,180,0.02);
   border-radius: 50%;
 }
-
-/* ─── FOOTER ──────────────────────────────────────────── */
-.site-footer{
-  position: relative; z-index: 2;
-  padding: 2rem 6vw;
-  border-top: 1px solid rgba(0,255,180,0.08);
-}
-.sf-line{
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #00ffb4, transparent);
-  margin-bottom: 1.5rem; opacity: 0.2;
-}
-.sf-row{
-  display: flex; align-items: center;
-  justify-content: space-between;
-}
-.sf-brand{
-  display: flex; align-items: center; gap: 0.6rem;
-  font-family: 'Orbitron', sans-serif; font-size: 0.72rem;
-  font-weight: 700; letter-spacing: 0.16em; color: #fff;
-}
-.sf-brand em{ font-style: normal; color: #00ffb4; }
-.sf-copy{
-  font-family: 'JetBrains Mono', monospace; font-size: 0.52rem;
-  letter-spacing: 0.1em; color: rgba(0,255,180,0.18);
-}
-.sf-links{ display: flex; gap: 1.5rem; }
-.sf-links a{
-  font-family: 'JetBrains Mono', monospace; font-size: 0.56rem;
-  letter-spacing: 0.1em; color: rgba(150,210,180,0.35);
-  text-decoration: none; transition: color 0.25s;
-}
-.sf-links a:hover{ color: #00ffb4; }
 
 /* ─── RESPONSIVE ──────────────────────────────────────── */
 @media(max-width:1100px){

@@ -23,6 +23,23 @@ export interface CourseItem {
     subCategoryId: number
 }
 
+export interface CourseDetailItem {
+    id: number
+    courseId: number
+    courseName: string
+    overview: string
+    comment: string
+    rating: number
+    syllabus: string
+    courseware: string
+    teacher: string
+    learnedDuration: number
+    totalDuration: number
+    courseDescription: string
+    subCategoryId: number
+    categoryId: number
+}
+
 export const getAllCategories = () => {
     return request<CategoryItem[]>({
         url: '/api/categories',
@@ -40,6 +57,13 @@ export const getSubCategoriesByCategoryId = (categoryId: number) => {
 export const getCoursesBySubCategoryId = (subCategoryId: number) => {
     return request<CourseItem[]>({
         url: `/api/courses/sub-category/${subCategoryId}`,
+        method: 'get'
+    })
+}
+
+export const getCourseDetail = (courseId: number) => {
+    return request<CourseDetailItem>({
+        url: `/api/courses/${courseId}`,
         method: 'get'
     })
 }

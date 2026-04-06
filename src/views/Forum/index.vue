@@ -890,7 +890,7 @@ onUnmounted(() => {
 /* ─── FORUM HERO ─────────────────────────────────────── */
 .forum-hero {
   position: relative; z-index: 2;
-  padding: 90px 2rem 3rem;
+  padding: 90px 10rem 3rem;
   border-bottom: 1px solid rgba(0,255,180,0.08);
   overflow: hidden;
 }

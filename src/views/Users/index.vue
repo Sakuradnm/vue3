@@ -322,8 +322,16 @@ export default {
 
 <template>
   <!-- 背景视频 -->
-  <video class="bg-video" autoplay loop muted playsinline>
+  <video
+    class="bg-video"
+    autoplay
+    loop
+    muted
+    playsinline
+    preload="auto"
+  >
     <source src="/videos/home1.mp4" type="video/mp4">
+    您的浏览器不支持视频播放
   </video>
 
   <!-- 登录页面容器 -->
@@ -332,11 +340,26 @@ export default {
       <!-- 左侧区域 -->
       <div class="help-section">
         <div class="help-links">
-          <router-link to="/Agreement" class="help-item">用 户 协 议</router-link>
-          <router-link to="/Policy" class="help-item">隐 私 政 策</router-link>
-          <router-link to="/Help" class="help-item">帮 助 中 心</router-link>
-          <router-link to="/Customer" class="help-item">客 服 中 心</router-link>
-          <router-link to="/Customer" class="help-item">忘 记 密 码</router-link>
+          <router-link to="/Agreement" class="help-item">
+            <svg-icon name="policy" :width="20" height="20"/>
+            <span>用户协议</span>
+          </router-link>
+          <router-link to="/Policy" class="help-item">
+            <svg-icon name="security" :width="20" height="20"/>
+            <span>隐私政策</span>
+          </router-link>
+          <router-link to="/Help" class="help-item">
+            <svg-icon name="service" :width="20" height="20"/>
+            <span>帮助中心</span>
+          </router-link>
+          <router-link to="/Customer" class="help-item">
+            <svg-icon name="contact_support" :width="20" height="20"/>
+            <span>客服中心</span>
+          </router-link>
+          <router-link to="/Customer" class="help-item">
+            <svg-icon name="forget" :width="20" height="20"/>
+            <span>忘记密码</span>
+          </router-link>
         </div>
       </div>
 
@@ -397,7 +420,7 @@ export default {
                   <label class="checkbox-group">
                     <input type="checkbox" v-model="agreeToTerms">
                     <span class="custom-checkbox"></span>
-                    <span class="checkbox-label">已阅读并同意<a href="#">用户协议</a>和<a href="#">隐私政策</a></span>
+                    <span class="checkbox-label">已阅读并同意<router-link to="/Agreement">用户协议</router-link>和<router-link to="/Policy">隐私政策</router-link></span>
                   </label>
 
                   <button type="submit" class="submit-btn">LOGIN IN</button>
@@ -449,7 +472,7 @@ export default {
                   <label class="checkbox-group">
                     <input type="checkbox" v-model="agreeToTerms">
                     <span class="custom-checkbox"></span>
-                    <span class="checkbox-label">已阅读并同意<a href="#">用户协议</a>和<a href="#">隐私政策</a></span>
+                    <span class="checkbox-label">已阅读并同意<router-link to="/Agreement">用户协议</router-link>和<router-link to="/Policy">隐私政策</router-link></span>
                   </label>
 
                   <button type="submit" class="submit-btn">LOGIN IN</button>
@@ -499,7 +522,7 @@ export default {
               <label class="checkbox-group">
                 <input type="checkbox" v-model="agreeToTerms">
                 <span class="custom-checkbox"></span>
-                <span class="checkbox-label">已阅读并同意<a href="#">用户协议</a>和<a href="#">隐私政策</a></span>
+                <span class="checkbox-label">已阅读并同意<router-link to="/Agreement">用户协议</router-link>和<router-link to="/Policy">隐私政策</router-link></span>
               </label>
               <button type="submit" class="submit-btn">SIGN UP</button>
             </form>
@@ -510,8 +533,16 @@ export default {
 
       <!-- 右侧区域 -->
       <div class="right-section">
-        <video class="right-bg-video" autoplay loop muted playsinline>
+        <video
+          class="right-bg-video"
+          autoplay
+          loop
+          muted
+          playsinline
+          preload="auto"
+        >
           <source src="/videos/home2.mp4" type="video/mp4">
+          您的浏览器不支持视频播放
         </video>
         <div class="right-content">
           <h2>即刻加入我们</h2>
@@ -643,23 +674,45 @@ export default {
 .help-links {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .help-item {
   color: white;
-  width: 6rem;
   text-decoration: none;
-  font-size: 1rem;
+  font-size: 0.95rem;
   transition: all 0.3s ease;
-  padding: 1rem 0.4rem;
+  padding: 0.8rem 1rem;
   border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.help-item svg {
+  flex-shrink: 0;
+}
+
+.help-item span {
+  white-space: nowrap;
 }
 
 .help-item:hover {
   background: rgba(255, 255, 255, 0.1);
   transform: translateX(8px);
-  box-shadow: 2px 0 10px 10px rgba(255, 255, 255, 0.1);
+  box-shadow: 2px 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.checkbox-label a {
+  color: #2370d5;
+  text-decoration: none;
+  margin: 0 3px;
+  transition: all 0.3s ease;
+}
+
+.checkbox-label a:hover {
+  text-decoration: underline;
+  color: #4a90e2;
 }
 
 /************************************************************
@@ -672,6 +725,7 @@ export default {
   padding-left: 1rem;
   border-left: 1px solid rgba(255,255,255,0.1);
   border-radius: 15px;
+  min-height: 560px;
 }
 
 .right-bg-video {
@@ -686,7 +740,7 @@ export default {
 
 .right-content {
   position: absolute;
-  z-index: 2;
+  z-index: 10; /* 提高层级，确保在视频上方 */
   text-align: center;
   color: #ffffff;
   text-shadow: 0 0 2px hsl(198, 87%, 3%), 0 0 2px hsl(0, 0%, 100%), 0 0 2px hsl(198, 87%, 3%);
@@ -695,6 +749,7 @@ export default {
   transform: translate(-50%, -50%);
   width: 100%;
   padding: 2rem;
+  pointer-events: none; /* 让点击事件穿透到下层，但按钮需要单独设置 */
 
   h2 {
     font-size: 2rem;
@@ -718,6 +773,7 @@ export default {
   border-radius: 25px;
   cursor: pointer;
   transition: all 0.3s ease;
+  pointer-events: auto; /* 恢复按钮的点击事件 */
 }
 
 .switch-mode-btn:hover {
@@ -989,11 +1045,15 @@ input.error {
 
   .help-links {
     flex-direction: row;
+    flex-wrap: wrap;
     gap: 1rem;
+    justify-content: center;
   }
 
   .help-item {
-    width: 100%;
+    width: auto;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
   }
 
   .user-container {
