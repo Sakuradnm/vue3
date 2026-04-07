@@ -67,7 +67,7 @@ onUnmounted(() => {
 })
 
 </script>
-<style scoped>
+<style>
 /* 保留全局布局样式 */
 body,html {
   scroll-behavior: smooth;

@@ -1,5 +1,7 @@
-<script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+<script setup lang="ts">
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
+import { getForumPosts } from '@/api/forum';
+import type { ForumPostItem } from '@/api/forum';
 
 // ── State ────────────────────────────────────────────────
 const activeCategory = ref('all');
@@ -16,96 +18,20 @@ let observers = [];
 
 // ── Data ────────────────────────────────────────────────
 const categories = [
-  { id: 'all',      label: '全部',      icon: '◈', count: 128, color: '#00ffb4' },
-  { id: 'frontend', label: '前端开发',  icon: '⬡', count: 42,  color: '#00c8ff' },
-  { id: 'algo',     label: '算法与数据', icon: '◆', count: 31,  color: '#a78bfa' },
-  { id: 'backend',  label: '后端架构',  icon: '◉', count: 28,  color: '#ff6b35' },
-  { id: 'design',   label: 'UI/UX 设计',icon: '◇', count: 15,  color: '#ffd93d' },
-  { id: 'career',   label: '求职经验',  icon: '◎', count: 12,  color: '#00ffb4' },
+  { id: 'all',      label: '全部',      icon: '◈', count: 0, color: '#00ffb4' },
+  { id: 'frontend', label: '前端开发',  icon: '⬡', count: 0, color: '#00c8ff' },
+  { id: 'algo',     label: '算法与数据', icon: '◆', count: 0, color: '#a78bfa' },
+  { id: 'backend',  label: '后端架构',  icon: '◉', count: 0, color: '#ff6b35' },
+  { id: 'design',   label: 'UI/UX 设计',icon: '◇', count: 0, color: '#ffd93d' },
+  { id: 'career',   label: '求职经验',  icon: '◎', count: 0, color: '#00ffb4' },
 ];
 
-const posts = ref([
-  {
-    id: 1, category: 'frontend', categoryLabel: '前端开发',
-    title: '分享：Vue 3 Composition API 完整工程实践笔记（含源码）',
-    preview: '整理了三个月真实项目中的 Vue3 最佳实践，涵盖状态管理、组合式函数封装、性能优化等核心话题，附完整可运行示例代码。',
-    author: 'fe_master', avatar: 'FM', avatarColor: '#00c8ff',
-    time: '2小时前', views: 1842, likes: 234, comments: 67,
-    tags: ['Vue3', 'Composition API', '工程实践'],
-    pinned: true, solved: false, hot: true,
-    score: 234,
-  },
-  {
-    id: 2, category: 'algo', categoryLabel: '算法',
-    title: '双指针 + 滑动窗口：从入门到 LeetCode Hard 的完整解题路径',
-    preview: '系统梳理了双指针与滑动窗口的所有变体题型，每种模式配有思维导图与3道例题，刷完这份资料可以解决 90% 的相关题目。',
-    author: 'algo_core', avatar: 'AC', avatarColor: '#a78bfa',
-    time: '4小时前', views: 2310, likes: 389, comments: 92,
-    tags: ['算法', 'LeetCode', '双指针'],
-    pinned: false, solved: true, hot: true,
-    score: 389,
-  },
-  {
-    id: 3, category: 'backend', categoryLabel: '后端',
-    title: '微服务架构实战：从单体到分布式的完整迁移指南',
-    preview: '记录了我们团队半年的微服务改造历程，包含服务拆分策略、接口契约设计、分布式事务处理等核心难点，有踩坑记录。',
-    author: 'backend_x', avatar: 'BX', avatarColor: '#ff6b35',
-    time: '6小时前', views: 987, likes: 156, comments: 44,
-    tags: ['微服务', 'Node.js', '架构设计'],
-    pinned: false, solved: false, hot: false,
-    score: 156,
-  },
-  {
-    id: 4, category: 'design', categoryLabel: 'UI/UX',
-    title: '2024 Figma 工作流：Auto Layout + Variables 完整教程',
-    preview: '深度讲解 Figma 最新特性的实际应用，包含设计系统搭建、组件库规范、设计与开发交付规范，附 Figma 源文件。',
-    author: 'ux_craft', avatar: 'UC', avatarColor: '#ffd93d',
-    time: '昨天', views: 654, likes: 98, comments: 23,
-    tags: ['Figma', '设计系统', 'Auto Layout'],
-    pinned: false, solved: false, hot: false,
-    score: 98,
-  },
-  {
-    id: 5, category: 'frontend', categoryLabel: '前端',
-    title: '【求助】TypeScript 泛型约束与条件类型的最佳实践？',
-    preview: '在项目中遇到了一些复杂的泛型场景，想了解大家在实际项目中如何处理 infer、条件类型链、以及泛型函数重载等问题。',
-    author: 'ts_learner', avatar: 'TL', avatarColor: '#00ffb4',
-    time: '昨天', views: 432, likes: 45, comments: 38,
-    tags: ['TypeScript', '泛型', '类型体操'],
-    pinned: false, solved: false, hot: false,
-    score: 45,
-  },
-  {
-    id: 6, category: 'career', categoryLabel: '求职',
-    title: '大厂前端面试总结：200 道高频题 + 答题框架（2024最新）',
-    preview: '花了两个月整理的面试题库，涵盖字节、腾讯、阿里、美团等大厂真题，每道题都有详细解析和答题思路，亲测有效。',
-    author: 'offer_hunter', avatar: 'OH', avatarColor: '#00c8ff',
-    time: '2天前', views: 5621, likes: 892, comments: 213,
-    tags: ['面试', '求职', '前端'],
-    pinned: false, solved: false, hot: true,
-    score: 892,
-  },
-  {
-    id: 7, category: 'algo', categoryLabel: '算法',
-    title: '图论精讲：BFS/DFS/Dijkstra 可视化教程 + 动画演示',
-    preview: '用动画的方式讲解图论中最核心的几种算法，每个算法都有交互式可视化演示，学完能独立实现各类图论题目。',
-    author: 'graph_viz', avatar: 'GV', avatarColor: '#a78bfa',
-    time: '3天前', views: 1234, likes: 267, comments: 56,
-    tags: ['图论', 'BFS', 'DFS', '可视化'],
-    pinned: false, solved: true, hot: false,
-    score: 267,
-  },
-  {
-    id: 8, category: 'backend', categoryLabel: '后端',
-    title: 'Redis 实战：缓存穿透、击穿、雪崩的终极解决方案',
-    preview: '深度分析 Redis 在生产环境中的常见问题及其解决方案，包含布隆过滤器、互斥锁、多级缓存等核心设计模式。',
-    author: 'redis_pro', avatar: 'RP', avatarColor: '#ff6b35',
-    time: '3天前', views: 2108, likes: 334, comments: 78,
-    tags: ['Redis', '缓存', '后端优化'],
-    pinned: false, solved: false, hot: false,
-    score: 334,
-  },
-]);
+const allPosts = ref<ForumPostItem[]>([]);
+const displayedPosts = ref<ForumPostItem[]>([]);
+const loading = ref(false);
+const loadingMore = ref(false);
+const hasMore = ref(true);
+const pageSize = 10;
 
 const hotTopics = [
   { rank: 1, title: 'Vue3 vs React 2024 大比拼', replies: 203, color: '#ff6b35' },
@@ -124,17 +50,19 @@ const activeUsers = [
 
 // ── Computed ─────────────────────────────────────────────
 const filteredPosts = computed(() => {
-  let list = posts.value;
+  let list = displayedPosts.value;
   if (activeCategory.value !== 'all') {
     list = list.filter(p => p.category === activeCategory.value);
   }
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase();
-    list = list.filter(p =>
-        p.title.toLowerCase().includes(q) ||
-        p.preview.toLowerCase().includes(q) ||
-        p.tags.some(t => t.toLowerCase().includes(q))
-    );
+    list = list.filter(p => {
+      const titleMatch = p.title.toLowerCase().includes(q);
+      const previewMatch = p.preview.toLowerCase().includes(q);
+      const tagsArray = Array.isArray(p.tags) ? p.tags : [];
+      const tagsMatch = tagsArray.some((t: string) => t.toLowerCase().includes(q));
+      return titleMatch || previewMatch || tagsMatch;
+    });
   }
   list = [...list].sort((a, b) => {
     if (sortBy.value === 'hot') return b.score - a.score;
@@ -150,14 +78,75 @@ const activeCatData = computed(() =>
 );
 
 // ── Actions ───────────────────────────────────────────────
+let searchTimer: number | null = null;
+const forumHeroRef = ref<HTMLElement | null>(null);
+const sidebarTopOffset = ref(62); // 侧边栏动态top值
+
+function debounceSearch() {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    fetchPosts();
+  }, 500);
+}
+
+async function fetchPosts() {
+  loading.value = true;
+  try {
+    const params: any = {};
+    if (activeCategory.value !== 'all') {
+      params.category = activeCategory.value;
+    }
+    if (searchQuery.value.trim()) {
+      params.keyword = searchQuery.value.trim();
+    }
+    params.sortBy = sortBy.value;
+
+    const response = await getForumPosts(params);
+    allPosts.value = response;
+    displayedPosts.value = allPosts.value.slice(0, pageSize);
+    hasMore.value = allPosts.value.length > pageSize;
+    updateCategoryCounts();
+  } catch (error) {
+    console.error('Failed to fetch posts:', error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+function loadMore() {
+  if (loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
+  const currentLength = displayedPosts.value.length;
+  const nextPosts = allPosts.value.slice(currentLength, currentLength + pageSize);
+  setTimeout(() => {
+    displayedPosts.value = [...displayedPosts.value, ...nextPosts];
+    hasMore.value = displayedPosts.value.length < allPosts.value.length;
+    loadingMore.value = false;
+  }, 300);
+}
+
+function updateCategoryCounts() {
+  const counts: Record<string, number> = {};
+  allPosts.value.forEach(post => {
+    counts[post.category] = (counts[post.category] || 0) + 1;
+  });
+  categories.forEach(cat => {
+    if (cat.id === 'all') {
+      cat.count = allPosts.value.length;
+    } else {
+      cat.count = counts[cat.id] || 0;
+    }
+  });
+}
+
 function toggleLike(id) {
   if (likedPosts.has(id)) {
     likedPosts.delete(id);
-    const p = posts.value.find(p => p.id === id);
+    const p = allPosts.value.find(p => p.id === id);
     if (p) p.likes--;
   } else {
     likedPosts.add(id);
-    const p = posts.value.find(p => p.id === id);
+    const p = allPosts.value.find(p => p.id === id);
     if (p) p.likes++;
   }
 }
@@ -167,6 +156,23 @@ function toggleBookmark(id) {
 }
 function fmtNum(n) {
   return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n;
+}
+
+// ── 侧边栏滚动跟随逻辑 ───────────────────────────────────
+function updateSidebarTopOffset() {
+  if (!forumHeroRef.value) {
+    sidebarTopOffset.value = 62;
+    return;
+  }
+  const heroRect = forumHeroRef.value.getBoundingClientRect();
+  const heroBottom = heroRect.bottom;
+  // 当 forum-hero 底部未滚出导航栏范围时，侧边栏跟随 hero 底部对齐
+  // 当 hero 底部 ≤ 导航栏高度(62px)时，侧边栏固定在导航栏底部
+  if (heroBottom <= 62) {
+    sidebarTopOffset.value = 62;
+  } else {
+    sidebarTopOffset.value = heroBottom;
+  }
 }
 
 // ── Particles ─────────────────────────────────────────────
@@ -228,17 +234,40 @@ function onMouseMove(e) {
   mouseY.value = e.clientY;
 }
 
+function handleScroll() {
+  // 滚动加载更多
+  const scrollHeight = document.documentElement.scrollHeight;
+  const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+  const clientHeight = document.documentElement.clientHeight;
+  if (scrollHeight - scrollTop - clientHeight < 200) {
+    loadMore();
+  }
+  // 更新侧边栏位置
+  updateSidebarTopOffset();
+}
+
 onMounted(() => {
   const root = document.querySelector('.forum-root');
   const canvas = root?.querySelector('.bg-canvas');
   if (canvas) initParticles(canvas);
   if (root) initObservers(root);
   window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('scroll', handleScroll);
+  window.addEventListener('resize', updateSidebarTopOffset);
+  updateSidebarTopOffset();
+  fetchPosts();
 });
+
+watch([activeCategory, sortBy], () => {
+  fetchPosts();
+});
+
 onUnmounted(() => {
   if (particleRafId) cancelAnimationFrame(particleRafId);
   observers.forEach(o => o.disconnect());
   window.removeEventListener('mousemove', onMouseMove);
+  window.removeEventListener('scroll', handleScroll);
+  window.removeEventListener('resize', updateSidebarTopOffset);
 });
 </script>
 
@@ -271,7 +300,7 @@ onUnmounted(() => {
           <svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input v-model="searchQuery" placeholder="搜索帖子、标签、作者…" class="search-input"/>
+          <input v-model="searchQuery" @input="debounceSearch" placeholder="搜索帖子、标签、作者…" class="search-input"/>
           <span v-if="searchQuery" class="s-clear" @click="searchQuery = ''">✕</span>
         </div>
       </div>
@@ -324,7 +353,7 @@ onUnmounted(() => {
     </transition>
 
     <!-- ══ FORUM HERO ══════════════════════════════════════ -->
-    <header class="forum-hero fade-up">
+    <header class="forum-hero fade-up" ref="forumHeroRef">
       <div class="fh-bg-grid"></div>
       <div class="fh-inner">
         <div class="fh-tag">[ KNOWLEDGE FORUM ]</div>
@@ -367,7 +396,6 @@ onUnmounted(() => {
                     @click="activeCategory = cat.id">
               <span class="ci-icon">{{ cat.icon }}</span>
               <span class="ci-label">{{ cat.label }}</span>
-              <span class="ci-count">{{ cat.count }}</span>
               <div class="ci-bar"></div>
             </button>
           </div>
@@ -434,9 +462,14 @@ onUnmounted(() => {
         </div>
 
         <!-- Post list -->
-        <transition-group name="post-list" tag="div" class="posts-list">
+        <div v-if="loading" class="loading-state fade-up visible">
+          <div class="loading-spinner">◈</div>
+          <p>加载中...</p>
+        </div>
+
+        <transition-group v-else name="post-list" tag="div" class="posts-list">
           <article v-for="(post, i) in filteredPosts" :key="post.id"
-                   class="post-card fade-up"
+                   class="post-card fade-up visible"
                    :style="`animation-delay:${i * 0.06}s`"
                    @mouseenter="hoveredPost = post.id"
                    @mouseleave="hoveredPost = -1">
@@ -485,7 +518,7 @@ onUnmounted(() => {
                 <p class="pc-preview">{{ post.preview }}</p>
 
                 <div class="pc-tags">
-                  <span v-for="tag in post.tags" :key="tag" class="pc-tag"># {{ tag }}</span>
+                  <span v-for="tag in (Array.isArray(post.tags) ? post.tags : [])" :key="tag" class="pc-tag"># {{ tag }}</span>
                 </div>
 
                 <div class="pc-footer">
@@ -495,7 +528,7 @@ onUnmounted(() => {
                     </div>
                     <div class="pcf-info">
                       <span class="pcf-name">{{ post.author }}</span>
-                      <span class="pcf-time">{{ post.time }}</span>
+                      <span class="pcf-time">{{ post.timeAgo }}</span>
                     </div>
                   </div>
                   <div class="pcf-actions">
@@ -538,22 +571,21 @@ onUnmounted(() => {
         </transition-group>
 
         <!-- Empty state -->
-        <div v-if="filteredPosts.length === 0" class="empty-state fade-up">
+        <div v-if="filteredPosts.length === 0" class="empty-state fade-up visible">
           <div class="es-icon">◈</div>
           <p class="es-title">未找到匹配内容</p>
           <p class="es-sub">尝试不同的关键词或分类</p>
         </div>
 
-        <!-- Load more -->
-        <div v-if="filteredPosts.length > 0" class="load-more fade-up">
-          <button class="lm-btn">
-            <span class="lm-sweep"></span>
-            加载更多帖子
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <polyline points="19 12 12 19 5 12"/>
-            </svg>
-          </button>
+        <!-- Loading more indicator -->
+        <div v-if="loadingMore" class="load-more fade-up visible">
+          <div class="loading-spinner">◈</div>
+          <p>加载中...</p>
+        </div>
+
+        <!-- No more data -->
+        <div v-if="!hasMore && filteredPosts.length > 0" class="load-more fade-up visible">
+          <p style="color: rgba(150,210,180,0.35); font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;">暂无更多内容</p>
         </div>
       </main>
 
@@ -651,7 +683,6 @@ onUnmounted(() => {
   color: #c8f0e0;
   font-family: 'Noto Sans SC', sans-serif;
   min-height: 100vh;
-  overflow-x: hidden;
   position: relative;
 }
 
@@ -973,40 +1004,48 @@ onUnmounted(() => {
 /* ─── LAYOUT ─────────────────────────────────────────── */
 .forum-layout {
   position: relative; z-index: 2;
-  display: grid;
-  grid-template-columns: 210px 1fr 200px;
-  gap: 0;
   max-width: 1400px;
   margin: 0 auto;
+  padding: 0 220px 0 230px; /* 调整左右padding以匹配新的侧边栏宽度 */
 }
 
 /* ─── SIDEBAR SHARED ─────────────────────────────────── */
 .sidebar-left, .sidebar-right {
-  border-right: 1px solid rgba(0,255,180,0.08);
-  padding: 2rem 0;
-  position: sticky; top: 62px;
-  height: calc(100vh - 62px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0,255,180,0.1) transparent;
-}
-.sidebar-right { border-right: none; border-left: 1px solid rgba(0,255,180,0.08); }
+  position: fixed;           /* 完全固定，不随页面滚动 */
+  top: v-bind(sidebarTopOffset + 'px');  /* 动态top值 */
+  bottom: 0;                 /* 延伸到页面底部 */
+  padding: 1rem 1rem;
+  overflow-y: hidden;        /* 禁用内部滚动 */
+  overflow-x: hidden;
+  z-index: 100;
+  background: #020b10;       /* 与页面背景色一致，防止透视 */
+  transition: top 0.05s linear; /* 快速跟随，避免视觉延迟 */
 
-.sl-section, .sr-section {
-  padding: 1.5rem 1.2rem;
-  border-bottom: 1px solid rgba(0,255,180,0.08);
+  /* 隐藏滚动条（保留功能） */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-.sl-title, .sr-title {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.52rem;
-  letter-spacing: 0.22em; color: #00ffb4; opacity: 0.6;
-  margin-bottom: 1rem;
+.sidebar-left::-webkit-scrollbar,
+.sidebar-right::-webkit-scrollbar {
+  display: none;
+}
+
+.sidebar-left  {
+  left: calc(50% - 700px); /* 居中布局左侧：50% - 最大宽度的一半 */
+  width: 230px;            /* 从210px扩大到230px */
+  border-right: 1px solid rgba(0,255,180,0.08);
+}
+.sidebar-right {
+  right: calc(50% - 700px); /* 居中布局右侧：50% - 最大宽度的一半 */
+  width: 220px;             /* 从200px扩大到220px */
+  border-left: 1px solid rgba(0,255,180,0.08);
 }
 
 /* Categories */
 .cat-list { display: flex; flex-direction: column; gap: 2px; }
 .cat-item {
   display: flex; align-items: center; gap: 0.65rem;
-  font-family: 'Noto Sans SC', sans-serif; font-size: 0.75rem;
+  font-family: 'Noto Sans SC', sans-serif; font-size: 0.85rem;
   color: rgba(150,210,180,0.35);
   background: none; border: none; cursor: pointer;
   padding: 0.6rem 0.75rem;
@@ -1030,10 +1069,6 @@ onUnmounted(() => {
 .cat-item.active::before { transform: scaleX(1); background: rgba(0,255,180,0.04); }
 .ci-icon { font-size: 0.7rem; color: var(--cc); opacity: 0.7; flex-shrink: 0; }
 .ci-label { flex: 1; }
-.ci-count {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
-  color: rgba(150,210,180,0.35);
-}
 .ci-bar {
   position: absolute; left: 0; top: 20%; bottom: 20%;
   width: 2px; background: var(--cc);
@@ -1046,18 +1081,18 @@ onUnmounted(() => {
 .hot-list { display: flex; flex-direction: column; gap: 0.65rem; }
 .hot-item { display: flex; align-items: flex-start; gap: 0.65rem; }
 .hi-rank {
-  font-family: 'Orbitron', sans-serif; font-size: 0.6rem;
+  font-family: 'Orbitron', sans-serif; font-size: 0.7rem;
   font-weight: 700; flex-shrink: 0; line-height: 1.4;
 }
 .hi-content { flex: 1; }
 .hi-title {
-  font-size: 0.72rem; color: rgba(180,230,200,0.65);
+  font-size: 0.82rem; color: rgba(180,230,200,0.65);
   line-height: 1.45; display: block;
   transition: color 0.2s; cursor: default;
 }
 .hot-item:hover .hi-title { color: #c8f0e0; }
 .hi-replies {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
   color: rgba(150,210,180,0.35); letter-spacing: 0.06em;
 }
 
@@ -1071,7 +1106,7 @@ onUnmounted(() => {
   position: relative;
 }
 .ui-avatar span {
-  font-family: 'Orbitron', sans-serif; font-size: 0.5rem;
+  font-family: 'Orbitron', sans-serif; font-size: 0.6rem;
   font-weight: 700; letter-spacing: 0.06em;
 }
 .ui-online {
@@ -1081,16 +1116,16 @@ onUnmounted(() => {
   box-shadow: 0 0 6px #00ffb4;
 }
 .ui-info { flex: 1; min-width: 0; }
-.ui-name { font-size: 0.7rem; color: #c8f0e0; display: block; }
+.ui-name { font-size: 0.8rem; color: #c8f0e0; display: block; }
 .ui-posts {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
   color: rgba(150,210,180,0.35);
 }
 
 /* ─── MAIN ────────────────────────────────────────────── */
 .main-content {
   padding: 1.8rem;
-  border-right: 1px solid rgba(0,255,180,0.08);
+  min-height: 100vh;
 }
 
 /* Toolbar */
@@ -1102,18 +1137,18 @@ onUnmounted(() => {
 }
 .tb-left { display: flex; align-items: center; gap: 0.75rem; }
 .tb-count {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
   letter-spacing: 0.1em; color: rgba(150,210,180,0.35);
 }
 .tb-count em { font-style:normal; color: #00ffb4; }
 .tb-active-cat {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.56rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.66rem;
   letter-spacing: 0.1em;
   padding: 0.2rem 0.65rem; border: 1px solid;
 }
 .sort-group { display: flex; gap: 2px; }
 .sort-btn {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.58rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
   letter-spacing: 0.12em; color: rgba(150,210,180,0.35);
   background: none; border: 1px solid rgba(0,255,180,0.08);
   padding: 0.38rem 0.85rem; cursor: pointer;
@@ -1145,7 +1180,7 @@ onUnmounted(() => {
 
 .pc-pinned {
   display: flex; align-items: center; gap: 0.4rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
   letter-spacing: 0.14em; color: #ffd93d;
   background: rgba(255,217,61,0.06);
   border-bottom: 1px solid rgba(255,217,61,0.12);
@@ -1170,7 +1205,7 @@ onUnmounted(() => {
   display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
   background: none; border: none; cursor: pointer;
   color: rgba(150,210,180,0.35);
-  font-family: 'JetBrains Mono', monospace; font-size: 0.58rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
   transition: color 0.25s, filter 0.25s;
 }
 .vote-btn svg { width: 18px; height: 18px; }
@@ -1183,7 +1218,7 @@ onUnmounted(() => {
 }
 .pc-comments-n {
   display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.52rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.62rem;
   color: rgba(150,210,180,0.35);
 }
 .pc-comments-n svg { width: 14px; height: 14px; }
@@ -1196,16 +1231,16 @@ onUnmounted(() => {
   margin-bottom: 0.6rem; flex-wrap: wrap;
 }
 .pc-cat {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
   letter-spacing: 0.12em; padding: 0.15rem 0.5rem;
   border: 1px solid;
 }
 .pc-hot {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
   letter-spacing: 0.1em; color: #ff6b35;
 }
 .pc-solved {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
   letter-spacing: 0.1em; color: #00ffb4;
 }
 
@@ -1217,7 +1252,7 @@ onUnmounted(() => {
 .post-card:hover .pc-title { color: #00ffb4; }
 
 .pc-preview {
-  font-size: 0.78rem; line-height: 1.75;
+  font-size: 0.88rem; line-height: 1.75;
   color: rgba(150,210,180,0.5); font-weight: 300;
   margin-bottom: 0.75rem;
   display: -webkit-box; -webkit-line-clamp: 2;
@@ -1226,7 +1261,7 @@ onUnmounted(() => {
 
 .pc-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .pc-tag {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
   letter-spacing: 0.08em; color: rgba(150,210,180,0.35);
   background: rgba(0,255,180,0.04);
   border: 1px solid rgba(0,255,180,0.07);
@@ -1246,15 +1281,15 @@ onUnmounted(() => {
   border: 1px solid; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
 }
-.pcf-avatar span { font-family: 'Orbitron', sans-serif; font-size: 0.45rem; font-weight: 700; }
+.pcf-avatar span { font-family: 'Orbitron', sans-serif; font-size: 0.55rem; font-weight: 700; }
 .pcf-info { display: flex; flex-direction: column; gap: 0.05rem; }
-.pcf-name { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: #c8f0e0; }
-.pcf-time { font-family: 'JetBrains Mono', monospace; font-size: 0.5rem; color: rgba(150,210,180,0.35); }
+.pcf-name { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #c8f0e0; }
+.pcf-time { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: rgba(150,210,180,0.35); }
 
 .pcf-actions { display: flex; align-items: center; gap: 0.5rem; }
 .pcf-views {
   display: flex; align-items: center; gap: 0.3rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; color: rgba(150,210,180,0.35);
+  font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: rgba(150,210,180,0.35);
 }
 .pcf-views svg { width: 12px; height: 12px; }
 .pcf-bookmark, .pcf-share {
@@ -1331,7 +1366,7 @@ onUnmounted(() => {
 /* Load more */
 .load-more {
   display: flex; justify-content: center;
-  padding: 2.5rem 0;
+  padding: 1rem 0;
 }
 .lm-btn {
   display: flex; align-items: center; gap: 0.65rem;
@@ -1360,7 +1395,7 @@ onUnmounted(() => {
 .sys-status { display: flex; flex-direction: column; gap: 0.6rem; }
 .sys-item {
   display: flex; align-items: center; gap: 0.6rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.58rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
 }
 .ssi-dot {
   width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
@@ -1370,7 +1405,7 @@ onUnmounted(() => {
   animation: blink 2s infinite;
 }
 .ssi-label { flex: 1; color: rgba(160,220,190,0.55); }
-.ssi-latency { color: #00ffb4; font-size: 0.5rem; }
+.ssi-latency { color: #00ffb4; font-size: 0.6rem; }
 
 /* Activity chart */
 .activity-chart {
@@ -1389,7 +1424,7 @@ onUnmounted(() => {
 
 .ac-labels {
   display: flex; justify-content: space-between;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.46rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.56rem;
   color: rgba(150,210,180,0.35); letter-spacing: 0.06em;
 }
 
@@ -1408,7 +1443,7 @@ onUnmounted(() => {
 .quick-actions { display: flex; flex-direction: column; gap: 2px; }
 .qa-item {
   display: flex; align-items: center; gap: 0.65rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
   letter-spacing: 0.1em; color: rgba(150,210,180,0.35);
   text-decoration: none;
   padding: 0.6rem 0.5rem;
@@ -1423,12 +1458,21 @@ onUnmounted(() => {
 
 /* ─── RESPONSIVE ─────────────────────────────────────── */
 @media(max-width:1200px){
-  .forum-layout{ grid-template-columns: 190px 1fr; }
-  .sidebar-right{ display: none; }
+  .forum-layout {
+    max-width: calc(100% - 210px);
+    margin-left: 210px;
+    padding: 0;
+  }
+  .sidebar-left { left: 0; }
+  .sidebar-right { display: none; }
 }
 @media(max-width:860px){
-  .forum-layout{ grid-template-columns: 1fr; }
-  .sidebar-left{ display: none; }
+  .forum-layout {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  .sidebar-left  { display: none; }
   .top-nav{ flex-wrap: wrap; height: auto; padding: 0.75rem 1rem; gap: 0.75rem; }
   .nav-search{ max-width: 100%; order: 3; width: 100%; margin: 0; }
   .fh-rings{ display: none; }
