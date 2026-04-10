@@ -67,3 +67,10 @@ export const getCourseDetail = (courseId: number) => {
         method: 'get'
     })
 }
+
+export const getCourseRatings = (courseId: number) => {
+    return request({
+        url: `/api/courses/${courseId}/ratings`,
+        method: 'get'
+    })
+}

@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Unmenu from './unmenu.vue'
 import { ElMessage } from 'element-plus'
+import { getUserById } from '@/api/user'
 
 const router = useRouter()
 const isMobileMenuOpen = ref(false)
@@ -13,10 +14,16 @@ const isLoggedIn = ref(false)
 const userInfo = ref<any>(null)
 const showUserDropdown = ref(false)
 const unreadNoticeCount = ref(0)
+const hideDropdownTimer = ref<number | null>(null)
 
 // 判断是否为管理员
 const isAdmin = computed(() => {
   return userInfo.value?.level === 'admin'
+})
+
+// 判断是否为教师
+const isTeacher = computed(() => {
+  return userInfo.value?.level === 'teacher'
 })
 
 // 基础菜单链接（所有用户可见）
@@ -26,7 +33,7 @@ const baseLinks = [
 
 // 仅登录用户可见的菜单链接
 const authOnlyLinks = [
-  { path: '/Upload',text: '上 传' },
+  { path: '/Upload',text: '上 传 课 程' },
 ]
 
 // 非管理员可见的菜单（学生、教师可见）
@@ -54,8 +61,8 @@ const mainLinks = computed(() => {
   // 如果不是管理员，添加普通用户菜单
   links.push(...nonAdminLinks)
 
-  // 如果已登录，添加上传选项
-  if (isLoggedIn.value) {
+  // 如果是教师，添加上传选项
+  if (isTeacher.value) {
     links.push(...authOnlyLinks)
   }
 
@@ -77,11 +84,33 @@ onUnmounted(() => {
   window.removeEventListener('storage', handleStorageChange)
 })
 
-const checkLoginStatus = () => {
+const checkLoginStatus = async () => {
   const storedUserInfo = localStorage.getItem('userInfo')
   if (storedUserInfo) {
-    userInfo.value = JSON.parse(storedUserInfo)
-    isLoggedIn.value = true
+    const user = JSON.parse(storedUserInfo)
+
+    try {
+      const res = await getUserById(user.id)
+      const userData = res
+
+      userInfo.value = {
+        id: userData.id,
+        username: userData.username,
+        nickname: userData.nickname || userData.username,
+        level: userData.level,
+        avatar: userData.avatarUrl || '',
+        phone: userData.phone,
+        email: userData.email
+      }
+
+      localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
+      isLoggedIn.value = true
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+      userInfo.value = user
+      userInfo.value.avatar = user.avatarUrl || user.avatar_url || user.avatar || ''
+      isLoggedIn.value = true
+    }
   } else {
     isLoggedIn.value = false
     userInfo.value = null
@@ -126,18 +155,6 @@ const searchSuggestions = computed(() => {
     { path: '/Brand', title: '关于我们' },
     { path: '/Users', title: '用户中心' },
     { path: '/Reserve', title: '论坛' },
-    { path: '/Ultra', title: '小米 SU7 Ultra' },
-    { path: '/Supra', title: 'TOYOTA GR SUPRA' },
-    { path: '/Brz', title: 'SUBARU BRZ' },
-    { path: '/Gtr', title: 'NISSAN GT-R' },
-    { path: '/Hellcat', title: 'DODGE CHALLENGER SRT® HELLCAT' },
-    { path: '/AfterSales', title: '售后服务' },
-    { path: '/Finance', title: '金融服务' },
-    { path: '/Maintenance', title: '保养维修' },
-    { path: '/Agreement', title: '用户协议' },
-    { path: '/Policy', title: '隐私政策' },
-    { path: '/Help', title: '帮助中心' },
-    { path: '/Customer', title: '客户服务' },
   ]
 
   return allSuggestions.filter(item =>
@@ -193,6 +210,29 @@ const selectSuggestion = (suggestion: typeof searchSuggestions.value[0]) => {
 const handleAvatarError = (e: Event) => {
   const target = e.target as HTMLImageElement
   target.style.display = 'none'
+  const placeholder = target.nextElementSibling as HTMLElement
+  if (placeholder) {
+    placeholder.style.display = 'flex'
+  }
+}
+
+const getAvatarUrl = computed(() => {
+  if (!userInfo.value) return ''
+  return userInfo.value.avatar || userInfo.value.avatarUrl || userInfo.value.avatar_url || ''
+})
+
+const showUserDropdownMenu = () => {
+  if (hideDropdownTimer.value) {
+    clearTimeout(hideDropdownTimer.value)
+    hideDropdownTimer.value = null
+  }
+  showUserDropdown.value = true
+}
+
+const hideUserDropdownMenu = () => {
+  hideDropdownTimer.value = window.setTimeout(() => {
+    showUserDropdown.value = false
+  }, 200)
 }
 
 const goToLogin = () => {
@@ -240,7 +280,6 @@ const getUserLevelText = (level: string) => {
   }
 }
 
-// 处理未登录时点击上传
 const handleUploadClick = (e: Event) => {
   if (!isLoggedIn.value) {
     e.preventDefault()
@@ -265,6 +304,12 @@ const handleLogout = () => {
     router.push('/Home')
   }, 500)
 }
+
+onUnmounted(() => {
+  if (hideDropdownTimer.value) {
+    clearTimeout(hideDropdownTimer.value)
+  }
+})
 
 </script>
 
@@ -390,44 +435,49 @@ const handleLogout = () => {
       <template v-if="isLoggedIn && userInfo">
         <div
             class="user-info-wrapper"
-            @mouseenter="showUserDropdown = true"
-            @mouseleave="showUserDropdown = false"
+            @mouseenter="showUserDropdownMenu"
+            @mouseleave="hideUserDropdownMenu"
         >
           <div class="user-avatar">
             <img
-                v-if="userInfo.avatar"
-                :src="userInfo.avatar"
-                :alt="userInfo.username"
+                v-if="getAvatarUrl"
+                :src="getAvatarUrl"
+                :alt="userInfo.nickname || userInfo.username"
                 class="avatar-img"
                 @error="handleAvatarError"
             />
             <div v-else class="avatar-placeholder">
-              {{ userInfo.username?.charAt(0).toUpperCase() }}
+              {{ (userInfo.nickname || userInfo.username)?.charAt(0).toUpperCase() }}
             </div>
           </div>
-          <span class="username-text">{{ userInfo.username }}</span>
+          <span class="username-text">{{ userInfo.nickname || userInfo.username }}</span>
 
           <div v-if="unreadNoticeCount > 0" class="notice-badge">
             {{ unreadNoticeCount > 9 ? '9+' : unreadNoticeCount }}
           </div>
 
           <transition name="dropdown-fade">
-            <div v-if="showUserDropdown" class="user-dropdown">
+            <div
+                v-if="showUserDropdown"
+                class="user-dropdown"
+                @mouseenter="showUserDropdownMenu"
+                @mouseleave="hideUserDropdownMenu"
+            >
               <div class="dropdown-header">
                 <div class="dropdown-avatar">
                   <img
-                      v-if="userInfo.avatar"
-                      :src="userInfo.avatar"
-                      :alt="userInfo.username"
+                      v-if="getAvatarUrl"
+                      :src="getAvatarUrl"
+                      :alt="userInfo.nickname || userInfo.username"
                       class="avatar-img"
                       @error="handleAvatarError"
                   />
                   <div v-else class="avatar-placeholder">
-                    {{ userInfo.username?.charAt(0).toUpperCase() }}
+                    {{ (userInfo.nickname || userInfo.username)?.charAt(0).toUpperCase() }}
                   </div>
                 </div>
                 <div class="dropdown-info">
-                  <div class="dropdown-username">{{ userInfo.username }}</div>
+                  <div class="dropdown-username">{{ userInfo.nickname || userInfo.username }}</div>
                   <div class="dropdown-level">{{ getUserLevelText(userInfo.level) }}</div>
                 </div>
               </div>
@@ -445,7 +495,7 @@ const handleLogout = () => {
                   <div v-if="unreadNoticeCount > 0" class="notice-dot"></div>
                 </div>
                 <div class="dropdown-item" @click="goToLibrary">
-                  <svg-icon name="home" :width="18" :height="18"/>
+                  <svg-icon name="record" :width="18" :height="18"/>
                   <span>学习记录</span>
                 </div>
                 <div class="dropdown-divider"></div>
@@ -476,12 +526,15 @@ const handleLogout = () => {
 .header {
   position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   width: 100%;
-  z-index: 1000;
+  z-index: 9999;
   backdrop-filter: blur(10px);
-  background-color: rgba(1, 10, 14, 0.9);
+  background-color: rgba(1, 10, 14, 0.95);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   height: 80px;
   box-sizing: border-box;
   padding: 0 60px;
@@ -507,16 +560,12 @@ const handleLogout = () => {
 }
 
 .nav-container {
-  position: static;
-  left: unset;
-  transform: none;
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
   height: 80px;
   padding: 0;
-  transition: all 0.3s ease;
 }
 
 .desktop-user {
@@ -819,6 +868,12 @@ const handleLogout = () => {
   background: rgba(255, 255, 255, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.3);
   position: relative;
+  transition: all 0.3s ease;
+}
+
+.user-info-wrapper:hover .user-avatar {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
 }
 
 .avatar-img {
@@ -828,6 +883,11 @@ const handleLogout = () => {
   position: absolute;
   top: 0;
   left: 0;
+  transition: transform 0.3s ease;
+}
+
+.user-info-wrapper:hover .avatar-img {
+  transform: scale(1.05);
 }
 
 .avatar-placeholder {
@@ -839,6 +899,7 @@ const handleLogout = () => {
   color: #fff;
   font-size: 18px;
   font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .username-text {
@@ -868,7 +929,7 @@ const handleLogout = () => {
 
 .user-dropdown {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 5px);
   right: 0;
   width: 240px;
   background: rgba(1, 10, 14, 0.98);
@@ -879,6 +940,16 @@ const handleLogout = () => {
   z-index: 1001;
   backdrop-filter: blur(10px);
   animation: dropdownSlide 0.2s ease;
+}
+
+.user-dropdown::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: 0;
+  left: 0;
+  height: 8px;
+  background: transparent;
 }
 
 @keyframes dropdownSlide {
@@ -910,6 +981,28 @@ const handleLogout = () => {
   background: rgba(255, 255, 255, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.3);
   flex-shrink: 0;
+  position: relative;
+}
+
+.dropdown-avatar .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.dropdown-avatar .avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .dropdown-info {

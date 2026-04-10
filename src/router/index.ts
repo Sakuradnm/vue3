@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 //菜单选项
 import Home from '@/views/Home/index.vue'
 //菜单 - 课程
@@ -96,18 +96,20 @@ const routes = [
     {
         path: '/course/:id',
         name: 'CourseDetail',
-        component: CourseDetail
+        component: CourseDetail,
+        meta: { requiresAuth: true }
     },
     {
         path: '/course/:id/learn',
         name: 'CourseLearn',
-        component: CourseDetail
+        component: CourseDetail,
+        meta: { requiresAuth: true }
     },
     {
         path: '/Upload',
         name: 'Upload',
         component: Upload,
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true, requiresTeacher: true }
     },
     {
         path: '/PersonalCenter',
@@ -133,6 +135,14 @@ const routes = [
         component: AdminDashboard,
         meta: { requiresAuth: true, requiresAdmin: true }
     },
+    {
+        path: '/privacy',
+        redirect: '/Policy'
+    },
+    {
+        path: '/terms',
+        redirect: '/Agreement'
+    },
     // 捕获第三方脚本的路由请求
     {
         path: '/hybridaction/:actionName',
@@ -155,12 +165,35 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
     const userInfoStr = localStorage.getItem('userInfo')
     
     if (to.meta.requiresAuth && !userInfoStr) {
-        next('/Users')
+        try {
+            await ElMessageBox.confirm(
+                '需要登录后才能访问，是否前往登录？',
+                '提示',
+                {
+                    confirmButtonText: '是',
+                    cancelButtonText: '否',
+                    type: 'warning'
+                }
+            )
+            next('/Users')
+        } catch {
+            next(false)
+        }
         return
+    }
+    
+    // 检查是否需要教师权限
+    if (to.meta.requiresTeacher) {
+        const userInfo = JSON.parse(userInfoStr || '{}')
+        if (userInfo.level !== 'teacher') {
+            ElMessage.error('无权访问，需要教师权限')
+            next('/Home')
+            return
+        }
     }
     
     // 检查是否需要管理员权限

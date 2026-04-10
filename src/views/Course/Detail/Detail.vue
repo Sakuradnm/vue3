@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getCourseDetail } from '@/api/course'
+import { getCourseDetail, getCourseRatings } from '@/api/course'
 
 const route = useRoute()
 const router = useRouter()
-const courseId = computed(() => Number(route.params.id))
+const courseId = ref<number>(0)
 
 const loading = ref(true)
 const isEnrolled = ref(false)
@@ -45,6 +45,7 @@ interface Review {
 }
 
 const courseDetail = ref<any>(null)
+const courseRatings = ref<any[]>([])
 
 const mockModules: Module[] = [
   {
@@ -82,43 +83,16 @@ const mockModules: Module[] = [
   }
 ]
 
-const mockReviews: Review[] = [
-  {
-    id: 1,
-    name: '李明',
-    initial: '李',
-    color: '#00c8ff',
-    rating: 5,
-    date: '2024-03-01',
-    comment: '课程内容非常系统，老师讲解清晰易懂，强烈推荐！',
-    helpful: 45
-  },
-  {
-    id: 2,
-    name: '王芳',
-    initial: '王',
-    color: '#a259ff',
-    rating: 5,
-    date: '2024-02-28',
-    comment: '学到了很多实用的知识，对提升技能很有帮助。',
-    helpful: 32
-  },
-  {
-    id: 3,
-    name: '张伟',
-    initial: '张',
-    color: '#ff6b35',
-    rating: 4,
-    date: '2024-02-25',
-    comment: '整体质量很好，教学节奏适中，希望能增加更多实战案例。',
-    helpful: 28
-  }
-]
-
 const course = computed(() => {
   if (!courseDetail.value) return null
 
   const detail = courseDetail.value
+  const ratings = courseRatings.value
+
+  const avgRating = ratings.length > 0
+    ? (ratings.reduce((sum, r) => sum + Number(r.rating), 0) / ratings.length).toFixed(1)
+    : '0.0'
+
   return {
     id: detail.courseId,
     title: detail.courseName,
@@ -132,13 +106,23 @@ const course = computed(() => {
     level: '中级',
     levelColor: '#00ff9d',
     students: Math.floor(Math.random() * 5000) + 500,
-    rating: detail.rating || 4.5,
-    reviews: mockReviews.length,
+    rating: Number(avgRating),
+    reviews: ratings.length,
     accent: '#00d4ff',
     price: 299,
     originalPrice: 599,
     modules: mockModules,
-    reviewList: mockReviews
+    reviewList: ratings.map((r, idx) => ({
+      id: r.id,
+      name: r.nickname || r.username,
+      initial: (r.nickname || r.username || '用')[0],
+      avatar: r.avatar_url,
+      color: ['#00c8ff', '#a259ff', '#ff6b35', '#00ff9d'][idx % 4],
+      rating: Number(r.rating),
+      date: r.created_at?.split('T')[0] || '2024-01-01',
+      comment: r.comment,
+      helpful: Math.floor(Math.random() * 50)
+    }))
   }
 })
 
@@ -165,19 +149,32 @@ const enroll = () => {
 
 const goBack = () => router.back()
 
-const ratingBars = [
-  { stars: 5, pct: 78 },
-  { stars: 4, pct: 15 },
-  { stars: 3, pct: 5 },
-  { stars: 2, pct: 1 },
-  { stars: 1, pct: 1 }
-]
+const ratingBars = computed(() => {
+  if (!course.value) return []
+  const ratings = courseRatings.value
+  return [5, 4, 3, 2, 1].map(stars => {
+    const count = ratings.filter(r => Math.round(Number(r.rating)) === stars).length
+    const pct = ratings.length > 0 ? Math.round((count / ratings.length) * 100) : 0
+    return { stars, pct }
+  })
+})
 
 async function loadCourseDetail() {
+  const id = Number(route.params.id)
+  if (!id || isNaN(id)) return
+
+  courseId.value = id
+
   try {
     loading.value = true
-    const data = await getCourseDetail(courseId.value)
+    courseDetail.value = null
+    courseRatings.value = []
+
+    const data = await getCourseDetail(id)
     courseDetail.value = data
+
+    const ratings = await getCourseRatings(id)
+    courseRatings.value = ratings
   } catch (error) {
     console.error('加载课程详情失败:', error)
     ElMessage.error('加载课程详情失败，请稍后重试')
@@ -255,16 +252,25 @@ function onMouseMove(e: MouseEvent) {
   mouseY.value = e.clientY
 }
 
-onMounted(() => {
+watch(() => course.value, (newVal) => {
+  if (newVal) {
+    setTimeout(() => {
+      observers.forEach(o => o.disconnect())
+      observers = []
+
+      const root = document.querySelector('.cd-root')
+      const canvas = root?.querySelector('.bg-canvas') as HTMLCanvasElement
+      if (canvas) initParticles(canvas)
+      if (root) initObservers(root)
+    }, 50)
+  }
+}, { immediate: true, deep: true })
+
+onBeforeMount(() => {
   loadCourseDetail()
+})
 
-  setTimeout(() => {
-    const root = document.querySelector('.cd-root')!
-    const canvas = root.querySelector('.bg-canvas') as HTMLCanvasElement
-    if (canvas) initParticles(canvas)
-    if (root) initObservers(root)
-  }, 100)
-
+onMounted(() => {
   window.addEventListener('mousemove', onMouseMove)
 })
 
@@ -504,7 +510,18 @@ onUnmounted(() => {
                 <div class="reviews-list">
                   <div v-for="review in course.reviewList" :key="review.id" class="review-card">
                     <div class="review-top">
-                      <div class="reviewer-avatar" :style="`background:linear-gradient(135deg,${review.color},${review.color}88)`">{{ review.initial }}</div>
+                      <div class="reviewer-avatar">
+                        <img
+                          v-if="review.avatar"
+                          :src="review.avatar"
+                          :alt="review.name"
+                          class="avatar-img"
+                          @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+                        />
+                        <div class="avatar-placeholder" :style="`background:linear-gradient(135deg,${review.color},${review.color}88)`">
+                          {{ review.initial }}
+                        </div>
+                      </div>
                       <div class="reviewer-info">
                         <span class="reviewer-name">{{ review.name }}</span>
                         <div class="reviewer-meta">
@@ -913,7 +930,27 @@ onUnmounted(() => {
   width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-family: 'Orbitron', sans-serif; font-size: 0.95rem; font-weight: 700; color: #fff;
+  position: relative;
+  overflow: hidden;
 }
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .reviewer-name { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #c8f0e0; display: block; margin-bottom: 3px; }
 .reviewer-meta { display: flex; align-items: center; gap: 8px; }
 .r-stars { font-size: 0.78rem; }

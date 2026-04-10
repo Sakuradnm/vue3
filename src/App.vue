@@ -22,10 +22,8 @@ import Footer from "@/components/Footer/footer.vue";
 
 const route = useRoute()
 
-// 检查是否为管理员登录状态
 const isAdminLogin = ref(false)
 
-// 检查是否为登录页面
 const isLoginPage = computed(() => route.path === '/Users')
 
 const checkAdminStatus = () => {
@@ -47,20 +45,16 @@ const handleStorageChange = (e: StorageEvent) => {
 onMounted(() => {
   checkAdminStatus()
 
-  // 监听 storage 事件（跨标签页同步）
   window.addEventListener('storage', handleStorageChange)
 
-  // 定期检查用户信息变化（处理同标签页内的变化）
   const checkInterval = setInterval(checkAdminStatus, 500)
 
-  // 保存 interval ID 以便清理
   ;(window as any).__adminCheckInterval = checkInterval
 })
 
 onUnmounted(() => {
   window.removeEventListener('storage', handleStorageChange)
 
-  // 清理定时器
   if ((window as any).__adminCheckInterval) {
     clearInterval((window as any).__adminCheckInterval)
   }

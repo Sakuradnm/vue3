@@ -435,16 +435,24 @@
     function exitLoader() {
         const loader = document.getElementById('loader');
         loader.classList.add('exit');
-        // fully remove after transition so Vue can mount cleanly
-        loader.addEventListener('transitionend', () => {
+        setTimeout(() => {
             loader.style.display = 'none';
-            // dispatch event so App.vue can trigger its entrance animation
             window.dispatchEvent(new CustomEvent('loader:done'));
-        }, { once: true });
+        }, 900);
     }
 
     // Start after a brief moment
     setTimeout(tick, 200);
+
+    // Fallback: force hide loader after 5 seconds
+    setTimeout(() => {
+        const loader = document.getElementById('loader');
+        if (loader && loader.style.display !== 'none') {
+            console.warn('Loader timeout - forcing hide');
+            exitLoader();
+        }
+    }, 5000);
+
 </script>
 </body>
 </html>

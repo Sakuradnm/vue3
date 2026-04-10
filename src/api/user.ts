@@ -28,7 +28,7 @@ export const createUser = (userData: any) => {
 // 用户注册（专用，与 createUser 区分）
 export const registerUser = (userData) => {
     return request({
-        url: '/api/users/register',  // ← 注意：后端注册端点是 /register
+        url: '/api/users/register',
         method: 'post',
         data: userData
     })
@@ -64,6 +64,23 @@ export const login = (username: string, password: string) => {
 export const getUsersByLevel = (level: string) => {
     return request({
         url: `/api/users/level/${level}`,
+        method: 'get'
+    })
+}
+
+// 上传头像
+export const uploadAvatar = (userId: number, avatarUrl: string) => {
+    return request({
+        url: `/api/users/${userId}/avatar`,
+        method: 'post',
+        data: { avatarUrl }
+    })
+}
+
+// 获取当前用户详细信息
+export const getCurrentUser = (userId: number) => {
+    return request({
+        url: `/api/users/${userId}`,
         method: 'get'
     })
 }
