@@ -6,9 +6,8 @@ export interface ForumPostItem {
     categoryLabel: string
     title: string
     preview: string
-    author: string
-    avatar: string
-    avatarColor: string
+    author: string // 用户昵称
+    avatar: string // 用户头像URL
     createdAt: string
     views: number
     likes: number
@@ -28,9 +27,8 @@ export interface ForumPostDetailItem {
     title: string
     preview: string
     content: string
-    author: string
-    avatar: string
-    avatarColor: string
+    author: string // 用户昵称
+    avatar: string // 用户头像URL
     createdAt: string
     views: number
     likes: number
@@ -72,5 +70,23 @@ export const commentPost = (id: number) => {
     return request({
         url: `/api/forum/posts/${id}/comment`,
         method: 'post'
+    })
+}
+
+export interface CreatePostData {
+    userId: number
+    category: string
+    categoryLabel: string
+    title: string
+    preview: string
+    content: string
+    tags?: string[]
+}
+
+export const createPost = (postData: CreatePostData) => {
+    return request<ForumPostItem>({
+        url: '/api/forum/posts',
+        method: 'post',
+        data: postData
     })
 }

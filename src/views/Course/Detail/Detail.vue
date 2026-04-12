@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getCourseDetail, getCourseRatings } from '@/api/course'
+import { getCourseDetail, getCourseRatings, getCourseOutline, type OutlineItem } from '@/api/course'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,19 +33,18 @@ interface Module {
   videos: Video[]
 }
 
-interface Review {
+interface OutlineItem {
   id: number
-  name: string
-  initial: string
-  color: string
-  rating: number
-  date: string
-  comment: string
-  helpful: number
+  courseId: number
+  parentId: number
+  title: string
+  sortOrder: number
+  resources?: any[]
 }
 
 const courseDetail = ref<any>(null)
 const courseRatings = ref<any[]>([])
+const courseOutline = ref<OutlineItem[]>([])
 
 const mockModules: Module[] = [
   {
@@ -93,11 +92,14 @@ const course = computed(() => {
     ? (ratings.reduce((sum, r) => sum + Number(r.rating), 0) / ratings.length).toFixed(1)
     : '0.0'
 
+  const parsedIntro = parseDetailIntro(detail.detailIntro)
+
   return {
     id: detail.courseId,
     title: detail.courseName,
     subtitle: detail.overview || '系统化专业课程',
-    description: detail.courseDescription || detail.overview || '暂无详细描述',
+    description: detail.detailIntro || detail.courseDescription || detail.overview || '暂无详细描述',
+    parsedIntro,
     instructor: detail.teacher || '专业讲师',
     instructorTitle: '资深教育专家',
     instructorBio: '拥有丰富的教学经验和行业实践经验，致力于为学生提供优质的学习体验。',
@@ -121,7 +123,7 @@ const course = computed(() => {
       rating: Number(r.rating),
       date: r.created_at?.split('T')[0] || '2024-01-01',
       comment: r.comment,
-      helpful: Math.floor(Math.random() * 50)
+      helpful: r.useful_likes || 0
     }))
   }
 })
@@ -129,6 +131,96 @@ const course = computed(() => {
 const totalVideos = computed(() =>
   course.value?.modules.reduce((s: number, m: Module) => s + m.videos.length, 0) || 0
 )
+
+const outlineTree = computed(() => {
+  let outlines = courseOutline.value
+
+  if (!outlines || outlines.length === 0) {
+    return mockModules.map((module, idx) => ({
+      id: module.id,
+      courseId: courseId.value,
+      parentId: 0,
+      title: module.title,
+      sortOrder: module.id,
+      sections: module.videos.map((video, vIdx) => ({
+        id: video.id,
+        courseId: courseId.value,
+        parentId: module.id,
+        title: `${String(idx + 1).padStart(2, '0')}.${vIdx + 1} ${video.title}`,
+        sortOrder: vIdx + 1,
+        resources: [{
+          id: video.id,
+          resourceType: 'video',
+          title: video.title,
+          resourceUrl: '',
+          duration: parseInt(video.duration.split(':')[0]) * 60 + parseInt(video.duration.split(':')[1]),
+          fileSize: null,
+          sortOrder: 1
+        }]
+      }))
+    }))
+  }
+
+  const chapters = outlines.filter(o => o.parentId === 0).sort((a, b) => a.sortOrder - b.sortOrder)
+
+  let chapterSectionsMap = new Map<number, any[]>()
+  chapters.forEach(ch => { chapterSectionsMap.set(ch.id, []) })
+
+  outlines.forEach(item => {
+    if (item.parentId !== 0 && chapterSectionsMap.has(item.parentId)) {
+      chapterSectionsMap.get(item.parentId)!.push({ ...item, resources: item.resources || [] })
+    }
+  })
+
+  for (const ch of chapters) {
+    const sections = chapterSectionsMap.get(ch.id) || []
+    if (sections.length === 0) {
+      let chapterNumber = 0
+      const chMatch = ch.title.match(/第([一二三四五六七八九十\d]+)章/)
+      if (chMatch) {
+        const numStr = chMatch[1]
+        if (/^\d+$/.test(numStr)) {
+          chapterNumber = parseInt(numStr, 10)
+        } else {
+          const chnMap: Record<string, number> = { '一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9, '十':10 }
+          chapterNumber = chnMap[numStr] || 0
+        }
+      }
+
+      if (chapterNumber > 0) {
+        const autoSections = outlines.filter(item => {
+          if (item.parentId === 0) return false
+          const match = item.title.match(/^(\d+)\./)
+          return match && parseInt(match[1], 10) === chapterNumber
+        }).map(item => ({ ...item, resources: item.resources || [] }))
+        if (autoSections.length) {
+          chapterSectionsMap.set(ch.id, autoSections.sort((a, b) => a.sortOrder - b.sortOrder))
+        }
+      }
+    } else {
+      chapterSectionsMap.set(ch.id, sections.sort((a, b) => a.sortOrder - b.sortOrder))
+    }
+  }
+
+  return chapters.map(chapter => ({
+    ...chapter,
+    sections: chapterSectionsMap.get(chapter.id) || []
+  }))
+})
+
+const formatDuration = (seconds: number) => {
+  if (!seconds) return ''
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+const formatFileSize = (bytes: number) => {
+  if (!bytes) return ''
+  const kb = bytes / 1024
+  if (kb < 1024) return `${kb.toFixed(0)} KB`
+  return `${(kb / 1024).toFixed(1)} MB`
+}
 
 const toggleModule = (id: number) => {
   activeModule.value = activeModule.value === id ? null : id
@@ -147,6 +239,14 @@ const enroll = () => {
   ElMessage.success('报名成功！开始学习吧~')
 }
 
+const openResource = (resource: any) => {
+  if (resource.resourceType === 'video') {
+    window.open(resource.resourceUrl, '_blank')
+  } else {
+    window.open(resource.resourceUrl, '_blank')
+  }
+}
+
 const goBack = () => router.back()
 
 const ratingBars = computed(() => {
@@ -159,6 +259,54 @@ const ratingBars = computed(() => {
   })
 })
 
+function parseDetailIntro(text: string) {
+  if (!text) return null
+
+  const sections = []
+  const patterns = [
+    { key: 'intro', label: '课程简介', regex: /【课程简介】([\s\S]*?)(?=【|$)/ },
+    { key: 'objectives', label: '学习目标', regex: /【学习目标】([\s\S]*?)(?=【|$)/ },
+    { key: 'content', label: '主要内容', regex: /【主要内容】([\s\S]*?)(?=【|$)/ },
+    { key: 'audience', label: '适用人群', regex: /【适用人群】([\s\S]*?)(?=【|$)/ },
+    { key: 'features', label: '教学特色', regex: /【教学特色】([\s\S]*?)(?=【|$)/ },
+  ]
+
+  patterns.forEach(({ key, label, regex }) => {
+    const match = text.match(regex)
+    if (match && match[1]) {
+      let content = match[1].trim()
+      let items = []
+
+      if (key === 'objectives') {
+        const itemMatches = content.match(/\d+\.\s+([^；;]+)[；;]/g)
+        if (itemMatches) {
+          items = itemMatches.map(item => item.replace(/^\d+\.\s+/, '').replace(/[；;]$/, '').trim())
+        } else {
+          items = content.split(/[；;\n]/).filter(s => s.trim()).map(s => s.trim())
+        }
+      } else if (key === 'content') {
+        const moduleMatches = content.match(/模块[一二三四五六七八九十\d]+：[^；;]+[；;]/g)
+        if (moduleMatches) {
+          items = moduleMatches.map(m => m.replace(/[；;]$/, '').trim())
+        } else {
+          items = content.split(/[；;\n]/).filter(s => s.trim()).map(s => s.trim())
+        }
+      } else {
+        content = content.replace(/\n+/g, '\n').trim()
+      }
+
+      sections.push({
+        key,
+        label,
+        content,
+        items: items.length > 0 ? items : null,
+      })
+    }
+  })
+
+  return sections.length > 0 ? sections : null
+}
+
 async function loadCourseDetail() {
   const id = Number(route.params.id)
   if (!id || isNaN(id)) return
@@ -169,12 +317,16 @@ async function loadCourseDetail() {
     loading.value = true
     courseDetail.value = null
     courseRatings.value = []
+    courseOutline.value = []
 
     const data = await getCourseDetail(id)
     courseDetail.value = data
 
     const ratings = await getCourseRatings(id)
     courseRatings.value = ratings
+
+    const outline = await getCourseOutline(id)
+    courseOutline.value = outline
   } catch (error) {
     console.error('加载课程详情失败:', error)
     ElMessage.error('加载课程详情失败，请稍后重试')
@@ -401,7 +553,23 @@ onUnmounted(() => {
 
             <!-- ── Overview ── -->
             <div v-show="activeTab === 'overview'">
-              <div class="content-block fade-up">
+              <template v-if="course.parsedIntro">
+                <div v-for="section in course.parsedIntro" :key="section.key" class="content-block fade-up">
+                  <div class="cb-header">
+                    <span class="cb-tag">[ {{ section.label.toUpperCase() }} ]</span>
+                    <h2 class="cb-title">{{ section.label }}</h2>
+                  </div>
+
+                  <div v-if="section.items" class="detail-items">
+                    <div v-for="(item, idx) in section.items" :key="idx" class="detail-item">
+                      <span class="item-marker">{{ section.key === 'objectives' ? idx + 1 + '.' : '◆' }}</span>
+                      <span class="item-text">{{ item }}</span>
+                    </div>
+                  </div>
+                  <p v-else class="block-text">{{ section.content }}</p>
+                </div>
+              </template>
+              <div v-else class="content-block fade-up">
                 <div class="cb-header">
                   <span class="cb-tag">[ DETAILS ]</span>
                   <h2 class="cb-title">课程详情</h2>
@@ -440,45 +608,48 @@ onUnmounted(() => {
                     <span class="cb-tag">[ CURRICULUM ]</span>
                     <h2 class="cb-title">课程大纲</h2>
                   </div>
-                  <span class="curriculum-meta">{{ course.modules.length }} 章 · {{ totalVideos }} 节视频</span>
+                  <span class="curriculum-meta">{{ outlineTree.length }} 章 · {{ courseOutline.length }} 节</span>
                 </div>
-                <div class="modules-list">
-                  <div v-for="module in course.modules" :key="module.id"
-                       class="module-wrap" :class="{ open: activeModule === module.id }">
-                    <button class="module-header" @click="toggleModule(module.id)">
-                      <div class="mh-left">
-                        <div class="module-num">{{ String(module.id).padStart(2,'0') }}</div>
-                        <div class="mh-text">
-                          <span class="module-title">{{ module.title }}</span>
-                          <span class="module-meta">{{ module.videoCount }} 节 · {{ module.duration }}</span>
+
+                <div v-if="outlineTree.length > 0" class="outline-tree">
+                  <div v-for="chapter in outlineTree" :key="chapter.id" class="chapter-item">
+                    <div class="chapter-header">
+                      <div class="chapter-icon">◈</div>
+                      <h3 class="chapter-title">{{ chapter.title }}</h3>
+                    </div>
+
+                    <div class="sections-list">
+                      <div v-for="section in chapter.sections" :key="section.id" class="section-item">
+                        <div class="section-header">
+                          <div class="section-icon">▸</div>
+                          <h4 class="section-title">{{ section.title }}</h4>
                         </div>
-                      </div>
-                      <svg class="chevron" :class="{ rotated: activeModule === module.id }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"/>
-                      </svg>
-                    </button>
-                    <Transition name="expand">
-                      <div v-if="activeModule === module.id" class="module-videos">
-                        <div v-for="video in module.videos" :key="video.id"
-                             class="video-row" :class="{ locked: !isEnrolled && !video.isFree }">
-                          <div class="vr-left">
-                            <div class="vr-icon">
-                              <svg v-if="isEnrolled || video.isFree" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                              <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+
+                        <div class="resources-inline">
+                          <template v-if="section.resources && section.resources.length">
+                            <div v-for="res in section.resources" :key="res.id" class="resource-inline-item">
+                              <div class="res-icon-small" :class="res.resourceType">
+                                <svg v-if="res.resourceType === 'video'" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                              </div>
+                              <span class="res-title-inline">{{ res.title }}</span>
+                              <div class="res-meta-inline">
+                                <span v-if="res.duration" class="res-duration">{{ formatDuration(res.duration) }}</span>
+                                <span v-if="res.fileSize" class="res-size">{{ formatFileSize(res.fileSize) }}</span>
+                              </div>
+                              <button class="res-btn-small" @click="openResource(res)">
+                                {{ res.resourceType === 'video' ? '播放' : '下载' }}
+                              </button>
                             </div>
-                            <span class="vr-title">{{ video.title }}</span>
-                            <span v-if="video.isFree" class="free-pill">免费试看</span>
-                          </div>
-                          <div class="vr-right">
-                            <span class="vr-dur">{{ video.duration }}</span>
-                            <button class="vr-btn" :disabled="!isEnrolled && !video.isFree">
-                              {{ isEnrolled || video.isFree ? '播放' : '解锁' }}
-                            </button>
-                          </div>
+                          </template>
+                          <div v-else class="empty-resources">暂无学习资料</div>
                         </div>
                       </div>
-                    </Transition>
+                    </div>
                   </div>
+                </div>
+                <div v-else class="empty-outline">
+                  <p>暂无课程大纲</p>
                 </div>
               </div>
             </div>
@@ -840,6 +1011,11 @@ onUnmounted(() => {
 .cb-title { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.04em; color: #c8f0e0; }
 .block-text { font-size: 0.87rem; color: rgba(200,240,224,0.85); line-height: 1.85; }
 
+.detail-items { display: flex; flex-direction: column; gap: 12px; }
+.detail-item { display: flex; gap: 10px; align-items: flex-start; font-size: 0.87rem; color: rgba(200,240,224,0.85); line-height: 1.75; }
+.item-marker { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: #00d4ff; font-weight: 600; flex-shrink: 0; min-width: 24px; }
+.item-text { flex: 1; }
+
 .instructor-card { display: flex; gap: 18px; align-items: flex-start; }
 .inst-card-avatar {
   width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0;
@@ -852,6 +1028,36 @@ onUnmounted(() => {
 .inst-bio { font-size: 0.82rem; color: rgba(200,240,224,0.85); line-height: 1.75; }
 
 .curriculum-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.73rem; color: rgba(150,210,180,0.35); }
+
+.outline-tree { display: flex; flex-direction: column; gap: 16px; }
+.chapter-item { background: rgba(0,212,255,0.03); border: 1px solid rgba(0,212,255,0.12); border-radius: 10px; padding: 18px 20px; transition: all 0.25s; }
+.chapter-item:hover { border-color: rgba(0,212,255,0.28); background: rgba(0,212,255,0.05); }
+.chapter-header { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+.chapter-icon { font-size: 1.3rem; color: #00d4ff; flex-shrink: 0; }
+.chapter-title { font-family: 'Orbitron', sans-serif; font-size: 1rem; font-weight: 600; color: #c8f0e0; letter-spacing: 0.04em; flex: 1; }
+
+.sections-list { display: flex; flex-direction: column; gap: 10px; padding-left: 32px; }
+.section-item { background: rgba(0,0,0,0.15); border: 1px solid rgba(0,212,255,0.08); border-radius: 8px; padding: 12px 14px; transition: all 0.2s; }
+.section-item:hover { border-color: rgba(0,212,255,0.2); }
+.section-header { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.section-icon { font-size: 0.85rem; color: #00ff9d; flex-shrink: 0; margin-top: 1px; }
+.section-title { font-size: 0.88rem; font-weight: 600; color: #c8f0e0; flex: 1; line-height: 1.4; }
+
+.resources-inline { display: flex; flex-direction: column; gap: 6px; padding-left: 22px; margin-top: 4px; }
+.resource-inline-item { display: flex; gap: 8px; align-items: center; padding: 7px 10px; background: rgba(0,212,255,0.04); border: 1px solid rgba(0,212,255,0.06); border-radius: 6px; transition: all 0.2s; }
+.resource-inline-item:hover { background: rgba(0,212,255,0.08); border-color: rgba(0,212,255,0.15); }
+.res-icon-small { width: 24px; height: 24px; border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.res-icon-small.video { background: rgba(0,212,255,0.12); color: #00d4ff; border: 1px solid rgba(0,212,255,0.15); }
+.res-icon-small.pdf { background: rgba(255,107,53,0.12); color: #ff6b35; border: 1px solid rgba(255,107,53,0.15); }
+.res-title-inline { font-size: 0.78rem; color: rgba(200,240,224,0.9); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.res-meta-inline { display: flex; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: rgba(150,210,180,0.4); flex-shrink: 0; }
+.res-btn-small { font-family: 'Noto Sans SC', sans-serif; font-size: 0.7rem; padding: 4px 10px; border-radius: 5px; border: 1px solid rgba(0,212,255,0.15); background: rgba(0,212,255,0.08); color: #00d4ff; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.res-btn-small:hover { background: rgba(0,212,255,0.18); border-color: rgba(0,212,255,0.3); }
+
+.empty-resources { font-size: 0.75rem; color: rgba(150,210,180,0.35); padding: 6px 0 2px 22px; font-style: italic; }
+
+.empty-outline { text-align: center; padding: 40px 20px; color: rgba(150,210,180,0.35); font-size: 0.85rem; }
+
 .modules-list { display: flex; flex-direction: column; gap: 4px; }
 .module-wrap { border: 1px solid rgba(0,212,255,0.08); border-radius: 10px; overflow: hidden; transition: border-color 0.25s; }
 .module-wrap.open { border-color: rgba(0,212,255,0.22); }

@@ -1,43 +1,49 @@
 {
-  "hash": "0da7643e",
+  "hash": "558e4516",
   "configHash": "22df5076",
-  "lockfileHash": "b54cf2a0",
-  "browserHash": "d7dc02bd",
+  "lockfileHash": "38d49c40",
+  "browserHash": "d7e86cdb",
   "optimized": {
     "@element-plus/icons-vue": {
       "src": "../../node_modules/@element-plus/icons-vue/dist/index.js",
       "file": "@element-plus_icons-vue.js",
-      "fileHash": "8e878720",
+      "fileHash": "d2ab0d23",
       "needsInterop": false
     },
     "axios": {
       "src": "../../node_modules/axios/index.js",
       "file": "axios.js",
-      "fileHash": "448d0abc",
+      "fileHash": "cb026dc5",
       "needsInterop": false
     },
     "element-plus": {
       "src": "../../node_modules/element-plus/es/index.mjs",
       "file": "element-plus.js",
-      "fileHash": "1b44e706",
+      "fileHash": "8b17b3ed",
       "needsInterop": false
     },
     "element-plus/dist/locale/zh-cn.mjs": {
       "src": "../../node_modules/element-plus/dist/locale/zh-cn.mjs",
       "file": "element-plus_dist_locale_zh-cn__mjs.js",
-      "fileHash": "67ad55a7",
+      "fileHash": "98fee9a0",
       "needsInterop": false
     },
     "vue": {
       "src": "../../node_modules/vue/dist/vue.runtime.esm-bundler.js",
       "file": "vue.js",
-      "fileHash": "0dca05a9",
+      "fileHash": "ef9224f7",
       "needsInterop": false
     },
     "vue-router": {
       "src": "../../node_modules/vue-router/dist/vue-router.mjs",
       "file": "vue-router.js",
-      "fileHash": "d0a790b7",
+      "fileHash": "d46d8a2c",
+      "needsInterop": false
+    },
+    "cropperjs": {
+      "src": "../../node_modules/cropperjs/dist/cropper.esm.raw.js",
+      "file": "cropperjs.js",
+      "fileHash": "2eb3cc04",
       "needsInterop": false
     }
   },

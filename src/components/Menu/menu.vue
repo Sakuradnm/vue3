@@ -132,7 +132,28 @@ const loadUnreadNotices = () => {
 
 const handleStorageChange = (e: StorageEvent) => {
   if (e.key === 'userInfo') {
-    checkLoginStatus()
+    // 如果是手动触发的 storage 事件（newValue 不为 null），直接更新
+    if (e.newValue) {
+      try {
+        const updatedUser = JSON.parse(e.newValue)
+        userInfo.value = {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          nickname: updatedUser.nickname || updatedUser.username,
+          level: updatedUser.level,
+          avatar: updatedUser.avatarUrl || updatedUser.avatar || '',
+          phone: updatedUser.phone,
+          email: updatedUser.email
+        }
+        isLoggedIn.value = true
+      } catch (error) {
+        console.error('解析用户信息失败:', error)
+        checkLoginStatus()
+      }
+    } else {
+      // 否则重新从后端获取
+      checkLoginStatus()
+    }
   }
   if (e.key === 'userNotices') {
     loadUnreadNotices()

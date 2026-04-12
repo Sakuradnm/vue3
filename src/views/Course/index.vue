@@ -989,8 +989,8 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 .suggestion-title :deep(.highlight) {
-  background: rgba(0, 212, 255, 0.3);
-  color: #00d4ff;
+  background: rgba(0, 255, 180, 0.2);
+  color: #00ffb4;
   padding: 1px 3px;
   border-radius: 3px;
   font-weight: 700;
@@ -1573,8 +1573,8 @@ onUnmounted(() => {
 }
 .course-card:hover .card-title { color: #00d4ff; }
 .card-title :deep(.highlight) {
-  background: rgba(0, 212, 255, 0.25);
-  color: #00d4ff;
+  background: rgba(0, 255, 180, 0.18);
+  color: #00ffb4;
   padding: 1px 3px;
   border-radius: 3px;
 }

@@ -36,6 +36,7 @@ export interface CourseDetailItem {
     learnedDuration: number
     totalDuration: number
     courseDescription: string
+    detailIntro: string
     subCategoryId: number
     categoryId: number
 }
@@ -71,6 +72,33 @@ export const getCourseDetail = (courseId: number) => {
 export const getCourseRatings = (courseId: number) => {
     return request({
         url: `/api/courses/${courseId}/ratings`,
+        method: 'get'
+    })
+}
+
+export interface OutlineItem {
+    id: number
+    courseId: number
+    parentId: number
+    title: string
+    sortOrder: number
+    description: string
+    resources: ResourceItem[]
+}
+
+export interface ResourceItem {
+    id: number
+    resourceType: string
+    title: string
+    resourceUrl: string
+    duration: number
+    fileSize: number
+    sortOrder: number
+}
+
+export const getCourseOutline = (courseId: number) => {
+    return request<OutlineItem[]>({
+        url: `/api/courses/${courseId}/outline`,
         method: 'get'
     })
 }

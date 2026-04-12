@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
-import { getForumPosts } from '@/api/forum';
+import { getForumPosts, createPost, type CreatePostData } from '@/api/forum';
 import type { ForumPostItem } from '@/api/forum';
+import { ElMessage } from 'element-plus';
 
 // ── State ────────────────────────────────────────────────
 const activeCategory = ref('all');
 const searchQuery = ref('');
-const sortBy = ref('hot');
+const sortBy = ref('new'); // 默认按最新排序
+const sortDirection = ref<'asc' | 'desc'>('desc'); // 排序方向：desc=降序, asc=升序
 const showCompose = ref(false);
 const likedPosts = reactive(new Set());
 const bookmarked = reactive(new Set());
@@ -15,6 +17,14 @@ const mouseX = ref(0);
 const mouseY = ref(0);
 let particleRafId = null;
 let observers = [];
+
+// 发帖表单状态
+const composeForm = reactive({
+  title: '',
+  category: 'frontend',
+  content: '',
+  tags: ''
+});
 
 // ── Data ────────────────────────────────────────────────
 const categories = [
@@ -27,11 +37,11 @@ const categories = [
 ];
 
 const allPosts = ref<ForumPostItem[]>([]);
-const displayedPosts = ref<ForumPostItem[]>([]);
 const loading = ref(false);
 const loadingMore = ref(false);
 const hasMore = ref(true);
 const pageSize = 10;
+const currentPage = ref(1); // 当前页码
 
 const hotTopics = [
   { rank: 1, title: 'Vue3 vs React 2024 大比拼', replies: 203, color: '#ff6b35' },
@@ -49,11 +59,16 @@ const activeUsers = [
 ];
 
 // ── Computed ─────────────────────────────────────────────
-const filteredPosts = computed(() => {
-  let list = displayedPosts.value;
+// 先对所有数据进行过滤和排序
+const sortedAndFilteredPosts = computed(() => {
+  let list = allPosts.value;
+  
+  // 分类过滤
   if (activeCategory.value !== 'all') {
     list = list.filter(p => p.category === activeCategory.value);
   }
+  
+  // 搜索过滤
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase();
     list = list.filter(p => {
@@ -64,13 +79,42 @@ const filteredPosts = computed(() => {
       return titleMatch || previewMatch || tagsMatch;
     });
   }
+  
+  // 排序逻辑
   list = [...list].sort((a, b) => {
-    if (sortBy.value === 'hot') return b.score - a.score;
-    if (sortBy.value === 'new') return b.id - a.id;
-    if (sortBy.value === 'views') return b.views - a.views;
-    return 0;
+    if (sortBy.value === 'new') {
+      // 最新：按创建时间排序（不需要箭头，固定降序）
+      // 时间越接近当前时间，应该排在越前面
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      return timeB - timeA; // 降序：新->旧（不受方向控制）
+    }
+    
+    // 热度和浏览支持双向排序
+    let result = 0;
+    if (sortBy.value === 'hot') {
+      // 热度：按点赞量排序
+      result = a.likes - b.likes;
+    } else if (sortBy.value === 'views') {
+      // 浏览：按观看次数排序
+      result = a.views - b.views;
+    }
+    
+    // 根据方向调整排序
+    // desc=降序（大->小），asc=升序（小->大）
+    return sortDirection.value === 'desc' ? -result : result;
   });
+  
   return list;
+});
+
+// 分页显示：从排序后的数据中取当前页
+const displayedPosts = computed(() => {
+  return sortedAndFilteredPosts.value.slice(0, currentPage.value * pageSize);
+});
+
+const filteredPosts = computed(() => {
+  return displayedPosts.value;
 });
 
 const activeCatData = computed(() =>
@@ -85,12 +129,14 @@ const sidebarTopOffset = ref(62); // 侧边栏动态top值
 function debounceSearch() {
   if (searchTimer) clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
+    currentPage.value = 1; // 重置页码
     fetchPosts();
   }, 500);
 }
 
 async function fetchPosts() {
   loading.value = true;
+  currentPage.value = 1; // 重置页码
   try {
     const params: any = {};
     if (activeCategory.value !== 'all') {
@@ -99,12 +145,10 @@ async function fetchPosts() {
     if (searchQuery.value.trim()) {
       params.keyword = searchQuery.value.trim();
     }
-    params.sortBy = sortBy.value;
 
     const response = await getForumPosts(params);
     allPosts.value = response;
-    displayedPosts.value = allPosts.value.slice(0, pageSize);
-    hasMore.value = allPosts.value.length > pageSize;
+    updateHasMore();
     updateCategoryCounts();
   } catch (error) {
     console.error('Failed to fetch posts:', error);
@@ -113,14 +157,17 @@ async function fetchPosts() {
   }
 }
 
+function updateHasMore() {
+  const totalFiltered = sortedAndFilteredPosts.value.length;
+  hasMore.value = currentPage.value * pageSize < totalFiltered;
+}
+
 function loadMore() {
   if (loadingMore.value || !hasMore.value) return;
   loadingMore.value = true;
-  const currentLength = displayedPosts.value.length;
-  const nextPosts = allPosts.value.slice(currentLength, currentLength + pageSize);
   setTimeout(() => {
-    displayedPosts.value = [...displayedPosts.value, ...nextPosts];
-    hasMore.value = displayedPosts.value.length < allPosts.value.length;
+    currentPage.value++;
+    updateHasMore();
     loadingMore.value = false;
   }, 300);
 }
@@ -156,6 +203,31 @@ function toggleBookmark(id) {
 }
 function fmtNum(n) {
   return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n;
+}
+
+function highlightText(text: string, query: string) {
+  if (!query || !text) return text;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return text.replace(regex, '<mark class="highlight">$1</mark>');
+}
+
+// 切换排序方向
+function toggleSortDirection(sortType: string) {
+  // 最新排序不需要箭头，固定降序
+  if (sortType === 'new') {
+    sortBy.value = 'new';
+    sortDirection.value = 'desc';
+    return;
+  }
+  
+  // 如果点击的是当前排序类型，切换方向
+  if (sortBy.value === sortType) {
+    sortDirection.value = sortDirection.value === 'desc' ? 'asc' : 'desc';
+  } else {
+    // 切换到新的排序类型，默认降序
+    sortBy.value = sortType;
+    sortDirection.value = 'desc';
+  }
 }
 
 // ── 侧边栏滚动跟随逻辑 ───────────────────────────────────
@@ -246,6 +318,73 @@ function handleScroll() {
   updateSidebarTopOffset();
 }
 
+// 发帖功能
+async function submitPost() {
+  // 验证表单
+  if (!composeForm.title.trim()) {
+    ElMessage.warning('请输入帖子标题');
+    return;
+  }
+  if (!composeForm.content.trim()) {
+    ElMessage.warning('请输入帖子内容');
+    return;
+  }
+
+  // 获取当前用户信息
+  const storedUserInfo = localStorage.getItem('userInfo');
+  if (!storedUserInfo) {
+    ElMessage.warning('请先登录');
+    showCompose.value = false;
+    return;
+  }
+
+  const user = JSON.parse(storedUserInfo);
+  const selectedCat = categories.find(c => c.id === composeForm.category);
+
+  // 生成预览（取内容前100字符）
+  const preview = composeForm.content.substring(0, 100) + (composeForm.content.length > 100 ? '...' : '');
+
+  // 处理标签
+  const tagsArray = composeForm.tags.trim()
+    .split(/[,，\s]+/)
+    .filter(t => t.length > 0)
+    .slice(0, 5); // 最多5个标签
+
+  const postData: CreatePostData = {
+    userId: user.id,
+    category: composeForm.category,
+    categoryLabel: selectedCat?.label || '其他',
+    title: composeForm.title.trim(),
+    preview: preview,
+    content: composeForm.content.trim(),
+    tags: tagsArray
+  };
+
+  try {
+    const newPost = await createPost(postData);
+    ElMessage.success('发帖成功！');
+    
+    // 重置表单
+    composeForm.title = '';
+    composeForm.category = 'frontend';
+    composeForm.content = '';
+    composeForm.tags = '';
+    showCompose.value = false;
+    
+    // 重新加载帖子列表
+    await fetchPosts();
+    
+    // 切换到最新排序，确保能看到新帖子
+    sortBy.value = 'new';
+    sortDirection.value = 'desc';
+    
+    console.log('新帖子已创建:', newPost);
+  } catch (error) {
+    console.error('Failed to create post:', error);
+    ElMessage.error('发帖失败，请重试');
+  }
+}
+
 onMounted(() => {
   const root = document.querySelector('.forum-root');
   const canvas = root?.querySelector('.bg-canvas');
@@ -258,7 +397,8 @@ onMounted(() => {
   fetchPosts();
 });
 
-watch([activeCategory, sortBy], () => {
+watch([activeCategory, sortBy, sortDirection], () => {
+  currentPage.value = 1; // 重置页码
   fetchPosts();
 });
 
@@ -330,19 +470,22 @@ onUnmounted(() => {
             <button class="cm-close" @click="showCompose = false">✕</button>
           </div>
           <div class="cm-body">
-            <input class="cm-field" placeholder="帖子标题…" />
+            <input v-model="composeForm.title" class="cm-field" placeholder="帖子标题…" maxlength="100" />
             <div class="cm-cats">
               <button v-for="c in categories.slice(1)" :key="c.id"
-                      class="cm-cat-btn" :style="`--cc:${c.color}`">
+                      class="cm-cat-btn" 
+                      :class="{ 'cm-cat-active': composeForm.category === c.id }"
+                      :style="`--cc:${c.color}`"
+                      @click="composeForm.category = c.id">
                 {{ c.icon }} {{ c.label }}
               </button>
             </div>
-            <textarea class="cm-textarea" placeholder="分享你的知识、问题或资源…" rows="6"></textarea>
-            <input class="cm-field" placeholder="标签（用空格分隔）…" />
+            <textarea v-model="composeForm.content" class="cm-textarea" placeholder="分享你的知识、问题或资源…" rows="8"></textarea>
+            <input v-model="composeForm.tags" class="cm-field" placeholder="标签（用空格或逗号分隔，最多5个）…" />
           </div>
           <div class="cm-footer">
             <button class="cm-cancel" @click="showCompose = false">取消</button>
-            <button class="cm-submit">
+            <button class="cm-submit" @click="submitPost">
               <span class="cb-sweep"></span>
               发布帖子
             </button>
@@ -437,9 +580,29 @@ onUnmounted(() => {
         <!-- Toolbar -->
         <div class="toolbar fade-up">
           <div class="tb-left">
-            <span class="tb-count">
-              共 <em>{{ filteredPosts.length }}</em> 条结果
-            </span>
+            <!-- 发帖按钮 -->
+            <button class="tb-compose-btn" @click="showCompose = true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              发帖
+            </button>
+            
+            <div class="search-input-wrap">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input
+                  v-model="searchQuery"
+                  @input="debounceSearch"
+                  type="text"
+                  class="tb-search-input"
+                  placeholder="输入关键词搜索..."
+              />
+              <span v-if="searchQuery" class="search-clear" @click="searchQuery=''; debounceSearch()">✕</span>
+            </div>
             <span v-if="activeCategory !== 'all'" class="tb-active-cat"
                   :style="`color:${activeCatData.color};border-color:${activeCatData.color}33;background:${activeCatData.color}0d`">
               {{ activeCatData.icon }} {{ activeCatData.label }}
@@ -448,14 +611,30 @@ onUnmounted(() => {
           </div>
           <div class="tb-right">
             <div class="sort-group">
-              <button v-for="s in [
-                {id:'hot', label:'热度'},
-                {id:'new', label:'最新'},
-                {id:'views', label:'浏览'},
-              ]" :key="s.id"
-                      class="sort-btn" :class="{ active: sortBy === s.id }"
-                      @click="sortBy = s.id">
-                {{ s.label }}
+              <!-- 最新（无箭头，固定降序） -->
+              <button class="sort-btn" :class="{ active: sortBy === 'new' }"
+                      @click="toggleSortDirection('new')">
+                最新
+              </button>
+              
+              <!-- 热度（带箭头） -->
+              <button class="sort-btn" :class="{ active: sortBy === 'hot' }"
+                      @click="toggleSortDirection('hot')">
+                热度
+                <svg v-if="sortBy === 'hot'" class="sort-arrow" viewBox="0 0 24 24" fill="currentColor">
+                  <path v-if="sortDirection === 'desc'" d="M7 10l5 5 5-5z"/>
+                  <path v-else d="M7 14l5-5 5 5z"/>
+                </svg>
+              </button>
+              
+              <!-- 浏览（带箭头） -->
+              <button class="sort-btn" :class="{ active: sortBy === 'views' }"
+                      @click="toggleSortDirection('views')">
+                浏览
+                <svg v-if="sortBy === 'views'" class="sort-arrow" viewBox="0 0 24 24" fill="currentColor">
+                  <path v-if="sortDirection === 'desc'" d="M7 10l5 5 5-5z"/>
+                  <path v-else d="M7 14l5-5 5 5z"/>
+                </svg>
               </button>
             </div>
           </div>
@@ -473,12 +652,6 @@ onUnmounted(() => {
                    :style="`animation-delay:${i * 0.06}s`"
                    @mouseenter="hoveredPost = post.id"
                    @mouseleave="hoveredPost = -1">
-
-            <!-- Pinned indicator -->
-            <div v-if="post.pinned" class="pc-pinned">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              置顶
-            </div>
 
             <div class="pc-layout">
               <!-- Left: vote -->
@@ -514,8 +687,8 @@ onUnmounted(() => {
                   <span v-if="post.solved" class="pc-solved">✓ SOLVED</span>
                 </div>
 
-                <h2 class="pc-title">{{ post.title }}</h2>
-                <p class="pc-preview">{{ post.preview }}</p>
+                <h2 class="pc-title" v-html="highlightText(post.title, searchQuery)"></h2>
+                <p class="pc-preview" v-html="highlightText(post.preview, searchQuery)"></p>
 
                 <div class="pc-tags">
                   <span v-for="tag in (Array.isArray(post.tags) ? post.tags : [])" :key="tag" class="pc-tag"># {{ tag }}</span>
@@ -523,8 +696,9 @@ onUnmounted(() => {
 
                 <div class="pc-footer">
                   <div class="pcf-author">
-                    <div class="pcf-avatar" :style="`border-color:${post.avatarColor}44`">
-                      <span :style="`color:${post.avatarColor}`">{{ post.avatar }}</span>
+                    <div class="pcf-avatar">
+                      <img v-if="post.avatar" :src="post.avatar" :alt="post.author" />
+                      <span v-else>{{ post.author?.charAt(0)?.toUpperCase() }}</span>
                     </div>
                     <div class="pcf-info">
                       <span class="pcf-name">{{ post.author }}</span>
@@ -885,6 +1059,11 @@ onUnmounted(() => {
   background: rgba(0,255,180,0.08);
   border-color: var(--cc, #00ffb4);
 }
+.cm-cat-active {
+  background: rgba(0,255,180,0.12) !important;
+  border-color: var(--cc, #00ffb4) !important;
+  box-shadow: 0 0 10px rgba(0,255,180,0.2);
+}
 
 .cm-footer {
   display: flex; justify-content: flex-end; gap: 0.75rem;
@@ -1136,6 +1315,79 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(0,255,180,0.08);
 }
 .tb-left { display: flex; align-items: center; gap: 0.75rem; }
+
+/* Toolbar 发帖按钮 */
+.tb-compose-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  background: rgba(0,255,180,0.08);
+  border: 1px solid rgba(0,255,180,0.2);
+  border-radius: 8px;
+  color: #00ffb4;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+.tb-compose-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.tb-compose-btn:hover {
+  background: rgba(0,255,180,0.15);
+  border-color: rgba(0,255,180,0.35);
+  box-shadow: 0 0 15px rgba(0,255,180,0.15);
+  transform: translateY(-1px);
+}
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 280px;
+}
+.search-icon {
+  position: absolute;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+  color: rgba(150,210,180,0.35);
+  pointer-events: none;
+}
+.tb-search-input {
+  width: 100%;
+  padding: 0.45rem 2.2rem 0.45rem 2.2rem;
+  background: rgba(0,255,180,0.04);
+  border: 1px solid rgba(0,255,180,0.12);
+  border-radius: 8px;
+  color: #c8f0e0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  outline: none;
+  transition: all 0.25s;
+}
+.tb-search-input::placeholder {
+  color: rgba(150,210,180,0.3);
+}
+.tb-search-input:focus {
+  border-color: rgba(0,255,180,0.35);
+  background: rgba(0,255,180,0.06);
+  box-shadow: 0 0 12px rgba(0,255,180,0.08);
+}
+.search-clear {
+  position: absolute;
+  right: 8px;
+  cursor: pointer;
+  color: rgba(150,210,180,0.4);
+  font-size: 0.8rem;
+  transition: color 0.2s;
+}
+.search-clear:hover {
+  color: #00ffb4;
+}
 .tb-count {
   font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
   letter-spacing: 0.1em; color: rgba(150,210,180,0.35);
@@ -1153,11 +1405,22 @@ onUnmounted(() => {
   background: none; border: 1px solid rgba(0,255,180,0.08);
   padding: 0.38rem 0.85rem; cursor: pointer;
   transition: color 0.25s, background 0.25s, border-color 0.25s;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 .sort-btn:hover { color: #c8f0e0; border-color: rgba(0,255,180,0.22); }
 .sort-btn.active {
   color: #00ffb4; background: rgba(0,255,180,0.06);
   border-color: rgba(0,255,180,0.25);
+}
+
+/* 排序箭头 */
+.sort-arrow {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  transition: transform 0.2s;
 }
 
 /* Posts list */
@@ -1177,16 +1440,6 @@ onUnmounted(() => {
   border-color: rgba(0,255,180,0.15);
   transform: translateX(3px);
 }
-
-.pc-pinned {
-  display: flex; align-items: center; gap: 0.4rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
-  letter-spacing: 0.14em; color: #ffd93d;
-  background: rgba(255,217,61,0.06);
-  border-bottom: 1px solid rgba(255,217,61,0.12);
-  padding: 0.4rem 1.5rem;
-}
-.pc-pinned svg { width: 10px; height: 10px; fill: #ffd93d; }
 
 .pc-layout {
   display: flex; gap: 0;
@@ -1278,10 +1531,16 @@ onUnmounted(() => {
 .pcf-author { display: flex; align-items: center; gap: 0.6rem; }
 .pcf-avatar {
   width: 26px; height: 26px; border-radius: 50%;
-  border: 1px solid; flex-shrink: 0;
+  border: 1px solid rgba(0,255,180,0.2); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
 }
-.pcf-avatar span { font-family: 'Orbitron', sans-serif; font-size: 0.55rem; font-weight: 700; }
+.pcf-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pcf-avatar span { font-family: 'Orbitron', sans-serif; font-size: 0.55rem; font-weight: 700; color: #00ffb4; }
 .pcf-info { display: flex; flex-direction: column; gap: 0.05rem; }
 .pcf-name { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #c8f0e0; }
 .pcf-time { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: rgba(150,210,180,0.35); }
@@ -1481,5 +1740,14 @@ onUnmounted(() => {
   .pc-vote{ width: 52px; }
   .fh-title{ flex-direction: column; gap: 0; }
   .fh-live-stats{ gap: 1.5rem; }
+}
+</style>
+
+<!-- 全局样式：搜索高亮样式 - 无背景，仅加粗+亮绿色 -->
+<style>
+.forum-root mark.highlight {
+  background: transparent !important;
+  color: #00ffb4 !important;
+  font-weight: bold !important;
 }
 </style>

@@ -1,146 +1,141 @@
 <template>
-  <div class="avatar-uploader">
-    <div class="avatar-preview" :style="{ backgroundImage: modelValue ? `url(${modelValue})` : 'none' }">
-      <div v-if="!modelValue" class="avatar-placeholder">{{ placeholder }}</div>
-      <div class="avatar-overlay" v-if="editable">
-        <button class="upload-btn" @click="triggerUpload">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          <span>更换</span>
-        </button>
+  <div class="file-container">
+    <!-- 头像 -->
+    <div class="avatar-container" :class="{ 'editable': editable }" @click="openSelector">
+      <img :src="displayUrl" alt="avatar" class="avatar" v-if="displayUrl">
+      <!-- 遮罩层 - 仅在可编辑时显示 -->
+      <div class="mask" v-if="editable">
+        <p class="icon">+</p>
       </div>
     </div>
     <input 
-      ref="fileInput" 
-      type="file" 
-      accept="image/*" 
-      @change="handleFileChange" 
-      style="display: none"
-    />
+      type="file"
+      accept="image/png,image/jpeg"
+      @change="handleFile"
+      class="input"
+      ref="avatarInput"
+      >
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
+<script setup>
+import { ref, computed, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 
-const props = defineProps<{
-  modelValue: string
-  placeholder?: string
-  editable?: boolean
-}>()
+const props = defineProps({
+  modelValue: {
+    type: String,
+    default: ''
+  },
+  editable: {
+    type: Boolean,
+    default: false
+  }
+});
 
-const emit = defineEmits<{
-  'update:modelValue': [value: string]
-  'change': [value: string]
-}>()
+const emit = defineEmits(['update:modelValue', 'change']);
 
-const fileInput = ref<HTMLInputElement>()
+const avatarInput = ref(null);
+const localImgUrl = ref('');
 
-const triggerUpload = () => {
-  fileInput.value?.click()
+// 优先显示本地预览，否则显示数据库URL
+const displayUrl = computed(() => localImgUrl.value || props.modelValue);
+
+// 监听 editable 变化，当变为 false 时清除本地缓存
+watch(() => props.editable, (newVal) => {
+  if (!newVal) {
+    // 退出编辑模式时，清除本地缓存，恢复为数据库中的头像
+    localImgUrl.value = '';
+  }
+});
+
+// 打开文件选择器
+function openSelector() {
+  if (!props.editable) return;
+  avatarInput.value.click();
 }
 
-const handleFileChange = (e: Event) => {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-
-  if (!file.type.startsWith('image/')) {
-    ElMessage.error('请选择图片文件')
-    return
+// 验证文件合法性
+function validateFile(file) {
+  const validTypes = ['image/jpeg', 'image/png'];
+  const maxSize = 5 * 1024 * 1024;
+  if (!validTypes.includes(file.type)) {
+    ElMessage.error('请选择正确的图片格式');
+    return false;
   }
-
-  if (file.size > 500 * 1024) {
-    ElMessage.error('图片大小不能超过500KB')
-    return
+  if (file.size > maxSize) {
+    ElMessage.error('请上传小于等于5M的图片');
+    return false;
   }
+  return true;
+}
 
-  const reader = new FileReader()
-  reader.onload = (event) => {
-    const base64 = event.target?.result as string
-    emit('update:modelValue', base64)
-    emit('change', base64)
-    ElMessage.success('头像已更新')
-  }
-  reader.readAsDataURL(file)
+// 选择文件（仅本地预览，不上传）
+function handleFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  if (!validateFile(file)) return;
 
-  input.value = ''
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = (e) => {
+    const base64Url = e.target.result;
+    localImgUrl.value = base64Url;
+    emit('update:modelValue', base64Url);
+    emit('change', base64Url);
+  };
 }
 </script>
 
 <style scoped>
-.avatar-uploader {
-  position: relative;
-  display: inline-block;
+/* 输入框none隐藏 */
+.input {
+  display: none;
 }
-
-.avatar-preview {
-  width: 88px;
-  height: 88px;
+/* 头像容器 */
+.avatar-container {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: 20px auto;
   border-radius: 50%;
-  background-size: cover;
-  background-position: center;
-  background-color: #141b2d;
-  position: relative;
+  border: 1px solid #ccc;
+  background-color: #ffffff;
   overflow: hidden;
-  border: 3px solid transparent;
-  background-image: linear-gradient(#141b2d, #141b2d), linear-gradient(135deg, #4f6ef7, #a855f7);
-  background-origin: border-box;
-  background-clip: content-box, border-box;
 }
-
-.avatar-placeholder {
+/* 可编辑状态 */
+.avatar-container.editable {
+  cursor: pointer;
+}
+/* 悬浮时显示遮罩层（仅可编辑状态） */
+.avatar-container.editable:hover .mask {
+  opacity: 0.6;
+}
+/* 遮罩层 */
+.mask {
+  position: absolute;
+  top: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Space Mono', monospace;
-  font-size: 32px;
-  font-weight: 700;
-  color: #7c9ff5;
-}
-
-.avatar-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 50%;
+  background-color: black;
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.5s;
 }
-
-.avatar-preview:hover .avatar-overlay {
-  opacity: 1;
-}
-
-.upload-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
+/* +号图标 */
+.icon {
   color: white;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.2s;
+  font-size: 80px;
 }
-
-.upload-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.upload-btn svg {
-  width: 16px;
-  height: 16px;
+/* 头像 */
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 </style>
