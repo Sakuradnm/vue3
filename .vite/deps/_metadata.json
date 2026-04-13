@@ -1,49 +1,61 @@
 {
-  "hash": "558e4516",
+  "hash": "110befe6",
   "configHash": "22df5076",
-  "lockfileHash": "38d49c40",
-  "browserHash": "d7e86cdb",
+  "lockfileHash": "e76ae9be",
+  "browserHash": "095f4eb8",
   "optimized": {
     "@element-plus/icons-vue": {
       "src": "../../node_modules/@element-plus/icons-vue/dist/index.js",
       "file": "@element-plus_icons-vue.js",
-      "fileHash": "d2ab0d23",
+      "fileHash": "01566f3f",
       "needsInterop": false
     },
     "axios": {
       "src": "../../node_modules/axios/index.js",
       "file": "axios.js",
-      "fileHash": "cb026dc5",
+      "fileHash": "7e2795d7",
       "needsInterop": false
     },
     "element-plus": {
       "src": "../../node_modules/element-plus/es/index.mjs",
       "file": "element-plus.js",
-      "fileHash": "8b17b3ed",
+      "fileHash": "d6038768",
       "needsInterop": false
     },
     "element-plus/dist/locale/zh-cn.mjs": {
       "src": "../../node_modules/element-plus/dist/locale/zh-cn.mjs",
       "file": "element-plus_dist_locale_zh-cn__mjs.js",
-      "fileHash": "98fee9a0",
+      "fileHash": "56529bdd",
+      "needsInterop": false
+    },
+    "gsap": {
+      "src": "../../node_modules/gsap/index.js",
+      "file": "gsap.js",
+      "fileHash": "138a1a43",
+      "needsInterop": false
+    },
+    "gsap/ScrollTrigger": {
+      "src": "../../node_modules/gsap/ScrollTrigger.js",
+      "file": "gsap_ScrollTrigger.js",
+      "fileHash": "8d07b2bd",
+      "needsInterop": false
+    },
+    "three": {
+      "src": "../../node_modules/three/build/three.module.js",
+      "file": "three.js",
+      "fileHash": "7f62ad5d",
       "needsInterop": false
     },
     "vue": {
       "src": "../../node_modules/vue/dist/vue.runtime.esm-bundler.js",
       "file": "vue.js",
-      "fileHash": "ef9224f7",
+      "fileHash": "56233cc0",
       "needsInterop": false
     },
     "vue-router": {
       "src": "../../node_modules/vue-router/dist/vue-router.mjs",
       "file": "vue-router.js",
-      "fileHash": "d46d8a2c",
-      "needsInterop": false
-    },
-    "cropperjs": {
-      "src": "../../node_modules/cropperjs/dist/cropper.esm.raw.js",
-      "file": "cropperjs.js",
-      "fileHash": "2eb3cc04",
+      "fileHash": "606c04c7",
       "needsInterop": false
     }
   },

@@ -511,7 +511,7 @@ onUnmounted(() => {
                   <span>个人中心</span>
                 </div>
                 <div class="dropdown-item" @click="goToNotice">
-                  <svg-icon name="menu" :width="18" :height="18"/>
+                  <svg-icon name="notice" :width="18" :height="18"/>
                   <span>我的通知</span>
                   <div v-if="unreadNoticeCount > 0" class="notice-dot"></div>
                 </div>
@@ -521,7 +521,7 @@ onUnmounted(() => {
                 </div>
                 <div class="dropdown-divider"></div>
                 <div class="dropdown-item logout" @click="handleLogout">
-                  <svg-icon name="menu" :width="18" :height="18"/>
+                  <svg-icon name="logout" :width="18" :height="18"/>
                   <span>退出登录</span>
                 </div>
               </div>
@@ -552,13 +552,14 @@ onUnmounted(() => {
   width: 100%;
   z-index: 9999;
   backdrop-filter: blur(10px);
-  background-color: rgba(1, 10, 14, 0.95);
+  background-color: rgba(255, 255, 255, 0.95);
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 80px;
   box-sizing: border-box;
   padding: 0 60px;
+  border-bottom: 1px solid rgba(0, 102, 255, 0.1);
 }
 
 .logo {
@@ -570,12 +571,12 @@ onUnmounted(() => {
 
 .logo-text {
   display: block;
-  background: linear-gradient(110deg, #00d4ff 0%, #4fa3ff 40%, #a78bfa 80%);
+  background: linear-gradient(110deg, #0066FF 0%, #00D4FF 40%, #7C3AED 80%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 24px rgba(0, 212, 255, 0.4));
+  filter: drop-shadow(0 0 24px rgba(0, 102, 255, 0.3));
   font-size: 1.5rem;
   font-weight: 800;
 }
@@ -609,7 +610,7 @@ onUnmounted(() => {
 
 .nav-links a, .service-trigger {
   position: relative;
-  color: #fff;
+  color: #1a1a1a;
   text-decoration: none;
   font-weight: 500;
   padding: 0.5rem 0;
@@ -627,14 +628,12 @@ onUnmounted(() => {
   left: 0;
   width: 0;
   height: 2px;
-  background: #fff;
+  background: #0066FF;
   transition: width 0.3s ease;
 }
 .nav-links a:hover::after, .service-trigger:hover::after {
   width: 100%;
 }
-
-
 
 .search-container {
   position: relative;
@@ -646,10 +645,10 @@ onUnmounted(() => {
 .search-input {
   width: 200px;
   padding: 8px 40px 8px 12px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 102, 255, 0.05);
+  border: 1px solid rgba(0, 102, 255, 0.2);
   border-radius: 20px;
-  color: #fff;
+  color: #1a1a1a;
   font-size: 0.9rem;
   outline: none;
   transition: all 0.3s ease;
@@ -657,13 +656,13 @@ onUnmounted(() => {
 }
 
 .search-input:focus {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(0, 102, 255, 0.1);
+  border-color: rgba(0, 102, 255, 0.4);
   width: 240px;
 }
 
 .search-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(26, 26, 26, 0.5);
 }
 
 .search-btn {
@@ -671,7 +670,7 @@ onUnmounted(() => {
   right: 5px;
   background: transparent;
   border: none;
-  color: #fff;
+  color: #0066FF;
   padding: 5px 8px;
   cursor: pointer;
   display: flex;
@@ -689,11 +688,11 @@ onUnmounted(() => {
   top: calc(100% + 10px);
   left: 0;
   width: 240px;
-  background: rgba(1, 10, 14, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 102, 255, 0.2);
   border-radius: 8px;
   padding: 8px 0;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
   z-index: 1001;
   animation: slideDown 0.2s ease;
 }
@@ -711,13 +710,13 @@ onUnmounted(() => {
 
 .suggestion-item {
   padding: 10px 15px;
-  color: #fff;
+  color: #1a1a1a;
   cursor: pointer;
   transition: background 0.2s ease;
 }
 
 .suggestion-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 102, 255, 0.1);
 }
 
 .course-megamenu {
@@ -725,12 +724,12 @@ onUnmounted(() => {
   top: 80px;
   left: 0;
   width: 100%;
-  background: rgba(1, 10, 14, 0.98);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   padding: 40px 5%;
   z-index: 999;
   animation: slideDownMega 0.3s ease;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(0, 102, 255, 0.1);
 }
 
 @keyframes slideDownMega {
@@ -753,18 +752,18 @@ onUnmounted(() => {
 }
 
 .megamenu-column {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 102, 255, 0.03);
   border-radius: 12px;
   padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(0, 102, 255, 0.1);
   transition: all 0.3s ease;
 }
 
 .megamenu-column:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 102, 255, 0.06);
+  border-color: rgba(0, 102, 255, 0.2);
   transform: translateY(-5px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 102, 255, 0.1);
 }
 
 .category-header {
@@ -773,11 +772,11 @@ onUnmounted(() => {
   gap: 12px;
   margin-bottom: 20px;
   padding-bottom: 15px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 2px solid rgba(0, 102, 255, 0.2);
 }
 
 .category-header h3 {
-  color: #fff;
+  color: #1a1a1a;
   font-size: 1.1rem;
   font-weight: 600;
   margin: 0;
@@ -792,7 +791,7 @@ onUnmounted(() => {
 .course-card {
   display: block;
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 102, 255, 0.05);
   border-radius: 8px;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -800,10 +799,10 @@ onUnmounted(() => {
 }
 
 .course-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 102, 255, 0.1);
+  border-color: rgba(0, 102, 255, 0.3);
   transform: translateX(5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 5px 15px rgba(0, 102, 255, 0.15);
 }
 
 .course-image {
@@ -829,14 +828,14 @@ onUnmounted(() => {
 }
 
 .course-info h4 {
-  color: #fff;
+  color: #1a1a1a;
   font-size: 0.95rem;
   margin: 0 0 8px 0;
   font-weight: 600;
 }
 
 .course-info p {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(26, 26, 26, 0.6);
   font-size: 0.85rem;
   margin: 0;
   line-height: 1.4;
@@ -862,7 +861,7 @@ onUnmounted(() => {
 }
 
 .user-info-wrapper:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 102, 255, 0.1);
 }
 
 .user-icon-wrapper {
@@ -875,7 +874,7 @@ onUnmounted(() => {
 }
 
 .user-icon-wrapper:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 102, 255, 0.1);
 }
 
 .user-avatar {
@@ -886,15 +885,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 102, 255, 0.1);
+  border: 2px solid rgba(0, 102, 255, 0.3);
   position: relative;
   transition: all 0.3s ease;
 }
 
 .user-info-wrapper:hover .user-avatar {
-  border-color: rgba(255, 255, 255, 0.6);
-  box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+  border-color: rgba(0, 102, 255, 0.6);
+  box-shadow: 0 0 15px rgba(0, 102, 255, 0.2);
 }
 
 .avatar-img {
@@ -920,11 +919,11 @@ onUnmounted(() => {
   color: #fff;
   font-size: 18px;
   font-weight: 600;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0066FF 0%, #00D4FF 100%);
 }
 
 .username-text {
-  color: #fff;
+  color: #1a1a1a;
   font-size: 1rem;
   font-weight: 500;
   max-width: 100px;
@@ -953,11 +952,11 @@ onUnmounted(() => {
   top: calc(100% + 5px);
   right: 0;
   width: 240px;
-  background: rgba(1, 10, 14, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 102, 255, 0.15);
   border-radius: 12px;
   padding: 12px 0;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   z-index: 1001;
   backdrop-filter: blur(10px);
   animation: dropdownSlide 0.2s ease;
@@ -999,8 +998,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 102, 255, 0.1);
+  border: 2px solid rgba(0, 102, 255, 0.3);
   flex-shrink: 0;
   position: relative;
 }
@@ -1023,7 +1022,7 @@ onUnmounted(() => {
   color: #fff;
   font-size: 22px;
   font-weight: 600;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0066FF 0%, #00D4FF 100%);
 }
 
 .dropdown-info {
@@ -1032,7 +1031,7 @@ onUnmounted(() => {
 }
 
 .dropdown-username {
-  color: #fff;
+  color: #1a1a1a;
   font-size: 0.95rem;
   font-weight: 600;
   white-space: nowrap;
@@ -1041,7 +1040,7 @@ onUnmounted(() => {
 }
 
 .dropdown-level {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(26, 26, 26, 0.6);
   font-size: 0.8rem;
   margin-top: 4px;
 }
@@ -1062,14 +1061,14 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  color: #fff;
+  color: #1a1a1a;
   cursor: pointer;
   transition: all 0.2s ease;
   text-decoration: none;
 }
 
 .dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 102, 255, 0.1);
 }
 
 .dropdown-item.logout {
@@ -1119,8 +1118,8 @@ onUnmounted(() => {
   top: 80px;
   left: 0;
   width: 100%;
-  background: rgba(1, 10, 14, 0.70);
-  box-shadow: 0 5px 10px rgba(1, 10, 14, 0.85);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
   padding: 0.8rem 0;
   justify-content: center;
   align-items: center;

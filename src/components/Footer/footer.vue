@@ -5,8 +5,8 @@
       <div class="sf-brand">
         <svg viewBox="0 0 32 32" fill="none" width="22" height="22">
           <polygon points="16,2 30,10 30,22 16,30 2,22 2,10"
-                   stroke="#00ffb4" stroke-width="1.5" fill="rgba(0,255,180,0.06)"/>
-          <circle cx="16" cy="16" r="3" fill="#00ffb4"/>
+                   stroke="#0066FF" stroke-width="1.5" fill="rgba(0,102,255,0.06)"/>
+          <circle cx="16" cy="16" r="3" fill="#0066FF"/>
         </svg>
         <span class="sf-name">COURSHARE<em>.io</em></span>
       </div>
@@ -27,17 +27,16 @@
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
-/* ─── FOOTER ──────────────────────────────────────────── */
 .site-footer{
   position: relative; z-index: 2;
   padding: 2rem 6vw;
-  border-top: 1px solid rgba(0,255,180,0.08);
-  background: #020b10;
+  border-top: 1px solid rgba(0,102,255,0.15);
+  background: #ffffff;
 }
 .sf-line{
   height: 1px;
-  background: linear-gradient(90deg, transparent, #00ffb4, transparent);
-  margin-bottom: 1.5rem; opacity: 0.2;
+  background: linear-gradient(90deg, transparent, #0066FF, transparent);
+  margin-bottom: 1.5rem; opacity: 0.3;
 }
 .sf-row{
   display: flex; align-items: center;
@@ -46,22 +45,21 @@
 .sf-brand{
   display: flex; align-items: center; gap: 0.6rem;
   font-family: 'Orbitron', sans-serif; font-size: 0.72rem;
-  font-weight: 700; letter-spacing: 0.16em; color: #fff;
+  font-weight: 700; letter-spacing: 0.16em; color: #1a1a1a;
 }
-.sf-brand em{ font-style: normal; color: #00ffb4; }
+.sf-brand em{ font-style: normal; color: #0066FF; }
 .sf-copy{
   font-family: 'JetBrains Mono', monospace; font-size: 0.52rem;
-  letter-spacing: 0.1em; color: rgba(0,255,180,0.18);
+  letter-spacing: 0.1em; color: rgba(0,102,255,0.35);
 }
 .sf-links{ display: flex; gap: 1.5rem; }
 .sf-links a{
   font-family: 'JetBrains Mono', monospace; font-size: 0.56rem;
-  letter-spacing: 0.1em; color: rgba(150,210,180,0.35);
+  letter-spacing: 0.1em; color: rgba(0,102,255,0.5);
   text-decoration: none; transition: color 0.25s;
 }
-.sf-links a:hover{ color: #00ffb4; }
+.sf-links a:hover{ color: #0066FF; }
 
-/* ─── RESPONSIVE ──────────────────────────────────────── */
 @media(max-width:860px){
   .sf-row{
     flex-direction: column;

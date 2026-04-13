@@ -257,7 +257,7 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(1, 10, 14, 0.45);
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
   z-index: 1001;
   display: flex;
@@ -302,7 +302,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 1rem;
-  color: #fff;
+  color: #1a1a1a;
   text-decoration: none;
   font-size: 1.25rem;
   padding: 1rem;
@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
 }
 
 .unmenu-link:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 102, 255, 0.08);
   transform: translateX(10px);
 }
 
@@ -343,7 +343,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 1rem;
-  color: #fff;
+  color: #1a1a1a;
   text-decoration: none;
   font-size: 1.1rem;
   padding: 0.75rem;
@@ -352,7 +352,7 @@ onBeforeUnmount(() => {
 }
 
 .mobile-submenu-link:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 102, 255, 0.08);
   transform: translateX(5px);
 }
 </style>
