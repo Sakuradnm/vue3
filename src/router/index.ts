@@ -8,6 +8,7 @@ import CourseDetail from "@/views/Course/Detail/Detail.vue"
 
 import Upload from "@/views/Upload/index.vue"
 import Forum from "@/views/Forum/index.vue"
+import ForumDetail from "@/views/Forum/Detail/index.vue"
 import Brand from "@/views/Brand/index.vue";
 import Users from '@/views/Users/index.vue'
 
@@ -53,6 +54,11 @@ const routes = [
         path: '/Forum',
         name: 'Forum',
         component: Forum
+    },
+    {
+        path: '/forum/:id',
+        name: 'ForumDetail',
+        component: ForumDetail
     },
     {
         path: '/Agreement',

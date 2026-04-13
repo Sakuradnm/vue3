@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { getForumPosts, createPost, type CreatePostData } from '@/api/forum';
 import type { ForumPostItem } from '@/api/forum';
 import { ElMessage } from 'element-plus';
+
+const router = useRouter();
 
 // ── State ────────────────────────────────────────────────
 const activeCategory = ref('all');
@@ -201,6 +204,11 @@ function toggleBookmark(id) {
   if (bookmarked.has(id)) bookmarked.delete(id);
   else bookmarked.add(id);
 }
+
+function goToDetail(postId: number) {
+  router.push(`/forum/${postId}`);
+}
+
 function fmtNum(n) {
   return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n;
 }
@@ -650,6 +658,7 @@ onUnmounted(() => {
           <article v-for="(post, i) in filteredPosts" :key="post.id"
                    class="post-card fade-up visible"
                    :style="`animation-delay:${i * 0.06}s`"
+                   @click="goToDetail(post.id)"
                    @mouseenter="hoveredPost = post.id"
                    @mouseleave="hoveredPost = -1">
 
@@ -720,7 +729,7 @@ onUnmounted(() => {
                         <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
                       </svg>
                     </button>
-                    <button class="pcf-share">
+                    <button class="pcf-share" @click.stop>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/>
                         <circle cx="18" cy="19" r="3"/>
