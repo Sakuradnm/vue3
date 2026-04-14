@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getForumPostDetail, likePost, getComments, createComment, likeComment, type ForumPostDetailItem, type ForumCommentItem } from '@/api/forum'
-import { ElMessage } from 'element-plus'
+import { getForumPostDetail, likePost, getPostLikeStatus, getComments, createComment, likeComment, getCommentLikeStatus, deleteComment, type ForumPostDetailItem, type ForumCommentItem } from '@/api/forum'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ChatRound, Star } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -12,6 +12,8 @@ const commentContent = ref('')
 const replyTo = ref<{ id: number; username: string } | null>(null)
 const loading = ref(false)
 const liked = ref(false)
+// 使用 Set 追踪用户点赞的评论ID
+const likedComments = ref(new Set<number>())
 
 const fetchPostDetail = async () => {
   const postId = Number(route.params.id)
@@ -21,9 +23,24 @@ const fetchPostDetail = async () => {
   try {
     const res = await getForumPostDetail(postId)
     post.value = res
+    
+    // 获取当前用户的点赞状态
+    const userInfoStr = localStorage.getItem('userInfo')
+    if (userInfoStr) {
+      const userInfo = JSON.parse(userInfoStr)
+      if (userInfo.id) {
+        try {
+          const likeStatus = await getPostLikeStatus(postId, Number(userInfo.id))
+          liked.value = likeStatus.liked
+        } catch (error) {
+          console.error('获取点赞状态失败:', error)
+          liked.value = false
+        }
+      }
+    }
+    
     await fetchComments(postId)
   } catch (error: any) {
-    console.error('加载失败:', error)
     ElMessage.error(error?.message || '加载失败')
   } finally {
     loading.value = false
@@ -34,21 +51,85 @@ const fetchComments = async (postId: number) => {
   try {
     const res = await getComments(postId)
     comments.value = res
+    
+    // 获取当前用户对所有评论的点赞状态
+    await fetchCommentLikeStatuses()
   } catch (error) {
-    console.error('获取评论失败', error)
     comments.value = []
   }
 }
 
+// 获取用户对所有评论的点赞状态
+const fetchCommentLikeStatuses = async () => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (!userInfoStr) return
+  
+  const userInfo = JSON.parse(userInfoStr)
+  if (!userInfo.id) return
+  
+  const userId = Number(userInfo.id)
+  
+  // 收集所有评论ID（包括子评论）
+  const commentIds: number[] = []
+  const collectCommentIds = (comments: ForumCommentItem[]) => {
+    comments.forEach(comment => {
+      commentIds.push(comment.id)
+      if (comment.children && comment.children.length > 0) {
+        collectCommentIds(comment.children)
+      }
+    })
+  }
+  collectCommentIds(comments.value)
+  
+  // 批量获取点赞状态
+  const promises = commentIds.map(async (commentId) => {
+    try {
+      const status = await getCommentLikeStatus(commentId, userId)
+      if (status.liked) {
+        likedComments.value.add(commentId)
+      }
+    } catch (error) {
+      // 忽略单个请求失败
+    }
+  })
+  
+  await Promise.all(promises)
+}
+
 const handleLike = async () => {
   if (!post.value) return
+
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (!userInfoStr) {
+    ElMessage.warning('请先登录')
+    return
+  }
+
+  const userInfo = JSON.parse(userInfoStr)
+
+  if (!userInfo.id) {
+    ElMessage.error('用户信息异常，请重新登录')
+    return
+  }
+
   try {
-    await likePost(post.value.id)
-    post.value.likes++
-    liked.value = true
-    ElMessage.success('点赞成功')
-  } catch (error) {
-    ElMessage.error('操作失败')
+    // 根据当前点赞状态决定是点赞还是取消点赞
+    const action = liked.value ? 'unlike' : 'like'
+    await likePost(post.value.id, Number(userInfo.id), action)
+    
+    if (action === 'like') {
+      // 点赞成功
+      post.value.likes++
+      liked.value = true
+      ElMessage.success('点赞成功')
+    } else {
+      // 取消点赞成功
+      post.value.likes = Math.max(0, post.value.likes - 1)
+      liked.value = false
+      ElMessage.info('已取消点赞')
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.response?.data?.error || error?.message || '操作失败')
   }
 }
 
@@ -60,11 +141,19 @@ const handleSubmitComment = async () => {
 
   if (!post.value) return
 
+  // 从 localStorage 获取当前登录用户信息
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (!userInfoStr) {
+    ElMessage.warning('请先登录')
+    return
+  }
+
+  const userInfo = JSON.parse(userInfoStr)
+
   try {
-    const userId = 1
     await createComment({
       postId: post.value.id,
-      userId,
+      userId: Number(userInfo.id),
       parentId: replyTo.value?.id || 0,
       content: commentContent.value
     })
@@ -84,15 +173,103 @@ const handleReply = (comment: ForumCommentItem) => {
 }
 
 const handleLikeComment = async (commentId: number) => {
+  // 从 localStorage 获取当前登录用户信息
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (!userInfoStr) {
+    ElMessage.warning('请先登录')
+    return
+  }
+
+  const userInfo = JSON.parse(userInfoStr)
+
   try {
-    await likeComment(commentId)
-    ElMessage.success('点赞成功')
+    // 根据当前点赞状态决定是点赞还是取消点赞
+    const isLiked = likedComments.value.has(commentId)
+    const action = isLiked ? 'unlike' : 'like'
+    await likeComment(commentId, Number(userInfo.id), action)
+    
+    if (action === 'like') {
+      // 点赞成功
+      likedComments.value.add(commentId)
+      ElMessage.success('点赞成功')
+    } else {
+      // 取消点赞成功
+      likedComments.value.delete(commentId)
+      ElMessage.info('已取消点赞')
+    }
+    
+    // 重新加载评论列表以更新点赞数
     if (post.value) {
       await fetchComments(post.value.id)
     }
   } catch (error) {
     ElMessage.error('操作失败')
   }
+}
+
+// 辅助函数：根据ID查找评论（包括子评论）
+const findCommentById = (comments: ForumCommentItem[], id: number): ForumCommentItem | null => {
+  for (const comment of comments) {
+    if (comment.id === id) return comment
+    if (comment.children && comment.children.length > 0) {
+      const found = findCommentById(comment.children, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+const handleDeleteComment = async (commentId: number) => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (!userInfoStr) {
+    ElMessage.warning('请先登录')
+    return
+  }
+
+  const userInfo = JSON.parse(userInfoStr)
+  const currentUserId = Number(userInfo.id)
+  
+  // 帖子所有者ID
+  const postOwnerId = post.value?.userId || 0
+
+  try {
+    await ElMessageBox.confirm(
+      '确定要删除这条评论吗？',
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    await deleteComment(commentId, currentUserId, postOwnerId)
+    ElMessage.success('删除成功')
+    
+    // 重新加载评论列表
+    if (post.value) {
+      await fetchComments(post.value.id)
+      // 更新帖子评论数
+      post.value.comments = Math.max(0, post.value.comments - 1)
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.response?.data?.error || '删除失败')
+    }
+  }
+}
+
+// 检查是否有权限删除评论
+const canDeleteComment = (comment: ForumCommentItem): boolean => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (!userInfoStr) return false
+  
+  const userInfo = JSON.parse(userInfoStr)
+  const currentUserId = Number(userInfo.id)
+  const postOwnerId = post.value?.userId || 0
+  
+  // 帖子所有者或评论作者可以删除
+  return currentUserId === postOwnerId || currentUserId === comment.userId
 }
 
 const goBack = () => {
@@ -140,7 +317,7 @@ onMounted(() => {
                 <span class="stat-label">点赞</span>
               </div>
               <div class="stat-box">
-                <span class="stat-number">{{ comments.length }}</span>
+                <span class="stat-number">{{ post.comments }}</span>
                 <span class="stat-label">评论</span>
               </div>
             </div>
@@ -166,6 +343,28 @@ onMounted(() => {
           <article class="post-card">
             <div class="accent-bar"></div>
             <h1 class="post-title">{{ post.title }}</h1>
+            
+            <!-- 作者和发布时间 -->
+            <div class="post-meta">
+              <div class="meta-author">
+                <div class="author-avatar">
+                  <img v-if="post.avatar" :src="post.avatar" :alt="post.author" />
+                  <span v-else>{{ post.author?.charAt(0)?.toUpperCase() }}</span>
+                </div>
+                <span class="author-name">{{ post.author }}</span>
+              </div>
+              <div class="meta-time">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <span>{{ post.createdAt }}</span>
+              </div>
+            </div>
+            
+            <!-- 副标题（在 post-meta 之下） -->
+            <div v-if="post.subtitle" class="post-subtitle">{{ post.subtitle }}</div>
+            
             <div class="post-body" v-html="post.content"></div>
           </article>
 
@@ -226,6 +425,13 @@ onMounted(() => {
                         <button class="action-btn" @click="handleReply(comment)">
                           回复
                         </button>
+                        <button 
+                          v-if="canDeleteComment(comment)" 
+                          class="action-btn delete-btn" 
+                          @click="handleDeleteComment(comment.id)"
+                        >
+                          删除
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -248,6 +454,13 @@ onMounted(() => {
                           </button>
                           <button class="action-btn small" @click="handleReply(reply)">
                             回复
+                          </button>
+                          <button 
+                            v-if="canDeleteComment(reply)" 
+                            class="action-btn small delete-btn" 
+                            @click="handleDeleteComment(reply.id)"
+                          >
+                            删除
                           </button>
                         </div>
                       </div>
@@ -362,6 +575,7 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .avatar-placeholder {
@@ -506,10 +720,71 @@ onMounted(() => {
   line-height: 1.3;
 }
 
+.post-subtitle {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 24px;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.post-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  margin-bottom: 32px;
+  border-top: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.meta-author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.author-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #eef2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #0066FF;
+}
+
+.author-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.author-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.meta-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #999;
+}
+
 .post-body {
   font-size: 16px;
   line-height: 1.8;
   color: #333;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .post-body :deep(h2) {
@@ -528,12 +803,49 @@ onMounted(() => {
 
 .post-body :deep(p) {
   margin: 16px 0;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .post-body :deep(img) {
   max-width: 100%;
+  height: auto;
   border-radius: 8px;
   margin: 20px 0;
+  display: block;
+}
+
+.post-body :deep(video) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 20px 0;
+  display: block;
+}
+
+.post-body :deep(ul),
+.post-body :deep(ol) {
+  margin: 16px 0;
+  padding-left: 24px;
+}
+
+.post-body :deep(li) {
+  margin: 8px 0;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.post-body :deep(a) {
+  color: #0066FF;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.post-body :deep(a):hover {
+  border-bottom-color: #0066FF;
 }
 
 .comments-section {
@@ -756,6 +1068,15 @@ onMounted(() => {
 .action-btn:hover {
   background: rgba(0, 102, 255, 0.1);
   color: #0066FF;
+}
+
+.action-btn.delete-btn {
+  color: #ff4d4f;
+}
+
+.action-btn.delete-btn:hover {
+  background: rgba(255, 77, 79, 0.1);
+  color: #ff4d4f;
 }
 
 .action-btn.small {

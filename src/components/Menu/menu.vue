@@ -106,7 +106,7 @@ const checkLoginStatus = async () => {
       localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
       isLoggedIn.value = true
     } catch (error) {
-      console.error('获取用户信息失败:', error)
+      // 静默处理错误
       userInfo.value = user
       userInfo.value.avatar = user.avatarUrl || user.avatar_url || user.avatar || ''
       isLoggedIn.value = true
@@ -147,7 +147,6 @@ const handleStorageChange = (e: StorageEvent) => {
         }
         isLoggedIn.value = true
       } catch (error) {
-        console.error('解析用户信息失败:', error)
         checkLoginStatus()
       }
     } else {

@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref, reactive } from 'vue';
+import { onMounted, onUnmounted, ref, reactive, computed } from 'vue';
 
 const rootRef = ref(null);
 const mouseX = ref(0);
@@ -9,6 +9,12 @@ const activeTab = ref(0);
 const hoveredMember = ref(-1);
 const countersStarted = ref(false);
 const counts = reactive({ resources: 0, users: 0, topics: 0, rating: 0 });
+
+// 检查用户登录状态
+const isLoggedIn = computed(() => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  return !!userInfoStr
+})
 
 let rafId = null;
 let particleRafId = null;
@@ -516,7 +522,7 @@ onUnmounted(() => {
               <polyline points="12 5 19 12 12 19"/>
             </svg>
           </router-link>
-          <router-link to="/Users" class="btn-ghost lg">
+          <router-link v-if="!isLoggedIn" to="/Users" class="btn-ghost lg">
             加入我们的团队
           </router-link>
         </div>

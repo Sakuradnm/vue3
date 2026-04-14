@@ -259,6 +259,9 @@ const initThree = () => {
   
   // 滚动事件
   window.addEventListener('scroll', onScroll)
+  
+  // 窗口大小调整事件
+  window.addEventListener('resize', onResize)
 }
 
 const onResize = () => {

@@ -9,6 +9,7 @@ import CourseDetail from "@/views/Course/Detail/Detail.vue"
 import Upload from "@/views/Upload/index.vue"
 import Forum from "@/views/Forum/index.vue"
 import ForumDetail from "@/views/Forum/Detail/index.vue"
+import ForumUpload from "@/views/Forum/Upload/index.vue"
 import Brand from "@/views/Brand/index.vue";
 import Users from '@/views/Users/index.vue'
 
@@ -17,10 +18,6 @@ import Agreement from "@/views/HelpSection/agreement.vue";
 import Policy from "@/views/HelpSection/policy.vue";
 import Help from "@/views//HelpSection/help.vue";
 import Customer from "@/views/HelpSection/customer.vue";
-
-// 服务
-import Finance from "@/views/Service/finance/index.vue";
-import Maintenance from "@/views/Service/maintenance/index.vue";
 
 // 用户相关
 import PersonalCenter from '@/views/Users/PersonalCenter/PersonalCenter.vue'
@@ -61,6 +58,12 @@ const routes = [
         component: ForumDetail
     },
     {
+        path: '/Forum/Upload',
+        name: 'ForumUpload',
+        component: ForumUpload,
+        meta: { requiresAuth: true }
+    },
+    {
         path: '/Agreement',
         name: 'Agreement',
         component: Agreement
@@ -79,20 +82,6 @@ const routes = [
         path: '/Customer',
         name: 'Customer',
         component: Customer
-    },
-
-
-    //  服务
-    {
-        path: '/Finance',
-        name: 'Finance',
-        component: Finance
-    },
-
-    {
-        path: '/Maintenance',
-        name: 'Maintenance',
-        component: Maintenance
     },
     {
         path: '/Course',

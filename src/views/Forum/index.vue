@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { getForumPosts, createPost, type CreatePostData } from '@/api/forum';
+import { getForumPosts, createPost, likePost, getPostLikeStatus, type CreatePostData, getForumCategories, type ForumCategory } from '@/api/forum';
 import type { ForumPostItem } from '@/api/forum';
 import { ElMessage } from 'element-plus';
 
@@ -12,7 +12,6 @@ const activeCategory = ref('all');
 const searchQuery = ref('');
 const sortBy = ref('new'); // 默认按最新排序
 const sortDirection = ref<'asc' | 'desc'>('desc'); // 排序方向：desc=降序, asc=升序
-const showCompose = ref(false);
 const likedPosts = reactive(new Set());
 const bookmarked = reactive(new Set());
 const hoveredPost = ref(-1);
@@ -21,23 +20,10 @@ const mouseY = ref(0);
 let particleRafId = null;
 let observers = [];
 
-// 发帖表单状态
-const composeForm = reactive({
-  title: '',
-  category: 'frontend',
-  content: '',
-  tags: ''
-});
-
 // ── Data ────────────────────────────────────────────────
-const categories = [
-  { id: 'all',      label: '全部',      icon: '◈', count: 0, color: '#00ffb4' },
-  { id: 'frontend', label: '前端开发',  icon: '⬡', count: 0, color: '#00c8ff' },
-  { id: 'algo',     label: '算法与数据', icon: '◆', count: 0, color: '#a78bfa' },
-  { id: 'backend',  label: '后端架构',  icon: '◉', count: 0, color: '#ff6b35' },
-  { id: 'design',   label: 'UI/UX 设计',icon: '◇', count: 0, color: '#ffd93d' },
-  { id: 'career',   label: '求职经验',  icon: '◎', count: 0, color: '#00ffb4' },
-];
+const categories = ref<ForumCategory[]>([
+  { id: 0, categoryId: 'all', label: '全部', icon: '◈', color: '#00ffb4', sortOrder: 0 }
+]);
 
 const allPosts = ref<ForumPostItem[]>([]);
 const loading = ref(false);
@@ -66,7 +52,7 @@ const activeUsers = [
 const sortedAndFilteredPosts = computed(() => {
   let list = allPosts.value;
 
-  // 分类过滤
+  // 分类过滤：使用 category 进行匹配
   if (activeCategory.value !== 'all') {
     list = list.filter(p => p.category === activeCategory.value);
   }
@@ -121,7 +107,7 @@ const filteredPosts = computed(() => {
 });
 
 const activeCatData = computed(() =>
-    categories.find(c => c.id === activeCategory.value) || categories[0]
+    categories.value.find(c => c.categoryId === activeCategory.value) || categories.value[0]
 );
 
 // ── Actions ───────────────────────────────────────────────
@@ -143,21 +129,51 @@ async function fetchPosts() {
   try {
     const params: any = {};
     if (activeCategory.value !== 'all') {
+      // 直接使用 activeCategory 作为筛选条件（对应数据库的 category 字段）
       params.category = activeCategory.value;
     }
     if (searchQuery.value.trim()) {
       params.keyword = searchQuery.value.trim();
     }
+    // 添加排序参数
+    params.sortBy = sortBy.value;
 
     const response = await getForumPosts(params);
+    
     allPosts.value = response;
     updateHasMore();
     updateCategoryCounts();
+    
+    // 获取当前用户的点赞状态
+    await fetchUserLikeStatus();
   } catch (error) {
-    console.error('Failed to fetch posts:', error);
+    // 静默处理错误，不输出到控制台
   } finally {
     loading.value = false;
   }
+}
+
+async function fetchUserLikeStatus() {
+  const userInfoStr = localStorage.getItem('userInfo');
+  if (!userInfoStr) return;
+  
+  const userInfo = JSON.parse(userInfoStr);
+  if (!userInfo.id) return;
+  
+  // 批量获取用户对所有帖子的点赞状态
+  const userId = Number(userInfo.id);
+  const promises = allPosts.value.map(async (post) => {
+    try {
+      const status = await getPostLikeStatus(post.id, userId);
+      if (status.liked) {
+        likedPosts.add(post.id);
+      }
+    } catch (error) {
+      // 忽略单个请求失败
+    }
+  });
+  
+  await Promise.all(promises);
 }
 
 function updateHasMore() {
@@ -180,26 +196,51 @@ function updateCategoryCounts() {
   allPosts.value.forEach(post => {
     counts[post.category] = (counts[post.category] || 0) + 1;
   });
-  categories.forEach(cat => {
-    if (cat.id === 'all') {
-      cat.count = allPosts.value.length;
+  categories.value.forEach(cat => {
+    if (cat.categoryId === 'all') {
+      // "全部"不显示数量
     } else {
-      cat.count = counts[cat.id] || 0;
+      cat.count = counts[cat.categoryId] || 0;
     }
   });
 }
 
-function toggleLike(id) {
-  if (likedPosts.has(id)) {
-    likedPosts.delete(id);
-    const p = allPosts.value.find(p => p.id === id);
-    if (p) p.likes--;
-  } else {
-    likedPosts.add(id);
-    const p = allPosts.value.find(p => p.id === id);
-    if (p) p.likes++;
+async function toggleLike(postId: number) {
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (!userInfoStr) {
+    ElMessage.warning('请先登录')
+    return
+  }
+
+  const userInfo = JSON.parse(userInfoStr)
+
+  if (!userInfo.id) {
+    ElMessage.error('用户信息异常，请重新登录')
+    return
+  }
+
+  try {
+    // 根据当前点赞状态决定是点赞还是取消点赞
+    const action = likedPosts.has(postId) ? 'unlike' : 'like'
+    await likePost(postId, userInfo.id, action)
+    const post = allPosts.value.find(p => p.id === postId)
+
+    if (action === 'like') {
+      // 点赞成功
+      if (post) post.likes++
+      likedPosts.add(postId)
+      ElMessage.success('点赞成功')
+    } else {
+      // 取消点赞成功
+      if (post) post.likes = Math.max(0, post.likes - 1)
+      likedPosts.delete(postId)
+      ElMessage.info('已取消点赞')
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.response?.data?.error || error?.message || '操作失败')
   }
 }
+
 function toggleBookmark(id) {
   if (bookmarked.has(id)) bookmarked.delete(id);
   else bookmarked.add(id);
@@ -209,8 +250,23 @@ function goToDetail(postId: number) {
   router.push(`/forum/${postId}`);
 }
 
+function goToUpload() {
+  const userInfoStr = localStorage.getItem('userInfo');
+  if (!userInfoStr) {
+    ElMessage.warning('请先登录');
+    return;
+  }
+  router.push('/Forum/Upload');
+}
+
 function fmtNum(n) {
   return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n;
+}
+
+// 获取分类颜色（用于帖子标签）
+function getCategoryColor(categoryId: string): string {
+  const category = categories.value.find(c => c.categoryId === categoryId);
+  return category?.color || '#0066FF';
 }
 
 function highlightText(text: string, query: string) {
@@ -385,10 +441,7 @@ async function submitPost() {
     // 切换到最新排序，确保能看到新帖子
     sortBy.value = 'new';
     sortDirection.value = 'desc';
-
-    console.log('新帖子已创建:', newPost);
   } catch (error) {
-    console.error('Failed to create post:', error);
     ElMessage.error('发帖失败，请重试');
   }
 }
@@ -402,8 +455,27 @@ onMounted(() => {
   window.addEventListener('scroll', handleScroll);
   window.addEventListener('resize', updateSidebarTopOffset);
   updateSidebarTopOffset();
+  
+  // 加载分类列表
+  loadCategories();
+  
+  // 初始加载帖子
   fetchPosts();
 });
+
+// 加载分类列表
+async function loadCategories() {
+  try {
+    const res = await getForumCategories()
+    // 在开头添加“全部”选项
+    categories.value = [
+      { id: 0, categoryId: 'all', label: '全部', icon: '◈', color: '#00ffb4', sortOrder: 0 },
+      ...res
+    ]
+  } catch (error) {
+    // 静默处理错误
+  }
+}
 
 watch([activeCategory, sortBy, sortDirection], () => {
   currentPage.value = 1; // 重置页码
@@ -458,7 +530,7 @@ onUnmounted(() => {
           <span class="ns-val">{{ activeUsers.filter(u=>u.online).length }}</span>
           <span class="ns-label">在线</span>
         </div>
-        <button class="compose-btn" @click="showCompose = !showCompose">
+        <button class="compose-btn" @click="goToUpload">
           <span class="cb-sweep"></span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -467,41 +539,6 @@ onUnmounted(() => {
         </button>
       </div>
     </nav>
-
-    <!-- ══ COMPOSE MODAL ══════════════════════════════════ -->
-    <transition name="modal-fade">
-      <div v-if="showCompose" class="compose-overlay" @click.self="showCompose = false">
-        <div class="compose-modal">
-          <div class="cm-header">
-            <span class="cm-tag">[ NEW_POST ]</span>
-            <h3 class="cm-title">发布新帖</h3>
-            <button class="cm-close" @click="showCompose = false">✕</button>
-          </div>
-          <div class="cm-body">
-            <input v-model="composeForm.title" class="cm-field" placeholder="帖子标题…" maxlength="100" />
-            <div class="cm-cats">
-              <button v-for="c in categories.slice(1)" :key="c.id"
-                      class="cm-cat-btn"
-                      :class="{ 'cm-cat-active': composeForm.category === c.id }"
-                      :style="`--cc:${c.color}`"
-                      @click="composeForm.category = c.id">
-                {{ c.icon }} {{ c.label }}
-              </button>
-            </div>
-            <textarea v-model="composeForm.content" class="cm-textarea" placeholder="分享你的知识、问题或资源…" rows="8"></textarea>
-            <input v-model="composeForm.tags" class="cm-field" placeholder="标签（用空格或逗号分隔，最多5个）…" />
-          </div>
-          <div class="cm-footer">
-            <button class="cm-cancel" @click="showCompose = false">取消</button>
-            <button class="cm-submit" @click="submitPost">
-              <span class="cb-sweep"></span>
-              发布帖子
-            </button>
-          </div>
-          <div class="cm-deco"></div>
-        </div>
-      </div>
-    </transition>
 
     <!-- ══ FORUM HERO ══════════════════════════════════════ -->
     <header class="forum-hero fade-up" ref="forumHeroRef">
@@ -542,9 +579,9 @@ onUnmounted(() => {
           <div class="cat-list">
             <button v-for="cat in categories" :key="cat.id"
                     class="cat-item"
-                    :class="{ active: activeCategory === cat.id }"
+                    :class="{ active: activeCategory === cat.categoryId }"
                     :style="`--cc:${cat.color}`"
-                    @click="activeCategory = cat.id">
+                    @click="activeCategory = cat.categoryId">
               <span class="ci-icon">{{ cat.icon }}</span>
               <span class="ci-label">{{ cat.label }}</span>
               <div class="ci-bar"></div>
@@ -589,7 +626,7 @@ onUnmounted(() => {
         <div class="toolbar fade-up">
           <div class="tb-left">
             <!-- 发帖按钮 -->
-            <button class="tb-compose-btn" @click="showCompose = true">
+            <button class="tb-compose-btn" @click="goToUpload">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
@@ -686,9 +723,10 @@ onUnmounted(() => {
               <div class="pc-body">
                 <div class="pc-meta">
                   <span class="pc-cat" :style="`
-                    color:${categories.find(c=>c.id===post.category)?.color || '#00ffb4'};
-                    border-color:${categories.find(c=>c.id===post.category)?.color || '#00ffb4'}33;
-                    background:${categories.find(c=>c.id===post.category)?.color || '#00ffb4'}0d
+                    --cat-color: ${getCategoryColor(post.category)};
+                    color: var(--cat-color);
+                    border-color: var(--cat-color)33;
+                    background: var(--cat-color)0d
                   `">
                     {{ post.categoryLabel }}
                   </span>
@@ -744,8 +782,8 @@ onUnmounted(() => {
 
             <!-- Hover progress bar -->
             <div class="pc-progress"
-                 :style="`width:${hoveredPost === post.id ? '100%' : '0'}`"
-                 :class="`color-${post.category}`"></div>
+                 :style="`width:${hoveredPost === post.id ? '100%' : '0'}; background: linear-gradient(90deg, ${getCategoryColor(post.category)}, ${getCategoryColor(post.category)}cc); box-shadow: 0 0 8px ${getCategoryColor(post.category)}66`">
+            </div>
 
             <!-- Corner deco -->
             <div class="pc-corner tl"></div>
@@ -1498,6 +1536,10 @@ onUnmounted(() => {
   font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
   letter-spacing: 0.12em; padding: 0.15rem 0.5rem;
   border: 1px solid;
+  color: var(--cat-color, #0066FF);
+  border-color: var(--cat-color, #0066FF)33;
+  background: var(--cat-color, #0066FF)0d;
+  transition: all 0.25s;
 }
 .pc-hot {
   font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
@@ -1580,15 +1622,8 @@ onUnmounted(() => {
 .pc-progress {
   position: absolute; bottom: 0; left: 0;
   height: 2px;
-  background: linear-gradient(90deg, #0066FF, #0080ff);
-  box-shadow: 0 0 8px rgba(0,102,255,0.4);
   transition: width 0.4s cubic-bezier(0.25,1,0.5,1);
 }
-.pc-progress.color-frontend { background: linear-gradient(90deg, #0066FF, #0080ff); }
-.pc-progress.color-algo { background: linear-gradient(90deg, #a78bfa, #0066FF); }
-.pc-progress.color-backend { background: linear-gradient(90deg, #ff6b35, #ffd93d); }
-.pc-progress.color-design { background: linear-gradient(90deg, #ffd93d, #ff6b35); }
-.pc-progress.color-career { background: linear-gradient(90deg, #0066FF, #0080ff); }
 
 /* Corner decoration */
 .pc-corner {

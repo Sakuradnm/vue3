@@ -23,6 +23,23 @@ export interface CourseItem {
     subCategoryId: number
 }
 
+export interface SubCategoryWithCourses {
+    id: number
+    name: string
+    description: string
+    sortOrder: number
+    categoryId: number
+    courses: CourseItem[]
+}
+
+export interface CourseTreeItem {
+    id: number
+    name: string
+    description: string
+    sortOrder: number
+    subCategories: SubCategoryWithCourses[]
+}
+
 export interface CourseDetailItem {
     id: number
     courseId: number
@@ -44,6 +61,16 @@ export interface CourseDetailItem {
 export const getAllCategories = () => {
     return request<CategoryItem[]>({
         url: '/api/categories',
+        method: 'get'
+    })
+}
+
+/**
+ * 获取完整的课程树结构（一次性返回所有分类、子分类和课程）
+ */
+export const getFullCourseTree = () => {
+    return request<CourseTreeItem[]>({
+        url: '/api/categories/tree',
         method: 'get'
     })
 }

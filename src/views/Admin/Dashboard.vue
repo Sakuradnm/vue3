@@ -342,7 +342,7 @@ const fetchUserList = async () => {
       ElMessage.error(error.value)
     }
   } catch (err) {
-    console.error('获取用户列表失败:', err)
+    // 静默处理错误
     error.value = '网络错误，请稍后重试'
     ElMessage.error('网络错误，请稍后重试')
   } finally {
@@ -410,7 +410,6 @@ const deleteUser = (user: UserData) => {
       // 重新加载用户列表
       await fetchUserList()
     } catch (err) {
-      console.error('删除用户失败:', err)
       ElMessage.error('删除失败，请稍后重试')
     }
   }).catch(() => {})

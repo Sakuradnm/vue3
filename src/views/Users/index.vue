@@ -195,7 +195,6 @@ export default {
           ElMessage.error('账号、密码或级别不匹配')
         }
       } catch (error) {
-        console.error('登录失败:', error)
         ElMessage.error(error.response?.data?.message || error.message || '登录失败，请检查网络连接')
       }
     }
@@ -291,7 +290,6 @@ export default {
         startCountdown('register')
       } catch (error) {
         ElMessage.error('网络错误，请稍后重试')
-        console.error('发送验证码失败:', error)
       }
     }
 

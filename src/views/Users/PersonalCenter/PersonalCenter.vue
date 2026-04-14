@@ -84,7 +84,7 @@ const loadUserInfo = async () => {
     })
     Object.assign(formData, userInfo)
   } catch (error) {
-    console.error('加载用户信息失败:', error)
+    // 静默处理错误
     showToast('加载用户信息失败', 'err')
   }
 }

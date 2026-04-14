@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAllCategories, getSubCategoriesByCategoryId, getCoursesBySubCategoryId } from '@/api/course'
+import { getFullCourseTree } from '@/api/course'
+import * as THREE from 'three'
 
 const router = useRouter()
 const selectedCategory = ref(-1)
@@ -16,6 +17,23 @@ let observers: IntersectionObserver[] = []
 const categories = ref<any[]>([])
 const loading = ref(true)
 
+// Three.js 相关状态
+const threeCanvasRef = ref<HTMLCanvasElement | null>(null)
+let threeScene: THREE.Scene | null = null
+let threeCamera: THREE.PerspectiveCamera | null = null
+let threeRenderer: THREE.WebGLRenderer | null = null
+let threeAnimationId: number | null = null
+let rotatingGroup: THREE.Group | null = null
+
+// 全息知识图谱相关
+let graphNodes: THREE.Points | null = null
+let graphLines: THREE.LineSegments | null = null
+let nodeLabels: Array<{ mesh: THREE.Mesh; data: any }> = []
+let raycaster = new THREE.Raycaster()
+let mousePosition = new THREE.Vector2()
+let hoveredNodeIndex = -1
+const nodeData = ref<any[]>([])
+
 // 搜索相关状态
 const searchInputFocused = ref(false)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -23,6 +41,369 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 // 分页相关状态
 const currentPage = ref(1)
 const pageSize = 6
+
+// ─── Three.js 全息投影知识图谱 ──────────────────────────
+function initThreeJS() {
+  const canvas = threeCanvasRef.value
+  if (!canvas) return
+
+  // 创建场景
+  threeScene = new THREE.Scene()
+
+  // 创建相机
+  const width = canvas.clientWidth
+  const height = canvas.clientHeight
+  threeCamera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000)
+  threeCamera.position.z = 12
+
+  // 创建渲染器
+  threeRenderer = new THREE.WebGLRenderer({ 
+    canvas, 
+    alpha: true,
+    antialias: true 
+  })
+  threeRenderer.setSize(width, height)
+  threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+
+  // 生成节点数据（基于真实课程数据）
+  generateNodeData()
+
+  // 创建节点（使用ShaderMaterial实现发光效果）
+  createHolographicNodes()
+
+  // 创建连接线
+  createConnectionLines()
+
+  // 添加光源
+  const ambientLight = new THREE.AmbientLight(0x4040ff, 0.5)
+  threeScene.add(ambientLight)
+
+  const pointLight1 = new THREE.PointLight(0x00d4ff, 1.5, 50)
+  pointLight1.position.set(5, 5, 5)
+  threeScene.add(pointLight1)
+
+  const pointLight2 = new THREE.PointLight(0xa855f7, 1.2, 50)
+  pointLight2.position.set(-5, -5, 5)
+  threeScene.add(pointLight2)
+
+  // 动画循环
+  function animate() {
+    threeAnimationId = requestAnimationFrame(animate)
+    
+    if (rotatingGroup) {
+      rotatingGroup.rotation.y += 0.002
+      rotatingGroup.rotation.x += 0.0005
+    }
+    
+    // 更新着色器uniforms
+    if (graphNodes && graphNodes.material instanceof THREE.ShaderMaterial) {
+      graphNodes.material.uniforms.time.value += 0.01
+    }
+    
+    threeRenderer!.render(threeScene!, threeCamera!)
+  }
+  animate()
+
+  // 鼠标交互
+  canvas.addEventListener('mousemove', onMouseMoveCanvas)
+  canvas.addEventListener('mouseleave', onMouseLeaveCanvas)
+
+  // 响应式调整
+  const handleResize = () => {
+    if (!threeCamera || !threeRenderer) return
+    const newWidth = canvas.clientWidth
+    const newHeight = canvas.clientHeight
+    threeCamera.aspect = newWidth / newHeight
+    threeCamera.updateProjectionMatrix()
+    threeRenderer.setSize(newWidth, newHeight)
+  }
+  window.addEventListener('resize', handleResize)
+
+  return () => {
+    window.removeEventListener('resize', handleResize)
+    canvas.removeEventListener('mousemove', onMouseMoveCanvas)
+    canvas.removeEventListener('mouseleave', onMouseLeaveCanvas)
+  }
+}
+
+// 生成节点数据
+function generateNodeData() {
+  const courses = allCoursesFlat.value
+  if (!courses || courses.length === 0) return
+
+  // 选择最多30个课程作为节点
+  const selectedCourses = courses.slice(0, 30)
+  
+  nodeData.value = selectedCourses.map((course, index) => {
+    // 在球面上分布节点（增大半径）
+    const phi = Math.acos(-1 + (2 * index) / selectedCourses.length)
+    const theta = Math.sqrt(selectedCourses.length * Math.PI) * phi
+    
+    const radius = 5 + Math.random() * 3  // 从原来的3+1.5增加到5+3
+    const x = radius * Math.cos(theta) * Math.sin(phi)
+    const y = radius * Math.sin(theta) * Math.sin(phi)
+    const z = radius * Math.cos(phi)
+    
+    return {
+      id: course.id,
+      title: course.title,
+      instructor: course.instructor,
+      rating: course.rating,
+      students: course.students,
+      position: new THREE.Vector3(x, y, z),
+      originalPos: new THREE.Vector3(x, y, z),
+      scale: 0,
+      targetScale: 1
+    }
+  })
+}
+
+// 创建全息节点
+function createHolographicNodes() {
+  if (!threeScene || nodeData.value.length === 0) return
+
+  rotatingGroup = new THREE.Group()
+  threeScene.add(rotatingGroup)
+
+  const geometry = new THREE.BufferGeometry()
+  const positions: number[] = []
+  const colors: number[] = []
+  const sizes: number[] = []
+
+  nodeData.value.forEach((node) => {
+    positions.push(node.position.x, node.position.y, node.position.z)
+    
+    // 蓝紫色渐变
+    const color = new THREE.Color()
+    color.setHSL(0.6 + Math.random() * 0.2, 0.8, 0.5)
+    colors.push(color.r, color.g, color.b)
+    
+    sizes.push(0.25)  // 从0.15增加到0.25
+  })
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1))
+
+  // 自定义着色器材质
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      time: { value: 0 },
+      pixelRatio: { value: Math.min(window.devicePixelRatio, 2) }
+    },
+    vertexShader: `
+      attribute float size;
+      varying vec3 vColor;
+      uniform float time;
+      uniform float pixelRatio;
+      
+      void main() {
+        vColor = color;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * pixelRatio * (500.0 / -mvPosition.z);  // 从300增加到500
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vColor;
+      uniform float time;
+      
+      void main() {
+        vec2 center = gl_PointCoord - vec2(0.5);
+        float dist = length(center);
+        
+        // 发光效果
+        float glow = 1.0 - dist;
+        glow = pow(glow, 1.5);
+        
+        // 扫描线效果
+        float scan = sin(dist * 20.0 - time * 3.0) * 0.5 + 0.5;
+        scan *= smoothstep(0.5, 1.0, glow);
+        
+        // 边缘光晕
+        float edge = smoothstep(0.4, 0.5, dist) * smoothstep(0.5, 0.3, dist);
+        
+        vec3 finalColor = vColor * glow + vec3(0.3, 0.6, 1.0) * scan * 0.5 + vec3(0.5, 0.3, 1.0) * edge;
+        float alpha = glow * 0.8 + edge * 0.6;
+        
+        gl_FragColor = vec4(finalColor, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexColors: true
+  })
+
+  graphNodes = new THREE.Points(geometry, material)
+  rotatingGroup.add(graphNodes)
+}
+
+// 创建连接线
+function createConnectionLines() {
+  if (!threeScene || !rotatingGroup || nodeData.value.length === 0) return
+
+  const linePositions: number[] = []
+  const lineColors: number[] = []
+
+  // 为每个节点创建2-4个连接
+  nodeData.value.forEach((node, i) => {
+    const connections = 2 + Math.floor(Math.random() * 3)
+    
+    for (let j = 0; j < connections; j++) {
+      const targetIndex = Math.floor(Math.random() * nodeData.value.length)
+      if (targetIndex === i) continue
+      
+      const target = nodeData.value[targetIndex]
+      
+      // 只连接距离较近的节点（增大距离阈值）
+      const distance = node.position.distanceTo(target.position)
+      if (distance > 7) continue  // 从4增加到7
+      
+      linePositions.push(
+        node.position.x, node.position.y, node.position.z,
+        target.position.x, target.position.y, target.position.z
+      )
+      
+      // 霓虹蓝紫色
+      const color = new THREE.Color()
+      color.setHSL(0.65 + Math.random() * 0.15, 0.9, 0.6)
+      lineColors.push(color.r, color.g, color.b, color.r, color.g, color.b)
+    }
+  })
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3))
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3))
+
+  const material = new THREE.LineBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.3,
+    blending: THREE.AdditiveBlending
+  })
+
+  graphLines = new THREE.LineSegments(geometry, material)
+  rotatingGroup.add(graphLines)
+}
+
+// 鼠标移动事件
+function onMouseMoveCanvas(event: MouseEvent) {
+  const canvas = threeCanvasRef.value
+  if (!canvas) return
+
+  const rect = canvas.getBoundingClientRect()
+  mousePosition.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+  mousePosition.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+  checkIntersection()
+}
+
+// 鼠标离开事件
+function onMouseLeaveCanvas() {
+  hoveredNodeIndex = -1
+}
+
+// 检测鼠标悬停
+function checkIntersection() {
+  if (!graphNodes || !threeCamera) return
+
+  raycaster.setFromCamera(mousePosition, threeCamera)
+  const intersects = raycaster.intersectObject(graphNodes)
+
+  if (intersects.length > 0) {
+    const index = intersects[0].index
+    if (index !== undefined && index !== hoveredNodeIndex) {
+      hoveredNodeIndex = index
+      showNodeTooltip(nodeData.value[index])
+    }
+  } else {
+    if (hoveredNodeIndex !== -1) {
+      hoveredNodeIndex = -1
+      hideNodeTooltip()
+    }
+  }
+}
+
+// 显示节点提示框（使用DOM元素）
+function showNodeTooltip(data: any) {
+  // 移除旧的提示框
+  hideNodeTooltip()
+
+  const tooltip = document.createElement('div')
+  tooltip.className = 'node-tooltip'
+  tooltip.innerHTML = `
+    <div class="tooltip-title">${data.title}</div>
+    <div class="tooltip-instructor">👤 ${data.instructor}</div>
+    <div class="tooltip-meta">
+      <span>⭐ ${data.rating}</span>
+      <span>👥 ${data.students.toLocaleString()}人</span>
+    </div>
+  `
+  
+  document.body.appendChild(tooltip)
+
+  // 定位到鼠标位置
+  const updatePosition = () => {
+    if (hoveredNodeIndex === -1) return
+    tooltip.style.left = `${mousePosition.x * window.innerWidth / 2 + window.innerWidth / 2 + 20}px`
+    tooltip.style.top = `${-mousePosition.y * window.innerHeight / 2 + window.innerHeight / 2 - 20}px`
+    requestAnimationFrame(updatePosition)
+  }
+  updatePosition()
+}
+
+// 隐藏节点提示框
+function hideNodeTooltip() {
+  const existing = document.querySelector('.node-tooltip')
+  if (existing) existing.remove()
+}
+
+// 节点展开动画
+function animateNodesExpansion() {
+  if (!nodeData.value.length || !graphNodes) return
+
+  const positions = graphNodes.geometry.attributes.position.array as Float32Array
+  
+  // 初始时所有节点在中心
+  for (let i = 0; i < positions.length; i += 3) {
+    positions[i] = 0
+    positions[i + 1] = 0
+    positions[i + 2] = 0
+  }
+  graphNodes.geometry.attributes.position.needsUpdate = true
+
+  // 渐次展开
+  nodeData.value.forEach((node, index) => {
+    setTimeout(() => {
+      const targetPos = node.originalPos
+      const startPos = new THREE.Vector3(0, 0, 0)
+      const duration = 800
+      const startTime = performance.now()
+
+      function animate(currentTime: number) {
+        const elapsed = currentTime - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        
+        // 弹性缓动
+        const ease = 1 - Math.pow(1 - progress, 3)
+        
+        const currentIndex = index * 3
+        positions[currentIndex] = startPos.x + (targetPos.x - startPos.x) * ease
+        positions[currentIndex + 1] = startPos.y + (targetPos.y - startPos.y) * ease
+        positions[currentIndex + 2] = startPos.z + (targetPos.z - startPos.z) * ease
+        
+        graphNodes!.geometry.attributes.position.needsUpdate = true
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate)
+        }
+      }
+      
+      requestAnimationFrame(animate)
+    }, index * 50) // 每个节点延迟50ms
+  })
+}
 
 // 平台优势数据
 const features = ref([
@@ -91,57 +472,56 @@ const generateMockCourse = (name: string, cIndex: number): Course => ({
 
 const loadCategories = async () => {
   try {
-    const categoryData = await getAllCategories()
-    categories.value = await Promise.all(
-        categoryData.map(async (cat: any, index: number) => {
-          const subCategoryData = await getSubCategoriesByCategoryId(cat.id)
-          const filteredSubs = subCategoryData.filter((sub: any) => sub.categoryId === cat.id)
-          const uniqueSubsMap = new Map<number, any>()
-          filteredSubs.forEach((sub: any) => {
-            if (!uniqueSubsMap.has(sub.id)) uniqueSubsMap.set(sub.id, sub)
-          })
-          const uniqueSubCategoryData = Array.from(uniqueSubsMap.values())
-          const subCategories: SubCategory[] = await Promise.all(
-              uniqueSubCategoryData.map(async (sub: any, subIndex: number) => {
-                const courseData = await getCoursesBySubCategoryId(sub.id)
-                const courses: Course[] = courseData.map((course: any, cIndex: number) => ({
-                  id: course.id,
-                  title: course.name,
-                  description: course.description || '系统化课程讲解，涵盖核心知识点与实战应用',
-                  instructor: '名师主讲',
-                  duration: '24 课时',
-                  level: ['初级', '中级', '高级'][Math.floor(Math.random() * 3)],
-                  levelColor: levelColors[Math.floor(Math.random() * levelColors.length)],
-                  students: Math.floor(Math.random() * 5000) + 500,
-                  rating: parseFloat((4.5 + Math.random() * 0.5).toFixed(1)),
-                  lessons: Math.floor(Math.random() * 30) + 20,
-                  accent: accents[cIndex % accents.length],
-                  tag: '核心课程',
-                  new: Math.random() > 0.7,
-                  hot: Math.random() > 0.8
-                }))
-                return {
-                  id: sub.id,
-                  name: sub.name,
-                  code: `${cat.id}.${subIndex + 1}`,
-                  categoryId: cat.id,
-                  groupIndex: subIndex + 1,
-                  courses
-                }
-              })
-          )
-          return {
-            id: cat.id,
-            name: cat.name,
-            code: `${cat.id * 100}`,
-            glyph: glyphs[index % glyphs.length],
-            desc: cat.description || '探索学科奥秘',
-            subCategories
-          }
-        })
-    )
+    // 一次性获取完整的课程树结构
+    const courseTreeData = await getFullCourseTree()
+    
+    // 转换数据格式以适配前端展示
+    categories.value = courseTreeData.map((cat: any, index: number) => ({
+      id: cat.id,
+      name: cat.name,
+      code: `${cat.id * 100}`,
+      glyph: glyphs[index % glyphs.length],
+      desc: cat.description || '探索学科奥秘',
+      subCategories: cat.subCategories.map((sub: any, subIndex: number) => ({
+        id: sub.id,
+        name: sub.name,
+        code: `${cat.id}.${subIndex + 1}`,
+        categoryId: cat.id,
+        groupIndex: subIndex + 1,
+        courses: sub.courses.map((course: any, cIndex: number) => ({
+          id: course.id,
+          title: course.name,
+          description: course.description || '系统化课程讲解，涵盖核心知识点与实战应用',
+          instructor: '名师主讲',
+          duration: '24 课时',
+          level: ['初级', '中级', '高级'][Math.floor(Math.random() * 3)],
+          levelColor: levelColors[Math.floor(Math.random() * levelColors.length)],
+          students: Math.floor(Math.random() * 5000) + 500,
+          rating: parseFloat((4.5 + Math.random() * 0.5).toFixed(1)),
+          lessons: Math.floor(Math.random() * 30) + 20,
+          accent: accents[cIndex % accents.length],
+          tag: '核心课程',
+          new: Math.random() > 0.7,
+          hot: Math.random() > 0.8
+        }))
+      }))
+    }))
+    
+    // 数据加载完成后，重新生成节点并触发展开动画
+    setTimeout(() => {
+      generateNodeData()
+      if (graphNodes) {
+        rotatingGroup?.remove(graphNodes)
+      }
+      if (graphLines) {
+        rotatingGroup?.remove(graphLines)
+      }
+      createHolographicNodes()
+      createConnectionLines()
+      animateNodesExpansion()
+    }, 100)
   } catch (error) {
-    console.error('加载分类失败:', error)
+    // 静默处理错误
     ElMessage.error('加载学科分类失败，请稍后重试')
   } finally {
     loading.value = false
@@ -434,6 +814,9 @@ onMounted(() => {
     const canvas = root?.querySelector('.bg-canvas') as HTMLCanvasElement
     if (canvas) cleanupParticles = initParticles(canvas) ?? null
     if (root) initObservers(root)
+    
+    // 初始化 Three.js
+    initThreeJS()
   }, 100)
   window.addEventListener('mousemove', onMouseMove)
 })
@@ -443,6 +826,10 @@ onUnmounted(() => {
   observers.forEach(o => o.disconnect())
   window.removeEventListener('mousemove', onMouseMove)
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  
+  // 清理 Three.js
+  if (threeAnimationId) cancelAnimationFrame(threeAnimationId)
+  if (threeRenderer) threeRenderer.dispose()
 })
 </script>
 
@@ -520,18 +907,28 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="hero-deco">
-        <div class="deco-card dc1">
-          <span class="dc-icon">📐</span>
-          <span class="dc-text">数学 · 110.11</span>
+      <!-- 右侧悬浮卡片 -->
+      <div class="float-cards">
+        <div class="float-card fc-1">
+          <div class="fc-icon">📚</div>
+          <div class="fc-content">
+            <div class="fc-title">系统化学习</div>
+            <div class="fc-desc">国家标准课程体系</div>
+          </div>
         </div>
-        <div class="deco-card dc2">
-          <div class="dc-progress"><div class="dc-bar" style="width:68%"/></div>
-          <span class="dc-text">学习进度 68%</span>
+        <div class="float-card fc-2">
+          <div class="fc-icon">🎯</div>
+          <div class="fc-content">
+            <div class="fc-title">精准定位</div>
+            <div class="fc-desc">智能推荐适合你的课程</div>
+          </div>
         </div>
-        <div class="deco-card dc3">
-          <span class="dc-star">★★★★★</span>
-          <span class="dc-text">权威学科体系</span>
+        <div class="float-card fc-3">
+          <div class="fc-icon">🏆</div>
+          <div class="fc-content">
+            <div class="fc-title">权威认证</div>
+            <div class="fc-desc">国家认可的学习证书</div>
+          </div>
         </div>
       </div>
     </section>
@@ -839,15 +1236,17 @@ onUnmounted(() => {
 .hero {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  min-height: 70vh;
   display: flex;
   align-items: center;
-  padding: 10px 150px 80px;
+  padding: 10px 150px 40px;  /* 从80px减少到40px */
   overflow: hidden;
 }
 .hero-inner {
   max-width: 620px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 .hero-label {
   display: inline-flex;
@@ -1062,6 +1461,139 @@ onUnmounted(() => {
   letter-spacing: 0.05em;
 }
 
+/* ─── Three.js 3D Canvas ─────────────────────────────── */
+.hero-three-canvas {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  cursor: pointer;
+}
+
+/* ─── 节点提示框 ─────────────────────────────────────── */
+.node-tooltip {
+  position: fixed;
+  background: rgba(8, 22, 44, 0.95);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  border-radius: 8px;
+  padding: 12px 16px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 212, 255, 0.3);
+  z-index: 10000;
+  pointer-events: none;
+  min-width: 200px;
+  animation: tooltipFadeIn 0.2s ease;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.tooltip-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #c8f0e0;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.tooltip-instructor {
+  font-size: 0.78rem;
+  color: rgba(150, 210, 180, 0.7);
+  margin-bottom: 8px;
+}
+
+.tooltip-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: rgba(0, 212, 255, 0.8);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── 右侧悬浮卡片 ───────────────────────────────────── */
+.float-cards {
+  position: absolute;
+  right: 100px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 5;
+}
+.float-card {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 102, 255, 0.2);
+  border-radius: 16px;
+  padding: 18px 22px;
+  backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 8px 32px rgba(0, 102, 255, 0.12), 0 0 0 1px rgba(0, 102, 255, 0.05);
+  min-width: 240px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.float-card:hover {
+  transform: translateX(-5px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(0, 102, 255, 0.2), 0 0 0 1px rgba(0, 102, 255, 0.1);
+  border-color: rgba(0, 102, 255, 0.35);
+}
+.fc-1 { animation: floatCard1 6s ease-in-out infinite; }
+.fc-2 { animation: floatCard2 6s ease-in-out infinite -2s; }
+.fc-3 { animation: floatCard3 6s ease-in-out infinite -4s; }
+@keyframes floatCard1 {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes floatCard2 {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes floatCard3 {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.fc-icon {
+  font-size: 2rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.1), rgba(0, 212, 255, 0.1));
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.fc-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fc-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: 0.02em;
+}
+.fc-desc {
+  font-size: 0.78rem;
+  color: rgba(26, 26, 26, 0.6);
+  line-height: 1.4;
+}
+
 /* ─── Deco floating cards ─────────────────────────────── */
 .hero-deco {
   position: absolute;
@@ -1102,7 +1634,7 @@ onUnmounted(() => {
 .main-content {
   position: relative;
   z-index: 1;
-  padding: 60px 80px;
+  padding: 20px 80px;  /* 从60px减少到20px，缩短与hero的距离 */
   background: #ffffff;
 }
 .content-wrapper {
