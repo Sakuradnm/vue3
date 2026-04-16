@@ -26,6 +26,9 @@ import {
   Plus,
   SwitchButton
 } from '@element-plus/icons-vue'
+import { getUserInfo } from '@/utils/session'
+import UserManagement from './user/user.vue'
+import CourseManagement from './course/course.vue'
 
 const router = useRouter()
 
@@ -48,8 +51,8 @@ const adminInfo = reactive({
 
 // 数据概览统计
 const stats = reactive({
-  totalCourses: 1247,
-  totalUsers: 8563,
+  totalCourses: 0,
+  totalUsers: 0,
   pendingReviews: 23,
   todayNotifications: 15
 })
@@ -350,6 +353,19 @@ const fetchUserList = async () => {
   }
 }
 
+// 获取课程总数
+const fetchCourseCount = async () => {
+  try {
+    const response = await axios.get('http://localhost:8080/api/courses')
+
+    if (response.data && Array.isArray(response.data)) {
+      stats.totalCourses = response.data.length
+    }
+  } catch (err) {
+    console.error('获取课程总数失败:', err)
+  }
+}
+
 const editUser = (user: UserData) => {
   Object.assign(editForm, {
     id: user.id,
@@ -440,12 +456,16 @@ onMounted(() => {
   if (activeMenu.value === 'users') {
     fetchUserList()
   }
+  
+  // 加载统计数据
+  fetchUserList()
+  fetchCourseCount()
 })
 
 const checkLoginStatus = () => {
-  const storedUserInfo = localStorage.getItem('userInfo')
+  const storedUserInfo = getUserInfo()
   if (storedUserInfo) {
-    userInfo.value = JSON.parse(storedUserInfo)
+    userInfo.value = storedUserInfo
     isLoggedIn.value = true
   } else {
     isLoggedIn.value = false
@@ -590,136 +610,12 @@ const checkLoginStatus = () => {
 
       <!-- 课程审核 -->
       <section v-if="activeMenu === 'courses'" class="courses-section">
-        <div class="section-header">
-          <h2 class="section-title">待审核课程列表</h2>
-        </div>
-
-        <div v-if="pendingCourses.length === 0" class="empty-state">
-          <Document class="empty-icon" />
-          <p>暂无待审核课程</p>
-        </div>
-
-        <div v-else class="courses-grid">
-          <div v-for="course in pendingCourses" :key="course.id" class="course-card">
-            <div class="course-thumbnail">
-              <img :src="course.thumbnail" :alt="course.title" />
-              <div class="course-category">{{ course.category }}</div>
-            </div>
-            <div class="course-info">
-              <h3 class="course-title">{{ course.title }}</h3>
-              <div class="course-meta">
-                <span class="instructor">讲师: {{ course.instructor }}</span>
-                <span class="submit-time">提交: {{ course.submitTime }}</span>
-              </div>
-            </div>
-            <div class="course-actions">
-              <el-button
-                  type="success"
-                  :icon="Check"
-                  @click="approveCourse(course)"
-                  plain
-              >
-                通过
-              </el-button>
-              <el-button
-                  type="danger"
-                  :icon="Close"
-                  @click="rejectCourse(course)"
-                  plain
-              >
-                拒绝
-              </el-button>
-            </div>
-          </div>
-        </div>
+        <CourseManagement />
       </section>
 
       <!-- 用户管理 -->
       <section v-if="activeMenu === 'users'" class="users-section">
-        <div class="section-header">
-          <h2 class="section-title">用户列表</h2>
-          <el-input
-              v-model="searchKeyword"
-              placeholder="搜索用户名或邮箱"
-              :prefix-icon="Search"
-              class="search-input"
-              clearable
-          />
-        </div>
-
-        <!-- 加载状态 -->
-        <div v-if="loading" class="loading-state">
-          <Refresh class="loading-icon spinning" />
-          <span>加载中...</span>
-        </div>
-
-        <!-- 错误提示 -->
-        <div v-else-if="error" class="error-state">
-          <Document class="error-icon" />
-          <p>{{ error }}</p>
-          <el-button type="primary" @click="fetchUserList" plain>
-            <Refresh /> 重试
-          </el-button>
-        </div>
-
-        <!-- 用户表格 -->
-        <div v-else-if="users.length > 0" class="table-container">
-          <el-table :data="filteredUsers" class="users-table" stripe>
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="username" label="用户名" />
-            <el-table-column prop="phone" label="手机号" width="140" />
-            <el-table-column prop="email" label="邮箱" />
-            <el-table-column prop="level" label="用户级别" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.level === 'admin' ? 'danger' : row.level === 'teacher' ? 'success' : ''">
-                  {{ translateLevel(row.level) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 'active' ? 'success' : 'info'">
-                  {{ row.status === 'active' ? '活跃' : '未激活' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="createdAt" label="创建时间" width="180">
-              <template #default="{ row }">
-                {{ formatDate(row.createdAt) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="updatedAt" label="更新时间" width="180">
-              <template #default="{ row }">
-                {{ formatDate(row.updatedAt) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right">
-              <template #default="{ row }">
-                <el-button
-                    size="small"
-                    :icon="Edit"
-                    @click="editUser(row)"
-                >
-                  编辑
-                </el-button>
-                <el-button
-                    size="small"
-                    :icon="Delete"
-                    @click="deleteUser(row)"
-                    type="danger"
-                >
-                  删除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-
-        <!-- 空数据提示 -->
-        <div v-else class="empty-state">
-          <User class="empty-icon" />
-          <p>暂无用户数据</p>
-        </div>
+        <UserManagement />
       </section>
 
       <!-- 通知中心 -->

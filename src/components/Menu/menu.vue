@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import Unmenu from './unmenu.vue'
 import { ElMessage } from 'element-plus'
 import { getUserById } from '@/api/user'
+import { getUserInfo, setUserInfo, clearUserInfo, getUserNotices, setUserNotices, clearSession } from '@/utils/session'
 
 const router = useRouter()
 const isMobileMenuOpen = ref(false)
@@ -85,33 +86,39 @@ onUnmounted(() => {
 })
 
 const checkLoginStatus = async () => {
-  const storedUserInfo = localStorage.getItem('userInfo')
-  if (storedUserInfo) {
-    const user = JSON.parse(storedUserInfo)
+  try {
+    const user = getUserInfo()
+    if (user) {
+      try {
+        const res = await getUserById(user.id)
+        const userData = res
 
-    try {
-      const res = await getUserById(user.id)
-      const userData = res
+        userInfo.value = {
+          id: userData.id,
+          username: userData.username,
+          nickname: userData.nickname || userData.username,
+          level: userData.level,
+          avatar: userData.avatarUrl || '',
+          phone: userData.phone,
+          email: userData.email
+        }
 
-      userInfo.value = {
-        id: userData.id,
-        username: userData.username,
-        nickname: userData.nickname || userData.username,
-        level: userData.level,
-        avatar: userData.avatarUrl || '',
-        phone: userData.phone,
-        email: userData.email
+        setUserInfo(userInfo.value)
+        isLoggedIn.value = true
+      } catch (error) {
+        // 静默处理错误，使用缓存的用户信息
+        userInfo.value = user
+        userInfo.value.avatar = user.avatarUrl || user.avatar_url || user.avatar || ''
+        isLoggedIn.value = true
       }
-
-      localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
-      isLoggedIn.value = true
-    } catch (error) {
-      // 静默处理错误
-      userInfo.value = user
-      userInfo.value.avatar = user.avatarUrl || user.avatar_url || user.avatar || ''
-      isLoggedIn.value = true
+    } else {
+      isLoggedIn.value = false
+      userInfo.value = null
     }
-  } else {
+  } catch (error) {
+    console.error('检查登录状态失败:', error)
+    // 发生错误时,清除无效的会话数据
+    clearUserInfo()
     isLoggedIn.value = false
     userInfo.value = null
   }
@@ -123,36 +130,14 @@ const loadUnreadNotices = () => {
     return
   }
 
-  const notices = localStorage.getItem('userNotices')
-  if (notices) {
-    const noticeList = JSON.parse(notices)
-    unreadNoticeCount.value = noticeList.filter((n: any) => !n.isRead).length
-  }
+  const noticeList = getUserNotices()
+  unreadNoticeCount.value = noticeList.filter((n: any) => !n.isRead).length
 }
 
 const handleStorageChange = (e: StorageEvent) => {
   if (e.key === 'userInfo') {
-    // 如果是手动触发的 storage 事件（newValue 不为 null），直接更新
-    if (e.newValue) {
-      try {
-        const updatedUser = JSON.parse(e.newValue)
-        userInfo.value = {
-          id: updatedUser.id,
-          username: updatedUser.username,
-          nickname: updatedUser.nickname || updatedUser.username,
-          level: updatedUser.level,
-          avatar: updatedUser.avatarUrl || updatedUser.avatar || '',
-          phone: updatedUser.phone,
-          email: updatedUser.email
-        }
-        isLoggedIn.value = true
-      } catch (error) {
-        checkLoginStatus()
-      }
-    } else {
-      // 否则重新从后端获取
-      checkLoginStatus()
-    }
+    // sessionStorage 不会触发 storage 事件，这里主要是为了兼容
+    checkLoginStatus()
   }
   if (e.key === 'userNotices') {
     loadUnreadNotices()
@@ -311,8 +296,7 @@ const handleUploadClick = (e: Event) => {
 }
 
 const handleLogout = () => {
-  localStorage.removeItem('userInfo')
-  localStorage.removeItem('rememberedUsername')
+  clearSession()
   isLoggedIn.value = false
   userInfo.value = null
   unreadNoticeCount.value = 0

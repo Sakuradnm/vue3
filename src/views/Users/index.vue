@@ -1,336 +1,578 @@
-<script>
-import { ref, reactive } from 'vue'
+<script setup>
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { createUser as apiCreateUser, registerUser  } from '@/api/user'
 import request from '@/utils/request'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
+import { setUserInfo, setRememberedUsername } from '@/utils/session'
+import * as THREE from 'three'
 
-export default {
-  name: 'Users',
-  setup () {
-    const router = useRouter()
-    // true 为登录页面，false 为注册页面
-    const isLogin = ref(true)
-    // 记住密码
-    const rememberMe = ref(false)
-    // 添加用户协议同意状态
-    const agreeToTerms = ref(false)
-    // 登录方式切换
-    const transitionName = ref('slide-left')
-    // 学生/教师切换
-    const loginTypeTransition = ref('fade-left')
-    // 登录类型：true 为学生，false 为教师
-    const isStudent = ref(true)
-    // 倒计时相关
-    const registerCountdown = ref(0)
-    // 密码显示/隐藏
-    const showPassword = ref(false)
+const router = useRouter()
+// true 为登录页面,false 为注册页面
+const isLogin = ref(true)
+// 记住密码
+const rememberMe = ref(false)
+// 添加用户协议同意状态
+const agreeToTerms = ref(false)
+// 登录方式切换
+const transitionName = ref('slide-left')
+// 学生/教师切换
+const loginTypeTransition = ref('fade-left')
+// 登录类型:true 为学生,false 为教师
+const isStudent = ref(true)
+// 倒计时相关
+const registerCountdown = ref(0)
+// 密码显示/隐藏
+const showPassword = ref(false)
 
-    // 切换密码显示/隐藏
-    const toggleShowPassword = () => {
-      showPassword.value = !showPassword.value
-    }
+// Canvas 粒子系统相关
+const canvasRef = ref(null)
+let animationId = null
+let particles = []
+let mousePosition = { x: 0, y: 0 }
 
-    const loginForm = reactive({
-      username: '',
-      password: ''
-    })
+// Three.js 右侧3D场景相关
+const rightSectionRef = ref(null)
+const threeCanvasRef = ref(null)
+let scene = null
+let camera = null
+let renderer = null
+let particleSystem = null
+let animationFrameId = null
 
-    // 添加用户输入类型标识
-    const inputType = ref('username')
+// 切换密码显示/隐藏
+const toggleShowPassword = () => {
+  showPassword.value = !showPassword.value
+}
 
-    // 验证输入类型的正则表达式
-    const phoneRegex = /^1[3-9]\d{9}$/
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const loginForm = reactive({
+  username: '',
+  password: ''
+})
 
-    // 监听用户名输入，自动判断类型
-    const handleUsernameInput = () => {
-      const value = loginForm.username.trim()
-      if (phoneRegex.test(value)) {
-        inputType.value = 'phone'
-      } else if (emailRegex.test(value)) {
-        inputType.value = 'email'
-      } else {
-        inputType.value = 'username'
-      }
-    }
+// 添加用户输入类型标识
+const inputType = ref('username')
 
-    // 清空输入框同时清除账号和密码，方便更换账号
-    const clearInput = () => {
-      loginForm.username = ''
-      loginForm.password = ''
+// 验证输入类型的正则表达式
+const phoneRegex = /^1[3-9]\d{9}$/
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// 监听用户名输入,自动判断类型
+const handleUsernameInput = () => {
+  const value = loginForm.username.trim()
+  if (phoneRegex.test(value)) {
+    inputType.value = 'phone'
+  } else if (emailRegex.test(value)) {
+    inputType.value = 'email'
+  } else {
+    inputType.value = 'username'
+  }
+}
+
+// 清空输入框同时清除账号和密码,方便更换账号
+const clearInput = () => {
+  loginForm.username = ''
+  loginForm.password = ''
+  inputType.value = 'username'
+}
+
+const registerForm = reactive({
+  username: '',
+  password: '',
+  confirmPassword: '',
+  phone: '',
+  email: '',
+  verificationCode: ''
+})
+const errors = reactive({
+  username: '',
+  password: '',
+  confirmPassword: '',
+  phone: '',
+  verificationCode: '',
+  email: ''
+})
+
+const switchMode = () => {
+  transitionName.value = isLogin.value ? 'slide-right' : 'slide-left'
+  isLogin.value = !isLogin.value
+  Object.keys(errors).forEach(key => { errors[key] = '' })
+}
+
+// 切换登录类型(学生/教师)
+const switchLoginType = (type) => {
+  if (isStudent.value === type) return
+  loginTypeTransition.value = type ? 'fade-left' : 'fade-right'
+  isStudent.value = type
+  // 切换时清空表单,避免残留数据
+  loginForm.username = ''
+  loginForm.password = ''
+  inputType.value = 'username'
+}
+
+// 统一登录逻辑,level 由 isStudent 决定(student / teacher)
+const handleLogin = async () => {
+  const form = document.querySelector('.login-box form')
+  if (!form.checkValidity()) {
+    form.reportValidity()
+    return
+  }
+
+  if (!agreeToTerms.value) {
+    ElMessage.warning('请先同意用户协议和隐私政策')
+    return
+  }
+
+  if (!loginForm.username.trim()) {
+    ElMessage.warning('请输入用户名/手机号/邮箱')
+    return
+  }
+
+  try {
+    const inputValue = loginForm.username.trim()
+
+    // 自动识别输入类型
+    let loginData
+    if (phoneRegex.test(inputValue)) {
+      inputType.value = 'phone'
+      loginData = { phone: inputValue, password: loginForm.password }
+    } else if (emailRegex.test(inputValue)) {
+      inputType.value = 'email'
+      loginData = { email: inputValue, password: loginForm.password }
+    } else {
       inputType.value = 'username'
+      loginData = { username: inputValue, password: loginForm.password }
     }
 
-    const registerForm = reactive({
-      username: '',
-      password: '',
-      confirmPassword: '',
-      phone: '',
-      email: '',
-      verificationCode: ''
-    })
-    const errors = reactive({
-      username: '',
-      password: '',
-      confirmPassword: '',
-      phone: '',
-      verificationCode: '',
-      email: ''
+    // 附加 level 字段,由学生/教师登录框决定(admin 除外)
+    const inputValueLower = inputValue.toLowerCase()
+    if (inputValueLower === 'admin' || inputValueLower.startsWith('admin')) {
+      loginData.level = 'admin'
+    } else {
+      loginData.level = isStudent.value ? 'student' : 'teacher'
+    }
+
+    const response = await request({
+      url: '/api/users/login',
+      method: 'post',
+      data: loginData
     })
 
-    const switchMode = () => {
-      transitionName.value = isLogin.value ? 'slide-right' : 'slide-left'
-      isLogin.value = !isLogin.value
-      Object.keys(errors).forEach(key => { errors[key] = '' })
-    }
+    // response 已经是用户数据对象(由 request 拦截器处理过)
+    if (response && typeof response === 'object' && response.id) {
+      const user = response
+      const userLevel = user.level
+      const inputLabel = inputType.value === 'phone' ? '手机号' : inputType.value === 'email' ? '邮箱' : '用户名'
 
-    // 切换登录类型（学生/教师）
-    const switchLoginType = (type) => {
-      if (isStudent.value === type) return
-      loginTypeTransition.value = type ? 'fade-left' : 'fade-right'
-      isStudent.value = type
-      // 切换时清空表单，避免残留数据
-      loginForm.username = ''
-      loginForm.password = ''
-      inputType.value = 'username'
-    }
-
-    // 统一登录逻辑，level 由 isStudent 决定（student / teacher）
-    const handleLogin = async () => {
-      const form = document.querySelector('.login-box form')
-      if (!form.checkValidity()) {
-        form.reportValidity()
-        return
-      }
-
-      if (!agreeToTerms.value) {
-        ElMessage.warning('请先同意用户协议和隐私政策')
-        return
-      }
-
-      if (!loginForm.username.trim()) {
-        ElMessage.warning('请输入用户名/手机号/邮箱')
-        return
-      }
-
-      try {
-        const inputValue = loginForm.username.trim()
-
-        // 自动识别输入类型
-        let loginData
-        if (phoneRegex.test(inputValue)) {
-          inputType.value = 'phone'
-          loginData = { phone: inputValue, password: loginForm.password }
-        } else if (emailRegex.test(inputValue)) {
-          inputType.value = 'email'
-          loginData = { email: inputValue, password: loginForm.password }
-        } else {
-          inputType.value = 'username'
-          loginData = { username: inputValue, password: loginForm.password }
+      // 管理员:任意窗口均可登录,直接跳转后台
+      if (userLevel === 'admin') {
+        setUserInfo(user)
+        if (rememberMe.value) {
+          setRememberedUsername(loginForm.username)
         }
+        window.dispatchEvent(new Event('userLogin'))
+        ElMessage.success('管理员登录成功!即将进入后台管理系统')
+        await router.push('/Admin')
+        return
+      }
 
-        // 附加 level 字段，由学生/教师登录框决定（admin 除外）
-        const inputValueLower = inputValue.toLowerCase()
-        if (inputValueLower === 'admin' || inputValueLower.startsWith('admin')) {
-          loginData.level = 'admin'
-        } else {
-          loginData.level = isStudent.value ? 'student' : 'teacher'
-        }
-
-        const response = await request({
-          url: '/api/users/login',
-          method: 'post',
-          data: loginData
-        })
-
-        // response 已经是用户数据对象（由 request 拦截器处理过）
-        if (response && typeof response === 'object' && response.id) {
-          const user = response
-          const userLevel = user.level
-          const inputLabel = inputType.value === 'phone' ? '手机号' : inputType.value === 'email' ? '邮箱' : '用户名'
-
-          // 管理员：任意窗口均可登录，直接跳转后台
-          if (userLevel === 'admin') {
-            localStorage.setItem('userInfo', JSON.stringify(user))
-            if (rememberMe.value) {
-              localStorage.setItem('rememberedUsername', loginForm.username)
-            }
-            localStorage.setItem('userInfo', JSON.stringify(user))
-            window.dispatchEvent(new Event('userLogin'))
-            ElMessage.success('管理员登录成功！即将进入后台管理系统')
-            await router.push('/Admin')
-            return
+      // 学生登录验证
+      if (isStudent.value) {
+        if (userLevel === 'student') {
+          setUserInfo(user)
+          if (rememberMe.value) {
+            setRememberedUsername(loginForm.username)
           }
-
-          // 学生登录验证
-          if (isStudent.value) {
-            if (userLevel === 'student') {
-              localStorage.setItem('userInfo', JSON.stringify(user))
-              if (rememberMe.value) {
-                localStorage.setItem('rememberedUsername', loginForm.username)
-              }
-              ElMessage.success(`${inputLabel}登录成功！`)
-              setTimeout(() => { router.push('/Home') }, 1000)
-            } else {
-              ElMessage.error('账号、密码或级别不匹配')
-            }
-            return
-          }
-
-          // 教师登录验证
-          if (!isStudent.value) {
-            if (userLevel === 'teacher') {
-              localStorage.setItem('userInfo', JSON.stringify(user))
-              if (rememberMe.value) {
-                localStorage.setItem('rememberedUsername', loginForm.username)
-              }
-              ElMessage.success(`${inputLabel}登录成功！`)
-              setTimeout(() => { router.push('/Home') }, 1000)
-            } else {
-              ElMessage.error('账号、密码或级别不匹配')
-            }
-          }
+          ElMessage.success(`${inputLabel}登录成功!`)
+          setTimeout(() => { router.push('/Home') }, 1000)
         } else {
           ElMessage.error('账号、密码或级别不匹配')
         }
-      } catch (error) {
-        ElMessage.error(error.response?.data?.message || error.message || '登录失败，请检查网络连接')
-      }
-    }
-
-    // 注册逻辑
-    const handleRegister = async () => {
-      // 清空所有错误提示
-      Object.keys(errors).forEach(key => { errors[key] = '' })
-
-      if (!registerForm.username) {
-        errors.username = '请输入用户名'
-        return
-      }
-      if (!/^[a-zA-Z0-9]{6,9}$/.test(registerForm.username)) {
-        errors.username = '用户名应为 6-9 位字母数字组合'
-        return
-      }
-      if (!registerForm.password) {
-        errors.password = '请输入密码'
-        return
-      }
-      if (!/^[a-zA-Z0-9]{6,12}$/.test(registerForm.password)) {
-        errors.password = '密码应为 6-12 位字母数字组合'
-        return
-      }
-      if (!registerForm.phone) {
-        errors.phone = '请输入手机号'
-        return
-      }
-      if (!/^1[3-9]\d{9}$/.test(registerForm.phone)) {
-        errors.phone = '手机号格式不正确'
-        return
-      }
-      if (!agreeToTerms.value) {
-        ElMessage.warning('请先阅读并同意用户协议和隐私政策')
         return
       }
 
-      try {
-        const userData = {
-          username: registerForm.username,
-          password: registerForm.password,
-          phone: registerForm.phone,
-          level: 'student'  // 注册权限固定为学生，教师账号由管理员创建
-        }
-
-        const response = await registerUser(userData)
-
-        if (response && response.code === 201) {
-          ElMessage.success('注册成功！请登录')
-          Object.keys(registerForm).forEach(key => { registerForm[key] = '' })
-          isLogin.value = true
-          transitionName.value = 'slide-left'
-        } else if (response && response.code === 400) {
-          // 区分用户名还是手机号冲突
-          const msg = response.message || '注册失败'
-          if (msg.includes('用户名')) {
-            errors.username = msg
-          } else if (msg.includes('手机号')) {
-            errors.phone = msg
+      // 教师登录验证
+      if (!isStudent.value) {
+        if (userLevel === 'teacher') {
+          setUserInfo(user)
+          if (rememberMe.value) {
+            setRememberedUsername(loginForm.username)
           }
-          ElMessage.error(msg)
+          ElMessage.success(`${inputLabel}登录成功!`)
+          setTimeout(() => { router.push('/Home') }, 1000)
         } else {
-          ElMessage.error(response?.message || '注册失败')
-        }
-      } catch (error) {
-        if (error.response?.data?.code === 400) {
-          const msg = error.response.data.message || '注册失败'
-          if (msg.includes('用户名')) errors.username = msg
-          else if (msg.includes('手机号')) errors.phone = msg
-          ElMessage.error(msg)
-        } else {
-          ElMessage.error(error.message || '注册失败')
+          ElMessage.error('账号、密码或级别不匹配')
         }
       }
+    } else {
+      ElMessage.error('账号、密码或级别不匹配')
+    }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || error.message || '登录失败,请检查网络连接')
+  }
+}
+
+// 注册逻辑
+const handleRegister = async () => {
+  // 清空所有错误提示
+  Object.keys(errors).forEach(key => { errors[key] = '' })
+
+  if (!registerForm.username) {
+    errors.username = '请输入用户名'
+    return
+  }
+  if (!/^[a-zA-Z0-9]{6,9}$/.test(registerForm.username)) {
+    errors.username = '用户名应为 6-9 位字母数字组合'
+    return
+  }
+  if (!registerForm.password) {
+    errors.password = '请输入密码'
+    return
+  }
+  if (!/^[a-zA-Z0-9]{6,12}$/.test(registerForm.password)) {
+    errors.password = '密码应为 6-12 位字母数字组合'
+    return
+  }
+  if (!registerForm.phone) {
+    errors.phone = '请输入手机号'
+    return
+  }
+  if (!/^1[3-9]\d{9}$/.test(registerForm.phone)) {
+    errors.phone = '手机号格式不正确'
+    return
+  }
+  if (!agreeToTerms.value) {
+    ElMessage.warning('请先阅读并同意用户协议和隐私政策')
+    return
+  }
+
+  try {
+    const userData = {
+      username: registerForm.username,
+      password: registerForm.password,
+      phone: registerForm.phone,
+      level: 'student'  // 注册权限固定为学生,教师账号由管理员创建
     }
 
-    // 注册验证码逻辑
-    const sendVerificationCode = async () => {
-      try {
-        if (!registerForm.phone) {
-          errors.phone = '请输入手机号'
-          return
-        }
+    const response = await registerUser(userData)
 
-        if (!/^1[3-9]\d{9}$/.test(registerForm.phone)) {
-          errors.phone = '手机号格式不正确'
-          return
-        }
-
-        // TODO: 调用后端发送验证码接口
-        ElMessage.success('验证码已发送（模拟）')
-        startCountdown('register')
-      } catch (error) {
-        ElMessage.error('网络错误，请稍后重试')
+    if (response && response.code === 201) {
+      ElMessage.success('注册成功!请登录')
+      Object.keys(registerForm).forEach(key => { registerForm[key] = '' })
+      isLogin.value = true
+      transitionName.value = 'slide-left'
+    } else if (response && response.code === 400) {
+      // 区分用户名还是手机号冲突
+      const msg = response.message || '注册失败'
+      if (msg.includes('用户名')) {
+        errors.username = msg
+      } else if (msg.includes('手机号')) {
+        errors.phone = msg
       }
+      ElMessage.error(msg)
+    } else {
+      ElMessage.error(response?.message || '注册失败')
     }
-
-    return {
-      isLogin,
-      rememberMe,
-      agreeToTerms,
-      isStudent,
-      inputType,
-      loginForm,
-      registerForm,
-      errors,
-      switchMode,
-      switchLoginType,
-      handleUsernameInput,
-      clearInput,
-      handleLogin,
-      handleRegister,
-      sendVerificationCode,
-      loginTypeTransition,
-      transitionName,
-      registerCountdown,
-      showPassword
+  } catch (error) {
+    if (error.response?.data?.code === 400) {
+      const msg = error.response.data.message || '注册失败'
+      if (msg.includes('用户名')) errors.username = msg
+      else if (msg.includes('手机号')) errors.phone = msg
+      ElMessage.error(msg)
+    } else {
+      ElMessage.error(error.message || '注册失败')
     }
   }
+}
+
+// 注册验证码逻辑
+const sendVerificationCode = async () => {
+  try {
+    if (!registerForm.phone) {
+      errors.phone = '请输入手机号'
+      return
+    }
+
+    if (!/^1[3-9]\d{9}$/.test(registerForm.phone)) {
+      errors.phone = '手机号格式不正确'
+      return
+    }
+
+    // TODO: 调用后端发送验证码接口
+    ElMessage.success('验证码已发送(模拟)')
+    startCountdown('register')
+  } catch (error) {
+    ElMessage.error('网络错误,请稍后重试')
+  }
+}
+
+// 初始化粒子系统 - 白色主题版本
+const initParticles = () => {
+  const canvas = canvasRef.value
+  if (!canvas) return
+
+  const ctx = canvas.getContext('2d')
+  let W = window.innerWidth
+  let H = window.innerHeight
+  canvas.width = W
+  canvas.height = H
+
+  // 创建粒子 - 使用蓝色和紫色渐变色调
+  const count = Math.floor((W * H) / 12000)
+  particles = Array.from({ length: count }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 0.8,
+    vy: (Math.random() - 0.5) * 0.8,
+    r: Math.random() * 3 + 1.5,
+    alpha: Math.random() * 0.4 + 0.2,
+    color: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe'][Math.floor(Math.random() * 5)]
+  }))
+
+  // 动画循环
+  const animate = () => {
+    // 使用渐变背景
+    const gradient = ctx.createLinearGradient(0, 0, W, H)
+    gradient.addColorStop(0, '#f5f7fa')
+    gradient.addColorStop(0.5, '#e8ecf1')
+    gradient.addColorStop(1, '#c3cfe2')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, W, H)
+    
+    // 绘制粒子连线
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x
+        const dy = particles[i].y - particles[j].y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        if (distance < 150) {
+          ctx.beginPath()
+          ctx.moveTo(particles[i].x, particles[i].y)
+          ctx.lineTo(particles[j].x, particles[j].y)
+          const opacity = 0.15 * (1 - distance / 150)
+          ctx.strokeStyle = `rgba(102, 126, 234, ${opacity})`
+          ctx.lineWidth = 0.8
+          ctx.stroke()
+        }
+      }
+    }
+
+    // 绘制粒子
+    particles.forEach(p => {
+      // 鼠标交互 - 吸引效果
+      const dx = mousePosition.x - p.x
+      const dy = mousePosition.y - p.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      
+      if (distance < 200) {
+        p.x += dx * 0.008
+        p.y += dy * 0.008
+      }
+
+      p.x += p.vx
+      p.y += p.vy
+
+      // 边界检测
+      if (p.x < 0 || p.x > W) p.vx *= -1
+      if (p.y < 0 || p.y > H) p.vy *= -1
+
+      // 绘制发光粒子
+      ctx.save()
+      ctx.shadowBlur = 15
+      ctx.shadowColor = p.color
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+      ctx.fillStyle = p.color.replace(')', `, ${p.alpha})`).replace('#', 'rgba(').replace(/(..)(..)(..)/, (_, r, g, b) => {
+        return `${parseInt(r, 16)},${parseInt(g, 16)},${parseInt(b, 16)}`
+      })
+      ctx.fill()
+      ctx.restore()
+    })
+
+    animationId = requestAnimationFrame(animate)
+  }
+
+  animate()
+
+  // 监听窗口大小变化
+  const handleResize = () => {
+    W = window.innerWidth
+    H = window.innerHeight
+    canvas.width = W
+    canvas.height = H
+  }
+
+  window.addEventListener('resize', handleResize)
+  
+  // 监听鼠标移动
+  const handleMouseMove = (e) => {
+    mousePosition.x = e.clientX
+    mousePosition.y = e.clientY
+  }
+  window.addEventListener('mousemove', handleMouseMove)
+
+  return () => {
+    window.removeEventListener('resize', handleResize)
+    window.removeEventListener('mousemove', handleMouseMove)
+  }
+}
+
+onMounted(() => {
+  const cleanup = initParticles()
+  initThreeJS()
+  onUnmounted(() => {
+    if (cleanup) cleanup()
+    if (animationId) cancelAnimationFrame(animationId)
+    cleanupThreeJS()
+  })
+})
+
+// 初始化 Three.js 场景
+const initThreeJS = () => {
+  const container = rightSectionRef.value
+  if (!container) return
+
+  // 获取容器尺寸
+  const width = container.clientWidth
+  const height = container.clientHeight
+
+  // 创建场景
+  scene = new THREE.Scene()
+
+  // 创建相机
+  camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000)
+  camera.position.z = 5
+
+  // 创建渲染器
+  renderer = new THREE.WebGLRenderer({ 
+    canvas: threeCanvasRef.value,
+    alpha: true,
+    antialias: true 
+  })
+  renderer.setSize(width, height)
+  renderer.setPixelRatio(window.devicePixelRatio)
+
+  // 创建粒子系统 - 球体形状
+  const particleCount = 2000
+  const geometry = new THREE.BufferGeometry()
+  const positions = new Float32Array(particleCount * 3)
+  const colors = new Float32Array(particleCount * 3)
+
+  const colorPalette = [
+    new THREE.Color('#667eea'),
+    new THREE.Color('#764ba2'),
+    new THREE.Color('#f093fb'),
+    new THREE.Color('#4facfe')
+  ]
+
+  for (let i = 0; i < particleCount; i++) {
+    // 在球体表面分布粒子
+    const phi = Math.acos(-1 + (2 * i) / particleCount)
+    const theta = Math.sqrt(particleCount * Math.PI) * phi
+    const radius = 2 + Math.random() * 0.5
+
+    positions[i * 3] = radius * Math.cos(theta) * Math.sin(phi)
+    positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi)
+    positions[i * 3 + 2] = radius * Math.cos(phi)
+
+    // 设置颜色
+    const color = colorPalette[Math.floor(Math.random() * colorPalette.length)]
+    colors[i * 3] = color.r
+    colors[i * 3 + 1] = color.g
+    colors[i * 3 + 2] = color.b
+  }
+
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+
+  // 创建粒子材质
+  const material = new THREE.PointsMaterial({
+    size: 0.05,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true
+  })
+
+  particleSystem = new THREE.Points(geometry, material)
+  scene.add(particleSystem)
+
+  // 添加环境光
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+  scene.add(ambientLight)
+
+  // 动画循环
+  let time = 0
+  const animate = () => {
+    animationFrameId = requestAnimationFrame(animate)
+    time += 0.005
+
+    // 旋转粒子系统
+    particleSystem.rotation.x += 0.001
+    particleSystem.rotation.y += 0.002
+
+    // 波浪效果
+    const positions = particleSystem.geometry.attributes.position.array
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3
+      const x = positions[i3]
+      const y = positions[i3 + 1]
+      const z = positions[i3 + 2]
+
+      // 添加轻微波动
+      positions[i3] = x + Math.sin(time + y * 0.5) * 0.002
+      positions[i3 + 1] = y + Math.cos(time + x * 0.5) * 0.002
+      positions[i3 + 2] = z + Math.sin(time + z * 0.5) * 0.002
+    }
+    particleSystem.geometry.attributes.position.needsUpdate = true
+
+    renderer.render(scene, camera)
+  }
+
+  animate()
+
+  // 响应式调整
+  const handleResize = () => {
+    if (!container) return
+    const newWidth = container.clientWidth
+    const newHeight = container.clientHeight
+    camera.aspect = newWidth / newHeight
+    camera.updateProjectionMatrix()
+    renderer.setSize(newWidth, newHeight)
+  }
+
+  window.addEventListener('resize', handleResize)
+
+  // 清理函数
+  return () => {
+    window.removeEventListener('resize', handleResize)
+  }
+}
+
+// 清理 Three.js 资源
+const cleanupThreeJS = () => {
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId)
+  }
+  if (renderer) {
+    renderer.dispose()
+  }
+  if (particleSystem) {
+    particleSystem.geometry.dispose()
+    particleSystem.material.dispose()
+  }
+  scene = null
+  camera = null
+  renderer = null
+  particleSystem = null
 }
 </script>
 
 <template>
-  <!-- 背景视频 -->
-  <video
-    class="bg-video"
-    autoplay
-    loop
-    muted
-    playsinline
-    preload="auto"
-  >
-    <source src="/videos/home1.mp4" type="video/mp4">
-    您的浏览器不支持视频播放
-  </video>
+  <!-- Canvas 动态背景 -->
+  <canvas ref="canvasRef" class="dynamic-bg"></canvas>
 
   <!-- 登录页面容器 -->
   <div class="user-container">
@@ -424,7 +666,7 @@ export default {
                   <button type="submit" class="submit-btn">LOGIN IN</button>
 
                   <div class="other-login">
-                    <p style="color: #ffffff;">其他登录方式</p>
+                    <p style="color: #718096;">其他登录方式</p>
                     <div class="login-methods">
                       <a href="#" class="method-item">
                         <img src="/logo/wechat.png" style="width: 45px" alt="微信登录">
@@ -476,7 +718,7 @@ export default {
                   <button type="submit" class="submit-btn">LOGIN IN</button>
 
                   <div class="other-login">
-                    <p style="color: #ffffff;">其他登录方式</p>
+                    <p style="color: #718096;">其他登录方式</p>
                     <div class="login-methods">
                       <a href="#" class="method-item">
                         <img src="/logo/wechat.png" style="width: 45px" alt="微信登录">
@@ -494,7 +736,7 @@ export default {
 
           <!-- 注册表单 -->
           <div class="register-box" v-else key="register">
-            <h2 style="color: rgb(255, 255, 255);">用户注册</h2>
+            <h2 style="color: #2d3748; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">用户注册</h2>
             <form @submit.prevent="handleRegister">
               <div class="form-group">
                 <input
@@ -530,18 +772,8 @@ export default {
       </div>
 
       <!-- 右侧区域 -->
-      <div class="right-section">
-        <video
-          class="right-bg-video"
-          autoplay
-          loop
-          muted
-          playsinline
-          preload="auto"
-        >
-          <source src="/videos/home2.mp4" type="video/mp4">
-          您的浏览器不支持视频播放
-        </video>
+      <div class="right-section" ref="rightSectionRef">
+        <canvas ref="threeCanvasRef" class="three-canvas"></canvas>
         <div class="right-content">
           <h2>即刻加入我们</h2>
           <p>开启您的数字创意之旅</p>
@@ -564,18 +796,17 @@ export default {
   align-items: center;
 }
 
-/* 背景视频样式 */
-.bg-video {
+/* Canvas 动态背景样式 */
+.dynamic-bg {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
   z-index: -1;
 }
 
-/* 主要内容框架样式 */
+/* 主要内容框架样式 - 白色主题 */
 .content-wrapper {
   width: 100% !important;
   height: 100% !important;
@@ -584,12 +815,12 @@ export default {
   display: flex;
   justify-content: center;
   gap: 5%;
-  background: rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(15px);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
   border-radius: 20px;
   padding: 3rem;
   position: relative;
-  box-shadow: 0 15px 30px 0 rgba(51, 88, 104, 0.27) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
 }
 
 /************************************************************
@@ -609,10 +840,11 @@ export default {
   width: 100%;
   box-sizing: border-box;
   padding: 1.5rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.95);
   border-radius: 12px;
   text-align: center;
   z-index: 4;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
 }
 
 .login-header {
@@ -626,7 +858,7 @@ export default {
 }
 
 .login-tabs h2 {
-  color: rgba(255, 255, 255, 0.5);
+  color: #8a8a8a;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
@@ -634,7 +866,8 @@ export default {
 }
 
 .login-tabs h2.active {
-  color: white;
+  color: #667eea;
+  font-weight: 600;
 }
 
 .login-tabs h2.active::after {
@@ -643,8 +876,9 @@ export default {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 2px;
-  background: #ffffff;
+  height: 3px;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px;
 }
 
 /* 其他登录 */
@@ -666,7 +900,7 @@ export default {
   margin-top: 3rem;
   width: 15%;
   padding-right: 1rem;
-  border-right: 1px solid rgba(255,255,255,0.1);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .help-links {
@@ -676,7 +910,7 @@ export default {
 }
 
 .help-item {
-  color: white;
+  color: #4a5568;
   text-decoration: none;
   font-size: 0.95rem;
   transition: all 0.3s ease;
@@ -696,21 +930,23 @@ export default {
 }
 
 .help-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
   transform: translateX(8px);
-  box-shadow: 2px 0 10px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  color: #667eea;
 }
 
 .checkbox-label a {
-  color: #2370d5;
+  color: #667eea;
   text-decoration: none;
   margin: 0 3px;
   transition: all 0.3s ease;
+  font-weight: 500;
 }
 
 .checkbox-label a:hover {
   text-decoration: underline;
-  color: #4a90e2;
+  color: #764ba2;
 }
 
 /************************************************************
@@ -721,61 +957,67 @@ export default {
   overflow: hidden;
   width: 40%;
   padding-left: 1rem;
-  border-left: 1px solid rgba(255,255,255,0.1);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 15px;
   min-height: 560px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
 }
 
-.right-bg-video {
+.three-canvas {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
   z-index: 1;
 }
 
 .right-content {
   position: absolute;
-  z-index: 10; /* 提高层级，确保在视频上方 */
+  z-index: 10;
   text-align: center;
-  color: #ffffff;
-  text-shadow: 0 0 2px hsl(198, 87%, 3%), 0 0 2px hsl(0, 0%, 100%), 0 0 2px hsl(198, 87%, 3%);
+  color: #2d3748;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   width: 100%;
   padding: 2rem;
-  pointer-events: none; /* 让点击事件穿透到下层，但按钮需要单独设置 */
+  pointer-events: none;
 
   h2 {
     font-size: 2rem;
     margin-bottom: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   p {
     font-size: 1.2rem;
-    opacity: 0.9;
+    color: #718096;
     margin-bottom: 2rem;
   }
 }
 
 /* 切换登录注册按钮 */
 .switch-mode-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
   color: white;
   padding: 0.8rem 2rem;
   border-radius: 25px;
   cursor: pointer;
   transition: all 0.3s ease;
-  pointer-events: auto; /* 恢复按钮的点击事件 */
+  pointer-events: auto;
+  font-weight: 600;
+  letter-spacing: 1px;
 }
 
 .switch-mode-btn:hover {
-  background: rgba(255, 255, 255, 0.34);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
 }
 
 /************************************************************
@@ -800,7 +1042,7 @@ export default {
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: rgba(255, 255, 255, 0.5);
+  color: #a0aec0;
   font-size: 1.2rem;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -813,7 +1055,7 @@ export default {
 }
 
 .clear-icon:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: #667eea;
   transform: translateY(-50%) scale(1.1);
 }
 
@@ -823,7 +1065,7 @@ export default {
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: rgba(255, 255, 255, 0.5);
+  color: #a0aec0;
   cursor: pointer;
   transition: all 0.3s ease;
   z-index: 10;
@@ -836,8 +1078,8 @@ export default {
 }
 
 .toggle-password-icon:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.1);
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
   transform: translateY(-50%) scale(1.05);
 }
 
@@ -850,31 +1092,30 @@ input {
   width: 100%;
   padding: 1rem;
   padding-right: 3rem;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(247, 250, 252, 0.8);
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
-  color: white;
+  color: #2d3748;
   font-size: 0.9rem;
-  transition: all 0.5s ease;
+  transition: all 0.3s ease;
   box-sizing: border-box;
+}
+
+input::placeholder {
+  color: #a0aec0;
 }
 
 input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.09);
-  box-shadow: 0 3px 10px 1px rgba(255, 255, 255, 0.32);
+  background: white;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 /* input 在 error 状态下高亮边框 */
 input.error {
-  border-color: rgba(255, 107, 107, 0.6) !important;
-  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.15);
-}
-
-/* input 在 error 状态下高亮边框 */
-input.error {
-  border-color: rgba(255, 107, 107, 0.6) !important;
-  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.15);
+  border-color: #fc8181 !important;
+  box-shadow: 0 0 0 3px rgba(252, 129, 129, 0.15);
 }
 
 .submit-btn {
@@ -882,7 +1123,7 @@ input.error {
   text-align: center;
   width: 100%;
   padding: 1rem;
-  background: rgba(84, 89, 96, 0.34);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -890,11 +1131,13 @@ input.error {
   cursor: pointer;
   transition: all 0.3s ease;
   margin-top: 1.5rem;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
 
 .submit-btn:hover {
-  background: rgba(100, 104, 111, 0.66);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
 /************************************************************
@@ -913,19 +1156,10 @@ input.error {
   display: none;
 }
 
-.checkbox-group input[type="checkbox"]:checked + .custom-checkbox {
-  background: rgb(100, 104, 111);
-  border-color: transparent;
-}
-
-.checkbox-group input[type="checkbox"]:checked + .custom-checkbox::after {
-  display: block;
-}
-
 .custom-checkbox {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.5);
+  border: 2px solid #cbd5e0;
   border-radius: 4px;
   margin-right: 8px;
   transition: all 0.3s ease;
@@ -938,20 +1172,19 @@ input.error {
   display: none;
 }
 
+.checkbox-group input[type="checkbox"]:checked + .custom-checkbox {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: transparent;
+}
+
+.checkbox-group input[type="checkbox"]:checked + .custom-checkbox::after {
+  display: block;
+}
+
 .checkbox-label {
-  color: rgba(255, 255, 255, 0.8);
+  color: #4a5568;
   font-size: 0.9rem;
   user-select: none;
-}
-
-.checkbox-label a {
-  color: #2370d5;
-  text-decoration: none;
-  margin: 0 3px;
-}
-
-.checkbox-label a:hover {
-  text-decoration: underline;
 }
 
 /************************************************************
@@ -1037,7 +1270,7 @@ input.error {
     order: 1;
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     padding-bottom: 2rem;
   }
 

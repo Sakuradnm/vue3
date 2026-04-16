@@ -391,7 +391,7 @@ async function submitPost() {
 
   try {
     await createPost(postData)
-    ElMessage.success('发帖成功！')
+    ElMessage.success('发帖成功！即将跳转到论坛列表页...')
     
     // 延迟跳转到论坛列表页
     setTimeout(() => {

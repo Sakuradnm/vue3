@@ -3,7 +3,8 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { getForumPosts, createPost, likePost, getPostLikeStatus, type CreatePostData, getForumCategories, type ForumCategory } from '@/api/forum';
 import type { ForumPostItem } from '@/api/forum';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { getUserInfo } from '@/utils/session';
 
 const router = useRouter();
 
@@ -143,37 +144,12 @@ async function fetchPosts() {
     allPosts.value = response;
     updateHasMore();
     updateCategoryCounts();
-    
-    // 获取当前用户的点赞状态
-    await fetchUserLikeStatus();
+
   } catch (error) {
     // 静默处理错误，不输出到控制台
   } finally {
     loading.value = false;
   }
-}
-
-async function fetchUserLikeStatus() {
-  const userInfoStr = localStorage.getItem('userInfo');
-  if (!userInfoStr) return;
-  
-  const userInfo = JSON.parse(userInfoStr);
-  if (!userInfo.id) return;
-  
-  // 批量获取用户对所有帖子的点赞状态
-  const userId = Number(userInfo.id);
-  const promises = allPosts.value.map(async (post) => {
-    try {
-      const status = await getPostLikeStatus(post.id, userId);
-      if (status.liked) {
-        likedPosts.add(post.id);
-      }
-    } catch (error) {
-      // 忽略单个请求失败
-    }
-  });
-  
-  await Promise.all(promises);
 }
 
 function updateHasMore() {
@@ -206,13 +182,11 @@ function updateCategoryCounts() {
 }
 
 async function toggleLike(postId: number) {
-  const userInfoStr = localStorage.getItem('userInfo')
-  if (!userInfoStr) {
-    ElMessage.warning('请先登录')
+  const userInfo = getUserInfo()
+  if (!userInfo) {
+    ElMessage.warning('请先登录后再点赞')
     return
   }
-
-  const userInfo = JSON.parse(userInfoStr)
 
   if (!userInfo.id) {
     ElMessage.error('用户信息异常，请重新登录')
@@ -220,18 +194,15 @@ async function toggleLike(postId: number) {
   }
 
   try {
-    // 根据当前点赞状态决定是点赞还是取消点赞
     const action = likedPosts.has(postId) ? 'unlike' : 'like'
-    await likePost(postId, userInfo.id, action)
+    const result = await likePost(postId, userInfo.id, action)
     const post = allPosts.value.find(p => p.id === postId)
 
-    if (action === 'like') {
-      // 点赞成功
+    if (result.liked) {
       if (post) post.likes++
       likedPosts.add(postId)
       ElMessage.success('点赞成功')
     } else {
-      // 取消点赞成功
       if (post) post.likes = Math.max(0, post.likes - 1)
       likedPosts.delete(postId)
       ElMessage.info('已取消点赞')
@@ -251,9 +222,21 @@ function goToDetail(postId: number) {
 }
 
 function goToUpload() {
-  const userInfoStr = localStorage.getItem('userInfo');
-  if (!userInfoStr) {
-    ElMessage.warning('请先登录');
+  const userInfo = getUserInfo();
+  if (!userInfo) {
+    ElMessageBox.confirm(
+      '需要登录后才能访问，是否前往登录？',
+      '提示',
+      {
+        confirmButtonText: '是',
+        cancelButtonText: '否',
+        type: 'warning',
+      }
+    ).then(() => {
+      router.push('/Users');
+    }).catch(() => {
+      // 用户取消，不做任何操作
+    });
     return;
   }
   router.push('/Forum/Upload');
@@ -395,14 +378,12 @@ async function submitPost() {
   }
 
   // 获取当前用户信息
-  const storedUserInfo = localStorage.getItem('userInfo');
-  if (!storedUserInfo) {
-    ElMessage.warning('请先登录');
+  const userInfo = getUserInfo();
+  if (!userInfo) {
+    ElMessage.warning('请先登录后再发布帖子');
     showCompose.value = false;
     return;
   }
-
-  const user = JSON.parse(storedUserInfo);
   const selectedCat = categories.find(c => c.id === composeForm.category);
 
   // 生成预览（取内容前100字符）
@@ -415,7 +396,7 @@ async function submitPost() {
       .slice(0, 5); // 最多5个标签
 
   const postData: CreatePostData = {
-    userId: user.id,
+    userId: userInfo.id,
     category: composeForm.category,
     categoryLabel: selectedCat?.label || '其他',
     title: composeForm.title.trim(),

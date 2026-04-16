@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import * as THREE from 'three'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { isLoggedIn } from '@/utils/session'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -20,6 +21,9 @@ let mouseY = 0
 let targetRotationX = 0
 let targetRotationY = 0
 let scrollProgress = 0
+
+// 检查登录状态
+const isUserLoggedIn = computed(() => isLoggedIn())
 
 // 初始化 Three.js 场景
 const initThree = () => {
@@ -394,6 +398,7 @@ onUnmounted(() => {
     <!-- Features Section -->
     <section class="features-section">
       <div class="section-header">
+        <div class="sec-tag">[ CORE ADVANTAGES ]</div>
         <h2 class="section-title">核心优势</h2>
         <p class="section-desc">重新定义在线学习体验</p>
       </div>
@@ -403,12 +408,6 @@ onUnmounted(() => {
           <div class="feature-icon">📚</div>
           <h3 class="feature-title">海量资源</h3>
           <p class="feature-desc">12800+ 优质课程资源，覆盖全学科领域</p>
-        </div>
-
-        <div class="feature-card glass-card">
-          <div class="feature-icon">🤖</div>
-          <h3 class="feature-title">AI 智能推荐</h3>
-          <p class="feature-desc">个性化学习路径，精准匹配你的需求</p>
         </div>
 
         <div class="feature-card glass-card">
@@ -428,30 +427,27 @@ onUnmounted(() => {
     <!-- Stats Section -->
     <section class="stats-section">
       <div class="stats-container glass-card">
-        <div class="stat-item">
+        <div class="stat-item" data-sub="TOTAL RESOURCES">
           <div class="stat-number gradient-text">12.8K+</div>
           <div class="stat-label">课程资源</div>
         </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
+        <div class="stat-item" data-sub="ACTIVE LEARNERS">
           <div class="stat-number gradient-text">4.2K+</div>
           <div class="stat-label">活跃用户</div>
         </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
+        <div class="stat-item" data-sub="COURSE TOPICS">
           <div class="stat-number gradient-text">320+</div>
           <div class="stat-label">专题课程</div>
         </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
+        <div class="stat-item" data-sub="AVG RATING / 5.0">
           <div class="stat-number gradient-text">4.9</div>
           <div class="stat-label">平均评分</div>
         </div>
       </div>
     </section>
 
-    <!-- CTA Section -->
-    <section class="cta-section">
+    <!-- CTA Section - 仅未登录用户可见 -->
+    <section v-if="!isUserLoggedIn" class="cta-section">
       <div class="cta-content glass-card">
         <h2 class="cta-title">准备好开始了吗？</h2>
         <p class="cta-desc">加入我们的知识共享网络，开启学习之旅</p>
@@ -465,15 +461,16 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
 /* ─── ROOT ────────────────────────────────────────────── */
 .home-root {
   position: relative;
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 50%, #f0f7ff 100%);
+  background: #f8f9fa;
   overflow-x: hidden;
   font-family: 'Noto Sans SC', sans-serif;
+  color: #1a1a1a;
 }
 
 /* ─── CANVAS ──────────────────────────────────────────── */
@@ -494,8 +491,8 @@ onUnmounted(() => {
   z-index: 1;
   pointer-events: none;
   background: 
-    radial-gradient(circle at 20% 30%, rgba(0, 102, 255, 0.08) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(0, 128, 255, 0.06) 0%, transparent 50%);
+    radial-gradient(circle at 20% 30%, rgba(0, 102, 255, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(0, 128, 255, 0.03) 0%, transparent 50%);
 }
 
 /* ─── HERO SECTION ────────────────────────────────────── */
@@ -539,11 +536,12 @@ onUnmounted(() => {
 }
 
 .hero-subtitle {
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   color: #495057;
   font-weight: 300;
   margin-bottom: 3rem;
   letter-spacing: 0.05em;
+  line-height: 1.9;
 }
 
 .hero-cta {
@@ -559,22 +557,24 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 1rem 2.2rem;
+  padding: 0.9rem 2rem;
   background: linear-gradient(135deg, #0066FF, #0080FF);
   color: #fff;
-  font-family: 'Noto Sans SC', sans-serif;
-  font-size: 0.95rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
   font-weight: 600;
+  letter-spacing: 0.14em;
   text-decoration: none;
-  border-radius: 12px;
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
   box-shadow: 0 4px 20px rgba(0, 102, 255, 0.3);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 102, 255, 0.4);
+  box-shadow: 0 8px 30px rgba(0, 102, 255, 0.4), 0 0 48px rgba(0, 102, 255, 0.2);
 }
 
 .btn-glow {
@@ -592,29 +592,31 @@ onUnmounted(() => {
 .btn-secondary {
   display: inline-flex;
   align-items: center;
-  padding: 1rem 2.2rem;
-  background: rgba(255, 255, 255, 0.8);
+  padding: 0.88rem 1.8rem;
+  background: #ffffff;
   backdrop-filter: blur(10px);
-  color: #0066FF;
-  font-family: 'Noto Sans SC', sans-serif;
-  font-size: 0.95rem;
+  color: #6c757d;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
   font-weight: 600;
+  letter-spacing: 0.14em;
   text-decoration: none;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 102, 255, 0.2);
-  transition: all 0.3s;
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  border: 1px solid #e9ecef;
+  transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(0, 102, 255, 0.4);
+  color: #0066FF;
+  border-color: rgba(0, 102, 255, 0.25);
   transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 102, 255, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 102, 255, 0.1);
 }
 
 .btn-primary.lg {
-  padding: 1.2rem 2.8rem;
-  font-size: 1.05rem;
+  padding: 1.05rem 2.5rem;
+  font-size: 0.76rem;
 }
 
 /* ─── SCROLL INDICATOR ────────────────────────────────── */
@@ -653,7 +655,8 @@ onUnmounted(() => {
 .features-section {
   position: relative;
   z-index: 2;
-  padding: 100px 6vw;
+  padding: 7rem 6vw;
+  border-bottom: 1px solid rgba(0, 102, 255, 0.08);
 }
 
 .section-header {
@@ -663,17 +666,27 @@ onUnmounted(() => {
 
 .section-title {
   font-family: 'Orbitron', sans-serif;
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(1.5rem, 3.2vw, 2.6rem);
   font-weight: 700;
   color: #1a1a1a;
-  margin-bottom: 0.8rem;
-  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.14em;
 }
 
 .section-desc {
-  font-size: 1rem;
+  font-size: 0.85rem;
   color: #6c757d;
   font-weight: 300;
+}
+
+/* ─── SECTION TAG ─────────────────────────────────────── */
+.sec-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.26em;
+  color: #0066FF;
+  opacity: 0.65;
+  margin-bottom: 1rem;
 }
 
 .features-grid {
@@ -686,73 +699,113 @@ onUnmounted(() => {
 
 /* ─── GLASS CARD ──────────────────────────────────────── */
 .glass-card {
-  background: rgba(255, 255, 255, 0.7);
+  background: #ffffff;
   backdrop-filter: blur(20px) saturate(1.5);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: 20px;
+  border: 1px solid rgba(0, 102, 255, 0.1);
+  border-radius: 0;
   padding: 2.5rem 2rem;
-  box-shadow: 
-    0 8px 32px rgba(0, 102, 255, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none;
+  transition: all 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #0066FF, #0080FF);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .glass-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 
-    0 16px 48px rgba(0, 102, 255, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-  border-color: rgba(0, 102, 255, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(0, 102, 255, 0.08);
+  border-color: rgba(0, 102, 255, 0.2);
+}
+
+.glass-card:hover::before {
+  transform: scaleX(1);
 }
 
 .feature-icon {
-  font-size: 3rem;
+  font-size: 2.5rem;
   margin-bottom: 1.2rem;
   display: block;
 }
 
 .feature-title {
-  font-size: 1.3rem;
-  font-weight: 700;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
   color: #1a1a1a;
   margin-bottom: 0.8rem;
+  letter-spacing: 0.1em;
 }
 
 .feature-desc {
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   color: #6c757d;
-  line-height: 1.7;
+  line-height: 1.85;
+  font-weight: 300;
 }
 
 /* ─── STATS SECTION ───────────────────────────────────── */
 .stats-section {
   position: relative;
   z-index: 2;
-  padding: 80px 6vw;
+  padding: 0;
+  border-bottom: 1px solid rgba(0, 102, 255, 0.08);
 }
 
 .stats-container {
-  max-width: 1000px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 3rem 2rem;
-  flex-wrap: wrap;
-  gap: 2rem;
+  max-width: 100%;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 0;
+  flex-wrap: nowrap;
+  gap: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .stat-item {
   text-align: center;
   flex: 1;
-  min-width: 150px;
+  min-width: auto;
+  padding: 3rem 2.5rem;
+  border-right: 1px solid rgba(0, 102, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+  transition: background 0.35s;
+}
+
+.stat-item:last-child {
+  border-right: none;
+}
+
+.stat-item:hover {
+  background: rgba(0, 102, 255, 0.02);
 }
 
 .stat-number {
   font-family: 'Orbitron', sans-serif;
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
   font-weight: 700;
   margin-bottom: 0.5rem;
+  line-height: 1;
+  background: linear-gradient(145deg, #1a1a1a 20%, #0066FF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 18px rgba(0, 102, 255, 0.2));
 }
 
 .gradient-text {
@@ -763,22 +816,33 @@ onUnmounted(() => {
 }
 
 .stat-label {
-  font-size: 0.9rem;
-  color: #6c757d;
+  font-size: 0.82rem;
+  color: #1a1a1a;
   letter-spacing: 0.05em;
+  margin-bottom: 0.2rem;
+}
+
+.stat-item::after {
+  content: attr(data-sub);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  color: #6c757d;
+  display: block;
+  margin-top: 0.3rem;
 }
 
 .stat-divider {
-  width: 1px;
-  height: 60px;
-  background: linear-gradient(to bottom, transparent, rgba(0, 102, 255, 0.2), transparent);
+  display: none;
 }
 
 /* ─── CTA SECTION ─────────────────────────────────────── */
 .cta-section {
   position: relative;
   z-index: 2;
-  padding: 100px 6vw 120px;
+  padding: 7rem 6vw 8rem;
+  text-align: center;
+  overflow: hidden;
 }
 
 .cta-content {
@@ -786,6 +850,7 @@ onUnmounted(() => {
   margin: 0 auto;
   text-align: center;
   padding: 4rem 3rem;
+  position: relative;
 }
 
 .cta-title {
@@ -794,13 +859,15 @@ onUnmounted(() => {
   font-weight: 700;
   color: #1a1a1a;
   margin-bottom: 1rem;
+  letter-spacing: 0.1em;
 }
 
 .cta-desc {
-  font-size: 1.05rem;
+  font-size: 0.86rem;
   color: #6c757d;
   margin-bottom: 2.5rem;
-  line-height: 1.7;
+  line-height: 1.95;
+  font-weight: 300;
 }
 
 /* ─── RESPONSIVE ──────────────────────────────────────── */
@@ -817,17 +884,26 @@ onUnmounted(() => {
   }
 
   .stats-container {
-    flex-direction: column;
-    gap: 2rem;
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .stat-divider {
-    width: 60px;
-    height: 1px;
-    background: linear-gradient(to right, transparent, rgba(0, 102, 255, 0.2), transparent);
+  .stat-item {
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 102, 255, 0.08);
+  }
+
+  .stat-item:nth-child(2),
+  .stat-item:last-child {
+    border-bottom: none;
   }
 
   .features-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-container {
     grid-template-columns: 1fr;
   }
 }

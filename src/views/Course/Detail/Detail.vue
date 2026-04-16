@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { getCourseDetail, getCourseRatings, getCourseOutline, type OutlineItem } from '@/api/course'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getCourseDetail, getCourseRatings, getCourseOutline, addCourseRating, likeRating, deleteCourseRating, type OutlineItem, type SectionItem } from '@/api/course'
+import { isLoggedIn, getUserInfo } from '@/utils/session'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,12 +40,26 @@ interface OutlineItem {
   parentId: number
   title: string
   sortOrder: number
+  sections?: SectionItem[]
+}
+
+interface SectionItem {
+  id: number
+  chapterId: number
+  title: string
+  sortOrder: number
   resources?: any[]
 }
 
 const courseDetail = ref<any>(null)
 const courseRatings = ref<any[]>([])
 const courseOutline = ref<OutlineItem[]>([])
+
+// 发布评论相关状态
+const showCommentForm = ref(false)
+const newRating = ref<number>(5)
+const newComment = ref<string>('')
+const submitting = ref(false)
 
 const mockModules: Module[] = [
   {
@@ -92,19 +107,22 @@ const course = computed(() => {
     ? (ratings.reduce((sum, r) => sum + Number(r.rating), 0) / ratings.length).toFixed(1)
     : '0.0'
 
-  const parsedIntro = parseDetailIntro(detail.detailIntro)
-
   return {
     id: detail.courseId,
     title: detail.courseName,
     subtitle: detail.overview || '系统化专业课程',
-    description: detail.detailIntro || detail.courseDescription || detail.overview || '暂无详细描述',
-    parsedIntro,
-    instructor: detail.teacher || '专业讲师',
+    description: detail.introduction || detail.courseDescription || detail.overview || '暂无详细描述',
+    // 新字段
+    introduction: detail.introduction,
+    learningObjectives: detail.learningObjectives,
+    mainContent: detail.mainContent,
+    targetAudience: detail.targetAudience,
+    teachingFeatures: detail.teachingFeatures,
+    instructor: detail.instructor || '专业讲师',
     instructorTitle: '资深教育专家',
     instructorBio: '拥有丰富的教学经验和行业实践经验，致力于为学生提供优质的学习体验。',
-    instructorInitial: (detail.teacher || '讲')[0],
-    duration: `${Math.floor((detail.totalDuration || 480) / 60)} 小时`,
+    instructorInitial: (detail.instructor || '讲')[0],
+    duration: '24 课时',
     level: '中级',
     levelColor: '#00ff9d',
     students: Math.floor(Math.random() * 5000) + 500,
@@ -116,6 +134,7 @@ const course = computed(() => {
     modules: mockModules,
     reviewList: ratings.map((r, idx) => ({
       id: r.id,
+      user_id: r.user_id,
       name: r.nickname || r.username,
       initial: (r.nickname || r.username || '用')[0],
       avatar: r.avatar_url,
@@ -123,7 +142,8 @@ const course = computed(() => {
       rating: Number(r.rating),
       date: r.created_at?.split('T')[0] || '2024-01-01',
       comment: r.comment,
-      helpful: r.useful_likes || 0
+      helpful: r.useful_likes || 0,
+      is_liked: r.is_liked || 0
     }))
   }
 })
@@ -142,69 +162,34 @@ const outlineTree = computed(() => {
       parentId: 0,
       title: module.title,
       sortOrder: module.id,
+      chapterNumber: idx + 1,
       sections: module.videos.map((video, vIdx) => ({
         id: video.id,
         courseId: courseId.value,
         parentId: module.id,
-        title: `${String(idx + 1).padStart(2, '0')}.${vIdx + 1} ${video.title}`,
+        title: video.title,
         sortOrder: vIdx + 1,
+        videoNumber: vIdx + 1,
         resources: [{
           id: video.id,
           resourceType: 'video',
           title: video.title,
           resourceUrl: '',
           duration: parseInt(video.duration.split(':')[0]) * 60 + parseInt(video.duration.split(':')[1]),
-          fileSize: null,
           sortOrder: 1
         }]
       }))
     }))
   }
 
-  const chapters = outlines.filter(o => o.parentId === 0).sort((a, b) => a.sortOrder - b.sortOrder)
-
-  let chapterSectionsMap = new Map<number, any[]>()
-  chapters.forEach(ch => { chapterSectionsMap.set(ch.id, []) })
-
-  outlines.forEach(item => {
-    if (item.parentId !== 0 && chapterSectionsMap.has(item.parentId)) {
-      chapterSectionsMap.get(item.parentId)!.push({ ...item, resources: item.resources || [] })
-    }
-  })
-
-  for (const ch of chapters) {
-    const sections = chapterSectionsMap.get(ch.id) || []
-    if (sections.length === 0) {
-      let chapterNumber = 0
-      const chMatch = ch.title.match(/第([一二三四五六七八九十\d]+)章/)
-      if (chMatch) {
-        const numStr = chMatch[1]
-        if (/^\d+$/.test(numStr)) {
-          chapterNumber = parseInt(numStr, 10)
-        } else {
-          const chnMap: Record<string, number> = { '一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9, '十':10 }
-          chapterNumber = chnMap[numStr] || 0
-        }
-      }
-
-      if (chapterNumber > 0) {
-        const autoSections = outlines.filter(item => {
-          if (item.parentId === 0) return false
-          const match = item.title.match(/^(\d+)\./)
-          return match && parseInt(match[1], 10) === chapterNumber
-        }).map(item => ({ ...item, resources: item.resources || [] }))
-        if (autoSections.length) {
-          chapterSectionsMap.set(ch.id, autoSections.sort((a, b) => a.sortOrder - b.sortOrder))
-        }
-      }
-    } else {
-      chapterSectionsMap.set(ch.id, sections.sort((a, b) => a.sortOrder - b.sortOrder))
-    }
-  }
-
-  return chapters.map(chapter => ({
+  // 新结构：后端直接返回章节和小节的嵌套结构
+  return outlines.map((chapter, cIdx) => ({
     ...chapter,
-    sections: chapterSectionsMap.get(chapter.id) || []
+    chapterNumber: cIdx + 1,
+    sections: (chapter.sections || []).map((section: any, sIdx: number) => ({
+      ...section,
+      videoNumber: sIdx + 1
+    }))
   }))
 })
 
@@ -215,26 +200,211 @@ const formatDuration = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
-const formatFileSize = (bytes: number) => {
-  if (!bytes) return ''
-  const kb = bytes / 1024
-  if (kb < 1024) return `${kb.toFixed(0)} KB`
-  return `${(kb / 1024).toFixed(1)} MB`
-}
-
 const toggleModule = (id: number) => {
   activeModule.value = activeModule.value === id ? null : id
 }
 
-const toggleLike = (id: number) => {
-  if (likedReviews.value.has(id)) {
-    likedReviews.value.delete(id)
-  } else {
-    likedReviews.value.add(id)
+const toggleLike = async (id: number) => {
+  // 检查是否登录
+  if (!isLoggedIn()) {
+    try {
+      await ElMessageBox.confirm(
+        '需要登录后才能点赞，是否前往登录？',
+        '提示',
+        {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning'
+        }
+      )
+      router.push('/Users')
+    } catch {
+      // 用户取消
+    }
+    return
+  }
+  
+  // 获取用户ID
+  const userInfo = getUserInfo()
+  if (!userInfo || !userInfo.id) {
+    ElMessage.error('无法获取用户信息，请重新登录')
+    return
+  }
+  
+  try {
+    const result = await likeRating(id, { userId: userInfo.id })
+    // 更新本地数据
+    const rating = courseRatings.value.find(r => r.id === id)
+    if (rating) {
+      if (rating.is_liked) {
+        // 取消点赞
+        rating.useful_likes = Math.max((rating.useful_likes || 0) - 1, 0)
+        rating.is_liked = 0
+      } else {
+        // 点赞
+        rating.useful_likes = (rating.useful_likes || 0) + 1
+        rating.is_liked = 1
+      }
+    }
+    ElMessage.success(result.message || '操作成功')
+  } catch (error: any) {
+    ElMessage.error(error.message || '操作失败')
   }
 }
 
-const enroll = () => {
+// 发布评论
+const submitComment = async () => {
+  // 检查是否登录
+  if (!isLoggedIn()) {
+    try {
+      await ElMessageBox.confirm(
+        '需要登录后才能发表评论，是否前往登录？',
+        '提示',
+        {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning'
+        }
+      )
+      router.push('/Users')
+    } catch {
+      // 用户取消
+    }
+    return
+  }
+  
+  // 验证输入
+  if (!newComment.value.trim()) {
+    ElMessage.warning('请输入评论内容')
+    return
+  }
+  
+  if (newRating.value < 1 || newRating.value > 5) {
+    ElMessage.warning('评分必须在1-5之间')
+    return
+  }
+  
+  // 获取用户ID
+  const userInfo = getUserInfo()
+  if (!userInfo || !userInfo.id) {
+    ElMessage.error('无法获取用户信息，请重新登录')
+    router.push('/Users')
+    return
+  }
+  
+  submitting.value = true
+  try {
+    const result = await addCourseRating(courseId.value, {
+      userId: userInfo.id,
+      rating: newRating.value,
+      comment: newComment.value.trim()
+    })
+    
+    ElMessage.success(result.message || '评论发布成功')
+    
+    // 重置表单
+    newRating.value = 5
+    newComment.value = ''
+    showCommentForm.value = false
+    
+    // 重新加载评论列表 - 确保获取最新数据
+    await loadCourseDetail()
+  } catch (error: any) {
+    ElMessage.error(error.message || '发布评论失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+// 取消发布
+const cancelComment = () => {
+  showCommentForm.value = false
+  newRating.value = 5
+  newComment.value = ''
+}
+
+// 删除评论
+const deleteComment = async (id: number) => {
+  // 检查是否登录
+  if (!isLoggedIn()) {
+    ElMessage.error('请先登录')
+    return
+  }
+  
+  // 获取用户ID
+  const userInfo = getUserInfo()
+  if (!userInfo || !userInfo.id) {
+    ElMessage.error('无法获取用户信息，请重新登录')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      '确定要删除这条评论吗？此操作不可恢复。',
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await deleteCourseRating(id, userInfo.id)
+    ElMessage.success('评论删除成功')
+    
+    // 重新加载评论列表
+    await loadCourseDetail()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '删除评论失败')
+    }
+  }
+}
+
+// 打开评论表单（需要登录）
+const openCommentForm = async () => {
+  // 检查是否登录
+  if (!isLoggedIn()) {
+    try {
+      await ElMessageBox.confirm(
+        '需要登录后才能发表评论，是否前往登录？',
+        '提示',
+        {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning'
+        }
+      )
+      router.push('/Users')
+    } catch {
+      // 用户取消
+    }
+    return
+  }
+  showCommentForm.value = true
+}
+
+const enroll = async () => {
+  // 检查是否登录
+  if (!isLoggedIn()) {
+    try {
+      await ElMessageBox.confirm(
+        '需要登录后才能学习课程，是否前往登录？',
+        '提示',
+        {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning'
+        }
+      )
+      // 用户点击“是”，跳转到登录页
+      router.push('/Users')
+    } catch {
+      // 用户点击“否”或关闭弹窗，不做任何操作
+    }
+    return
+  }
+  
   isEnrolled.value = true
   ElMessage.success('报名成功！开始学习吧~')
 }
@@ -249,6 +419,20 @@ const openResource = (resource: any) => {
 
 const goBack = () => router.back()
 
+// 解析带换行的文本为列表
+function parseNumberedList(text: string): string[] {
+  if (!text) return []
+  
+  // 统一换行符，去除首尾空白
+  let cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+  
+  // 按换行符分割，过滤空行
+  return cleanText
+    .split('\n')
+    .filter(s => s.trim().length > 0)
+    .map(s => s.trim())
+}
+
 const ratingBars = computed(() => {
   if (!course.value) return []
   const ratings = courseRatings.value
@@ -258,54 +442,6 @@ const ratingBars = computed(() => {
     return { stars, pct }
   })
 })
-
-function parseDetailIntro(text: string) {
-  if (!text) return null
-
-  const sections = []
-  const patterns = [
-    { key: 'intro', label: '课程简介', regex: /【课程简介】([\s\S]*?)(?=【|$)/ },
-    { key: 'objectives', label: '学习目标', regex: /【学习目标】([\s\S]*?)(?=【|$)/ },
-    { key: 'content', label: '主要内容', regex: /【主要内容】([\s\S]*?)(?=【|$)/ },
-    { key: 'audience', label: '适用人群', regex: /【适用人群】([\s\S]*?)(?=【|$)/ },
-    { key: 'features', label: '教学特色', regex: /【教学特色】([\s\S]*?)(?=【|$)/ },
-  ]
-
-  patterns.forEach(({ key, label, regex }) => {
-    const match = text.match(regex)
-    if (match && match[1]) {
-      let content = match[1].trim()
-      let items = []
-
-      if (key === 'objectives') {
-        const itemMatches = content.match(/\d+\.\s+([^；;]+)[；;]/g)
-        if (itemMatches) {
-          items = itemMatches.map(item => item.replace(/^\d+\.\s+/, '').replace(/[；;]$/, '').trim())
-        } else {
-          items = content.split(/[；;\n]/).filter(s => s.trim()).map(s => s.trim())
-        }
-      } else if (key === 'content') {
-        const moduleMatches = content.match(/模块[一二三四五六七八九十\d]+：[^；;]+[；;]/g)
-        if (moduleMatches) {
-          items = moduleMatches.map(m => m.replace(/[；;]$/, '').trim())
-        } else {
-          items = content.split(/[；;\n]/).filter(s => s.trim()).map(s => s.trim())
-        }
-      } else {
-        content = content.replace(/\n+/g, '\n').trim()
-      }
-
-      sections.push({
-        key,
-        label,
-        content,
-        items: items.length > 0 ? items : null,
-      })
-    }
-  })
-
-  return sections.length > 0 ? sections : null
-}
 
 async function loadCourseDetail() {
   const id = Number(route.params.id)
@@ -322,7 +458,11 @@ async function loadCourseDetail() {
     const data = await getCourseDetail(id)
     courseDetail.value = data
 
-    const ratings = await getCourseRatings(id)
+    // 获取用户ID，用于显示点赞状态
+    const userInfo = getUserInfo()
+    const userId = userInfo?.id
+    
+    const ratings = await getCourseRatings(id, userId)
     courseRatings.value = ratings
 
     const outline = await getCourseOutline(id)
@@ -509,45 +649,10 @@ onUnmounted(() => {
               <div class="ec-accent-line" :style="`background:${course.accent};box-shadow:0 0 14px ${course.accent}40`"></div>
             </div>
             <div class="ec-body">
-              <div class="ec-info-section">
-                <div class="ec-info-item">
-                  <span class="ec-info-icon">📚</span>
-                  <div class="ec-info-content">
-                    <span class="ec-info-label">课程时长</span>
-                    <span class="ec-info-value">{{ course.duration }}</span>
-                  </div>
-                </div>
-                <div class="ec-info-item">
-                  <span class="ec-info-icon">🎯</span>
-                  <div class="ec-info-content">
-                    <span class="ec-info-label">难度等级</span>
-                    <span class="ec-info-value">{{ course.level }}</span>
-                  </div>
-                </div>
-                <div class="ec-info-item">
-                  <span class="ec-info-icon">👥</span>
-                  <div class="ec-info-content">
-                    <span class="ec-info-label">学习人数</span>
-                    <span class="ec-info-value">{{ course.students.toLocaleString() }}人</span>
-                  </div>
-                </div>
-                <div class="ec-info-item">
-                  <span class="ec-info-icon">⭐</span>
-                  <div class="ec-info-content">
-                    <span class="ec-info-label">课程评分</span>
-                    <span class="ec-info-value">{{ course.rating }}分</span>
-                  </div>
-                </div>
-              </div>
               <button class="enroll-btn" :class="{ enrolled: isEnrolled }" @click="enroll">
                 <span class="cb-sweep"></span>
                 {{ isEnrolled ? '继续学习 →' : '立即学习' }}
               </button>
-              <div class="ec-features">
-                <div class="ecf-item" v-for="f in ['终身有效访问','三端同步','结课颁发证书','优质售后服务']" :key="f">
-                  <span class="ecf-check">✓</span>{{ f }}
-                </div>
-              </div>
             </div>
             <div class="ec-corner tl"></div>
             <div class="ec-corner br"></div>
@@ -576,23 +681,53 @@ onUnmounted(() => {
 
             <!-- ── Overview ── -->
             <div v-show="activeTab === 'overview'">
-              <template v-if="course.parsedIntro">
-                <div v-for="section in course.parsedIntro" :key="section.key" class="content-block fade-up">
-                  <div class="cb-header">
-                    <span class="cb-tag">[ {{ section.label.toUpperCase() }} ]</span>
-                    <h2 class="cb-title">{{ section.label }}</h2>
-                  </div>
-
-                  <div v-if="section.items" class="detail-items">
-                    <div v-for="(item, idx) in section.items" :key="idx" class="detail-item">
-                      <span class="item-marker">{{ section.key === 'objectives' ? idx + 1 + '.' : '◆' }}</span>
-                      <span class="item-text">{{ item }}</span>
-                    </div>
-                  </div>
-                  <p v-else class="block-text">{{ section.content }}</p>
+              <!-- 课程简介 -->
+              <div v-if="course.introduction" class="content-block fade-up">
+                <div class="cb-header">
+                  <span class="cb-tag">[ INTRODUCTION ]</span>
+                  <h2 class="cb-title">课程简介</h2>
                 </div>
-              </template>
-              <div v-else class="content-block fade-up">
+                <p class="block-text">{{ course.introduction }}</p>
+              </div>
+
+              <!-- 学习目标 -->
+              <div v-if="course.learningObjectives" class="content-block fade-up">
+                <div class="cb-header">
+                  <span class="cb-tag">[ OBJECTIVES ]</span>
+                  <h2 class="cb-title">学习目标</h2>
+                </div>
+                <p class="block-text">{{ course.learningObjectives }}</p>
+              </div>
+
+              <!-- 主要内容 -->
+              <div v-if="course.mainContent" class="content-block fade-up">
+                <div class="cb-header">
+                  <span class="cb-tag">[ CONTENT ]</span>
+                  <h2 class="cb-title">主要内容</h2>
+                </div>
+                <p class="block-text">{{ course.mainContent }}</p>
+              </div>
+
+              <!-- 适用人群 -->
+              <div v-if="course.targetAudience" class="content-block fade-up">
+                <div class="cb-header">
+                  <span class="cb-tag">[ AUDIENCE ]</span>
+                  <h2 class="cb-title">适用人群</h2>
+                </div>
+                <p class="block-text">{{ course.targetAudience }}</p>
+              </div>
+
+              <!-- 教学特色 -->
+              <div v-if="course.teachingFeatures" class="content-block fade-up">
+                <div class="cb-header">
+                  <span class="cb-tag">[ FEATURES ]</span>
+                  <h2 class="cb-title">教学特色</h2>
+                </div>
+                <p class="block-text">{{ course.teachingFeatures }}</p>
+              </div>
+
+              <!-- 如果没有详细信息，显示概述 -->
+              <div v-if="!course.introduction && !course.learningObjectives && !course.mainContent" class="content-block fade-up">
                 <div class="cb-header">
                   <span class="cb-tag">[ DETAILS ]</span>
                   <h2 class="cb-title">课程详情</h2>
@@ -631,21 +766,28 @@ onUnmounted(() => {
                     <span class="cb-tag">[ CURRICULUM ]</span>
                     <h2 class="cb-title">课程大纲</h2>
                   </div>
-                  <span class="curriculum-meta">{{ outlineTree.length }} 章 · {{ courseOutline.length }} 节</span>
+                  <span class="curriculum-meta">{{ outlineTree.length }} 章 · {{ courseOutline.reduce((sum, ch) => sum + (ch.sections?.length || 0), 0) }} 节</span>
                 </div>
 
                 <div v-if="outlineTree.length > 0" class="outline-tree">
-                  <div v-for="chapter in outlineTree" :key="chapter.id" class="chapter-item">
+                  <div v-for="(chapter, cIdx) in outlineTree" :key="chapter.id" class="chapter-item">
                     <div class="chapter-header">
-                      <div class="chapter-icon">◈</div>
+                      <div class="chapter-number-badge">
+                        <span class="chapter-num-text">CH {{ String(chapter.chapterNumber || cIdx + 1).padStart(2, '0') }}</span>
+                      </div>
                       <h3 class="chapter-title">{{ chapter.title }}</h3>
                     </div>
 
                     <div class="sections-list">
-                      <div v-for="section in chapter.sections" :key="section.id" class="section-item">
+                      <div v-for="(section, sIdx) in chapter.sections" :key="section.id" class="section-item">
                         <div class="section-header">
-                          <div class="section-icon">▸</div>
-                          <h4 class="section-title">{{ section.title }}</h4>
+                          <div class="vi-left">
+                            <span class="video-type-icon video">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            </span>
+                            <span class="video-number">{{ (chapter.chapterNumber || cIdx + 1) }}.{{ String(section.videoNumber || sIdx + 1).padStart(2, '0') }}</span>
+                            <h4 class="section-title">{{ section.title }}</h4>
+                          </div>
                         </div>
 
                         <div class="resources-inline">
@@ -658,7 +800,6 @@ onUnmounted(() => {
                               <span class="res-title-inline">{{ res.title }}</span>
                               <div class="res-meta-inline">
                                 <span v-if="res.duration" class="res-duration">{{ formatDuration(res.duration) }}</span>
-                                <span v-if="res.fileSize" class="res-size">{{ formatFileSize(res.fileSize) }}</span>
                               </div>
                               <button class="res-btn-small" @click="openResource(res)">
                                 {{ res.resourceType === 'video' ? '播放' : '下载' }}
@@ -701,6 +842,66 @@ onUnmounted(() => {
                   </div>
                 </div>
 
+                <!-- 发布评论按钮 -->
+                <div class="review-actions" style="margin-bottom: 24px;">
+                  <button 
+                    v-if="!showCommentForm" 
+                    class="write-review-btn"
+                    @click="openCommentForm"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    写评价
+                  </button>
+                </div>
+
+                <!-- 发布评论表单 -->
+                <div v-if="showCommentForm" class="comment-form-container" style="margin-bottom: 32px;">
+                  <div class="comment-form">
+                    <div class="form-header">
+                      <h3>发表评价</h3>
+                      <button class="close-form-btn" @click="cancelComment">×</button>
+                    </div>
+                    
+                    <div class="rating-selector">
+                      <label>评分：</label>
+                      <div class="star-rating">
+                        <span 
+                          v-for="star in 5" 
+                          :key="star"
+                          class="star-icon"
+                          :class="{ active: star <= newRating }"
+                          @click="newRating = star"
+                        >
+                          ★
+                        </span>
+                        <span class="rating-text">{{ newRating }} 分</span>
+                      </div>
+                    </div>
+                    
+                    <div class="comment-input-group">
+                      <label>评论内容：</label>
+                      <textarea
+                        v-model="newComment"
+                        placeholder="分享你的学习体验..."
+                        rows="4"
+                        maxlength="500"
+                        class="comment-textarea"
+                      ></textarea>
+                      <div class="char-count">{{ newComment.length }}/500</div>
+                    </div>
+                    
+                    <div class="form-actions">
+                      <button class="cancel-btn" @click="cancelComment" :disabled="submitting">取消</button>
+                      <button class="submit-btn" @click="submitComment" :disabled="submitting || !newComment.trim()">
+                        {{ submitting ? '提交中...' : '提交评价' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="reviews-list">
                   <div v-for="review in course.reviewList" :key="review.id" class="review-card">
                     <div class="review-top">
@@ -725,13 +926,28 @@ onUnmounted(() => {
                       </div>
                     </div>
                     <p class="review-text">{{ review.comment }}</p>
-                    <button class="helpful-btn" :class="{ liked: likedReviews.has(review.id) }" @click="toggleLike(review.id)">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="likedReviews.has(review.id) ? '#00d4ff' : 'currentColor'" stroke-width="2">
-                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
-                        <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
-                      </svg>
-                      {{ review.helpful + (likedReviews.has(review.id) ? 1 : 0) }} 人觉得有用
-                    </button>
+                    <div class="review-actions">
+                      <button class="helpful-btn" :class="{ liked: review.is_liked }" @click="toggleLike(review.id)">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="review.is_liked ? '#00d4ff' : 'currentColor'" stroke-width="2">
+                          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+                          <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+                        </svg>
+                        {{ review.helpful }} 人觉得有用
+                      </button>
+                      <!-- 只显示当前用户自己的评论的删除按钮 -->
+                      <button 
+                        v-if="getUserInfo() && getUserInfo().id === review.user_id"
+                        class="delete-btn" 
+                        @click="deleteComment(review.id)"
+                        title="删除评论"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        删除
+                      </button>
+                    </div>
                     <div class="rc-corner tl"></div>
                   </div>
                 </div>
@@ -976,28 +1192,15 @@ onUnmounted(() => {
 
 .ec-body { padding: 20px 22px 24px; }
 
-/* New info section styles */
-.ec-info-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
-.ec-info-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: rgba(255,255,255,0.8); border-radius: 8px; border: 1px solid rgba(0,102,255,0.08); transition: all 0.2s; }
-.ec-info-item:hover { background: rgba(0,102,255,0.04); border-color: rgba(0,102,255,0.15); }
-.ec-info-icon { font-size: 1.3rem; flex-shrink: 0; }
-.ec-info-content { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-.ec-info-label { font-size: 0.72rem; color: rgba(26,26,26,0.5); font-family: 'Noto Sans SC', sans-serif; }
-.ec-info-value { font-size: 0.9rem; font-weight: 600; color: #1a1a1a; font-family: 'JetBrains Mono', monospace; }
-
 .enroll-btn {
   display: block; width: 100%; padding: 13px; border-radius: 10px; border: none; cursor: pointer;
   background: linear-gradient(135deg, #0060cc, #0066FF); color: #fff;
   font-family: 'Noto Sans SC', sans-serif; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.04em;
   position: relative; overflow: hidden;
-  box-shadow: 0 6px 24px rgba(0,102,255,0.3); transition: all 0.3s; margin-bottom: 16px;
+  box-shadow: 0 6px 24px rgba(0,102,255,0.3); transition: all 0.3s;
 }
 .enroll-btn:hover:not(.enrolled) { box-shadow: 0 10px 36px rgba(0,102,255,0.45); transform: translateY(-1px); }
 .enroll-btn.enrolled { background: linear-gradient(135deg, #00a07a, #06d6a0); color: #fff; }
-
-.ec-features { display: flex; flex-direction: column; gap: 8px; }
-.ecf-item { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: rgba(26,26,26,0.6); }
-.ecf-check { color: #06d6a0; font-weight: 700; }
 
 .course-main { position: relative; z-index: 2; padding: 40px 48px 80px; max-width: 1280px; margin: 0 auto; }
 .main-inner { display: grid; grid-template-columns: 1fr 300px; gap: 32px; }
@@ -1051,14 +1254,40 @@ onUnmounted(() => {
 .chapter-item { background: rgba(0,102,255,0.02); border: 1px solid rgba(0,102,255,0.1); border-radius: 10px; padding: 18px 20px; transition: all 0.25s; }
 .chapter-item:hover { border-color: rgba(0,102,255,0.25); background: rgba(0,102,255,0.04); }
 .chapter-header { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
-.chapter-icon { font-size: 1.3rem; color: #0066FF; flex-shrink: 0; }
+.chapter-number-badge {
+  padding: 4px 10px;
+  background: rgba(0,102,255,0.08);
+  border: 1px solid rgba(0,102,255,0.15);
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.chapter-num-text {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0066FF;
+  letter-spacing: 0.1em;
+}
 .chapter-title { font-family: 'Orbitron', sans-serif; font-size: 1rem; font-weight: 600; color: #1a1a1a; letter-spacing: 0.04em; flex: 1; }
 
 .sections-list { display: flex; flex-direction: column; gap: 10px; padding-left: 32px; }
 .section-item { background: rgba(248,250,252,0.5); border: 1px solid rgba(0,102,255,0.08); border-radius: 8px; padding: 12px 14px; transition: all 0.2s; }
 .section-item:hover { border-color: rgba(0,102,255,0.2); }
 .section-header { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-.section-icon { font-size: 0.85rem; color: #06d6a0; flex-shrink: 0; margin-top: 1px; }
+.vi-left { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 0; }
+.video-type-icon {
+  width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.video-type-icon.video { background: rgba(0,102,255,0.08); color: #0066FF; border: 1px solid rgba(0,102,255,0.12); }
+.video-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0066FF;
+  flex-shrink: 0;
+  min-width: 32px;
+}
 .section-title { font-size: 0.88rem; font-weight: 600; color: #1a1a1a; flex: 1; line-height: 1.4; }
 
 .resources-inline { display: flex; flex-direction: column; gap: 6px; padding-left: 22px; margin-top: 4px; }
@@ -1189,6 +1418,33 @@ onUnmounted(() => {
 }
 .helpful-btn:hover, .helpful-btn.liked { background: rgba(0,102,255,0.08); border-color: rgba(0,102,255,0.2); color: #0066FF; }
 
+.review-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 71, 87, 0.2);
+  background: rgba(255, 71, 87, 0.05);
+  color: rgba(255, 71, 87, 0.8);
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-btn:hover {
+  background: rgba(255, 71, 87, 0.1);
+  border-color: rgba(255, 71, 87, 0.4);
+  color: #ff4757;
+}
+
 .sidebar-right { display: flex; flex-direction: column; gap: 14px; }
 .sidebar-card {
   background: rgba(248,250,252,0.6); border: 1px solid rgba(0,102,255,0.1);
@@ -1224,6 +1480,196 @@ onUnmounted(() => {
 }
 .ri-title { font-size: 0.82rem; font-weight: 600; color: #1a1a1a; margin-bottom: 2px; }
 .ri-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: rgba(26,26,26,0.5); }
+
+/* 评论表单样式 */
+.write-review-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #0066FF, #0052cc);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.write-review-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 102, 255, 0.4);
+}
+
+.comment-form-container {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.comment-form {
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(0, 102, 255, 0.15);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.form-header h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.close-form-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  color: rgba(26, 26, 26, 0.5);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-form-btn:hover {
+  color: #ff4757;
+  background: rgba(255, 71, 87, 0.1);
+  border-radius: 50%;
+}
+
+.rating-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.rating-selector label {
+  font-size: 0.9rem;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+.star-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.star-icon {
+  font-size: 1.8rem;
+  color: rgba(0, 102, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.star-icon.active {
+  color: #ffd93d;
+  filter: drop-shadow(0 0 4px rgba(255, 217, 61, 0.5));
+}
+
+.star-icon:hover {
+  transform: scale(1.1);
+}
+
+.rating-text {
+  margin-left: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  color: #0066FF;
+  font-weight: 600;
+}
+
+.comment-input-group {
+  margin-bottom: 20px;
+}
+
+.comment-input-group label {
+  display: block;
+  font-size: 0.9rem;
+  color: #1a1a1a;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.comment-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(0, 102, 255, 0.2);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: 'Noto Sans SC', sans-serif;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.8);
+  transition: all 0.3s;
+}
+
+.comment-textarea:focus {
+  outline: none;
+  border-color: #0066FF;
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+.char-count {
+  text-align: right;
+  font-size: 0.75rem;
+  color: rgba(26, 26, 26, 0.5);
+  margin-top: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancel-btn,
+.submit-btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: none;
+}
+
+.cancel-btn {
+  background: rgba(26, 26, 26, 0.05);
+  color: rgba(26, 26, 26, 0.6);
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background: rgba(26, 26, 26, 0.1);
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #0066FF, #0052cc);
+  color: #fff;
+}
+
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 102, 255, 0.4);
+}
+
+.cancel-btn:disabled,
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .expand-enter-active, .expand-leave-active { transition: all 0.32s cubic-bezier(0.25,1,0.5,1); overflow: hidden; }
 .expand-enter-from, .expand-leave-to { opacity: 0; transform: translateY(-8px); }

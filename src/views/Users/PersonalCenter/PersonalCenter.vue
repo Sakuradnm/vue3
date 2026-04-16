@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import AvatarUploader from '@/components/userUrl/index.vue'
 import { updateUser, getUserById } from '@/api/user'
 import request from '@/utils/request'
+import { getUserInfo, setUserInfo } from '@/utils/session'
 
 const router = useRouter()
 
@@ -55,13 +56,13 @@ onMounted(() => {
 })
 
 const loadUserInfo = async () => {
-  const storedUserInfo = localStorage.getItem('userInfo')
+  const storedUserInfo = getUserInfo()
   if (!storedUserInfo) {
     router.push('/Users')
     return
   }
 
-  const user = JSON.parse(storedUserInfo)
+  const user = storedUserInfo
   userId.value = user.id
 
   try {
@@ -115,9 +116,9 @@ const saveProfile = async () => {
     Object.assign(userInfo, formData)
 
     // 更新 localStorage 并触发 storage 事件，让顶部菜单实时更新
-    const storedUser = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const storedUser = getUserInfo() || {}
     const updatedUser = { ...storedUser, ...updateData }
-    localStorage.setItem('userInfo', JSON.stringify(updatedUser))
+    setUserInfo(updatedUser)
     
     // 手动触发 storage 事件，通知其他组件（如顶部菜单）更新
     window.dispatchEvent(new StorageEvent('storage', {

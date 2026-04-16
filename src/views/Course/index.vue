@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { getFullCourseTree } from '@/api/course'
+import { isLoggedIn } from '@/utils/session'
 import * as THREE from 'three'
 
 const router = useRouter()
@@ -16,6 +18,9 @@ let particleRafId: number | null = null
 let observers: IntersectionObserver[] = []
 const categories = ref<any[]>([])
 const loading = ref(true)
+
+// 排序相关状态
+const sortType = ref('default') // default, rating, students, newest
 
 // Three.js 相关状态
 const threeCanvasRef = ref<HTMLCanvasElement | null>(null)
@@ -592,13 +597,39 @@ const filteredCourses = computed(() => {
     courses = categories.value.flatMap(cat => cat.subCategories.flatMap(sub => sub.courses))
   }
   const q = debouncedSearchQuery.value.trim().toLowerCase()
-  if (!q) return courses
-  return courses.filter(c =>
-      c.title.toLowerCase().includes(q) ||
-      c.instructor.toLowerCase().includes(q) ||
-      c.description.toLowerCase().includes(q)
-  )
+  if (q) {
+    courses = courses.filter(c =>
+        c.title.toLowerCase().includes(q) ||
+        c.instructor.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q)
+    )
+  }
+  
+  // 应用排序
+  return sortCourses(courses)
 })
+
+// ─── 排序函数 ────────────────────────────────────────────────
+const sortCourses = (courses: Course[]) => {
+  const sorted = [...courses]
+  switch (sortType.value) {
+    case 'rating':
+      return sorted.sort((a, b) => b.rating - a.rating)
+    case 'students':
+      return sorted.sort((a, b) => b.students - a.students)
+    case 'newest':
+      // 假设新上传的课程ID更大，按ID降序排列
+      return sorted.sort((a, b) => Number(b.id) - Number(a.id))
+    case 'default':
+    default:
+      // 默认排序：热门和新上的排在前面
+      return sorted.sort((a, b) => {
+        const scoreA = (a.hot ? 1000 : 0) + (a.new ? 500 : 0) + a.rating * 100
+        const scoreB = (b.hot ? 1000 : 0) + (b.new ? 500 : 0) + b.rating * 100
+        return scoreB - scoreA
+      })
+  }
+}
 
 // ─── 分页后的课程列表 ────────────────────────────────────────
 const paginatedCourses = computed(() => {
@@ -611,7 +642,7 @@ const paginatedCourses = computed(() => {
 const totalPages = computed(() => Math.ceil(filteredCourses.value.length / pageSize))
 
 // ─── 监听筛选条件变化，重置页码 ──────────────────────────────
-watch([selectedCategory, selectedSubCategory, debouncedSearchQuery], () => {
+watch([selectedCategory, selectedSubCategory, debouncedSearchQuery, sortType], () => {
   currentPage.value = 1
 })
 
@@ -669,6 +700,35 @@ const goToCourse = (courseId: number) => {
   router.push(`/course/${courseId}`)
 }
 
+// 处理立即学习按钮点击
+const handleEnrollClick = async (event: Event, courseId: number) => {
+  // 阻止事件冒泡，避免触发卡片点击
+  event.stopPropagation()
+  
+  // 检查是否登录
+  if (!isLoggedIn()) {
+    try {
+      await ElMessageBox.confirm(
+        '需要登录后才能学习课程，是否前往登录？',
+        '提示',
+        {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning'
+        }
+      )
+      // 用户点击“是”，跳转到登录页
+      router.push('/Users')
+    } catch {
+      // 用户点击“否”或关闭弹窗，不做任何操作
+    }
+    return
+  }
+  
+  // 已登录则跳转到课程详情页
+  router.push(`/course/${courseId}`)
+}
+
 // ─── 搜索输入处理：建议框即时，课程网格防抖 300ms ───────────
 const handleSearchInput = () => {
   // if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
@@ -716,6 +776,29 @@ const highlightText = (text: string, query: string) => {
 const scrollToCoursesSection = () => {
   const el = document.querySelector('.courses-section')
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// ─── 处理排序变化 ────────────────────────────────────────────
+const handleSortChange = (event: Event) => {
+  const select = event.target as HTMLSelectElement
+  const value = select.value
+  
+  switch(value) {
+    case '综合排序':
+      sortType.value = 'default'
+      break
+    case '评分最高':
+      sortType.value = 'rating'
+      break
+    case '最多学员':
+      sortType.value = 'students'
+      break
+    case '最新上线':
+      sortType.value = 'newest'
+      break
+    default:
+      sortType.value = 'default'
+  }
 }
 
 // ─── 大类点击 ────────────────────────────────────────────────
@@ -809,6 +892,19 @@ let cleanupParticles: (() => void) | null = null
 
 onMounted(() => {
   loadCategories()
+  
+  // 检查是否需要刷新课程数据（从上传页面跳转过来）
+  const needRefresh = sessionStorage.getItem('courseNeedRefresh')
+  if (needRefresh === 'true') {
+    // 清除标志
+    sessionStorage.removeItem('courseNeedRefresh')
+    // 延迟重新加载数据，确保页面已渲染
+    setTimeout(() => {
+      loadCategories()
+      ElMessage.success('课程列表已更新')
+    }, 500)
+  }
+  
   setTimeout(() => {
     const root = document.querySelector('.cp-root')
     const canvas = root?.querySelector('.bg-canvas') as HTMLCanvasElement
@@ -1027,11 +1123,11 @@ onUnmounted(() => {
                   <span class="section-sub searching-text" v-else>· 找到 {{ filteredCourses.length }} 个相关课程</span>
                 </h2>
                 <div class="sort-wrap" v-show="!isSearching">
-                  <select class="sort-sel">
-                    <option>综合排序</option>
-                    <option>评分最高</option>
-                    <option>最多学员</option>
-                    <option>最新上线</option>
+                  <select class="sort-sel" @change="handleSortChange">
+                    <option value="综合排序">综合排序</option>
+                    <option value="评分最高">评分最高</option>
+                    <option value="最多学员">最多学员</option>
+                    <option value="最新上线">最新上线</option>
                   </select>
                 </div>
               </div>
@@ -1109,7 +1205,9 @@ onUnmounted(() => {
                           </div>
                           <span class="students-count">{{ course.students.toLocaleString() }} 人</span>
                         </div>
-                        <button class="card-cta" :style="{ background: course.accent, boxShadow: `0 4px 16px ${course.accent}44` }">
+                        <button class="card-cta" 
+                                :style="{ background: course.accent, boxShadow: `0 4px 16px ${course.accent}44` }"
+                                @click="handleEnrollClick($event, course.id)">
                           立即学习
                         </button>
                       </div>
@@ -1358,13 +1456,13 @@ onUnmounted(() => {
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  background: rgba(8, 24, 46, 0.98);
-  border: 1px solid rgba(0, 212, 255, 0.25);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 102, 255, 0.2);
   border-radius: 12px;
   overflow: hidden;
   backdrop-filter: blur(20px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 212, 255, 0.15);
-  z-index: 100;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 0 30px rgba(0, 102, 255, 0.08);
+  z-index: 1000;
 }
 .suggestion-item {
   display: flex;
@@ -1373,23 +1471,23 @@ onUnmounted(() => {
   padding: 12px 16px;
   cursor: pointer;
   transition: background 0.15s;
-  border-bottom: 1px solid rgba(0, 212, 255, 0.08);
+  border-bottom: 1px solid rgba(0, 102, 255, 0.08);
 }
 .suggestion-item:last-of-type { border-bottom: none; }
-.suggestion-item:hover { background: rgba(0, 212, 255, 0.1); }
+.suggestion-item:hover { background: rgba(0, 102, 255, 0.08); }
 .suggestion-content { flex: 1; min-width: 0; }
 .suggestion-title {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #c8f0e0;
+  color: #1a1a1a;
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .suggestion-title :deep(.highlight) {
-  background: rgba(0, 255, 180, 0.2);
-  color: #00ffb4;
+  background: rgba(0, 102, 255, 0.15);
+  color: #0066ff;
   padding: 1px 3px;
   border-radius: 3px;
   font-weight: 700;
@@ -1399,31 +1497,31 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   font-size: 0.75rem;
-  color: rgba(150, 210, 180, 0.6);
+  color: rgba(100, 100, 100, 0.6);
 }
 .suggestion-category {
   font-family: 'JetBrains Mono', monospace;
-  color: rgba(0, 212, 255, 0.7);
+  color: rgba(0, 102, 255, 0.7);
 }
-.suggestion-instructor { color: rgba(150, 210, 180, 0.5); }
+.suggestion-instructor { color: rgba(100, 100, 100, 0.5); }
 .suggestion-arrow {
   flex-shrink: 0;
-  color: rgba(0, 212, 255, 0.5);
+  color: rgba(0, 102, 255, 0.5);
   margin-left: 12px;
   transition: all 0.2s;
 }
 .suggestion-item:hover .suggestion-arrow {
-  color: #00d4ff;
+  color: #0066ff;
   transform: translateX(3px);
 }
 .suggestion-footer {
   padding: 8px 16px;
-  background: rgba(0, 212, 255, 0.04);
-  border-top: 1px solid rgba(0, 212, 255, 0.08);
+  background: rgba(0, 102, 255, 0.04);
+  border-top: 1px solid rgba(0, 102, 255, 0.08);
 }
 .suggestion-hint {
   font-size: 0.72rem;
-  color: rgba(150, 210, 180, 0.45);
+  color: rgba(100, 100, 100, 0.45);
   font-family: 'JetBrains Mono', monospace;
 }
 

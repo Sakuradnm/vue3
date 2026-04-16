@@ -6,7 +6,7 @@ import Home from '@/views/Home/index.vue'
 import Course from "@/views/Course/index.vue"
 import CourseDetail from "@/views/Course/Detail/Detail.vue"
 
-import Upload from "@/views/Upload/index.vue"
+import Upload from "@/views/Course/Upload/index.vue"
 import Forum from "@/views/Forum/index.vue"
 import ForumDetail from "@/views/Forum/Detail/index.vue"
 import ForumUpload from "@/views/Forum/Upload/index.vue"
@@ -91,14 +91,12 @@ const routes = [
     {
         path: '/course/:id',
         name: 'CourseDetail',
-        component: CourseDetail,
-        meta: { requiresAuth: true }
+        component: CourseDetail
     },
     {
         path: '/course/:id/learn',
         name: 'CourseLearn',
-        component: CourseDetail,
-        meta: { requiresAuth: true }
+        component: CourseDetail
     },
     {
         path: '/Upload',

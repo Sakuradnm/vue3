@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { getForumPostDetail, likePost, getPostLikeStatus, getComments, createComment, likeComment, getCommentLikeStatus, deleteComment, type ForumPostDetailItem, type ForumCommentItem } from '@/api/forum'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ChatRound, Star } from '@element-plus/icons-vue'
+import { getUserInfo } from '@/utils/session'
 
 const route = useRoute()
 const post = ref<ForumPostDetailItem | null>(null)
@@ -25,17 +26,14 @@ const fetchPostDetail = async () => {
     post.value = res
     
     // 获取当前用户的点赞状态
-    const userInfoStr = localStorage.getItem('userInfo')
-    if (userInfoStr) {
-      const userInfo = JSON.parse(userInfoStr)
-      if (userInfo.id) {
-        try {
-          const likeStatus = await getPostLikeStatus(postId, Number(userInfo.id))
-          liked.value = likeStatus.liked
-        } catch (error) {
-          console.error('获取点赞状态失败:', error)
-          liked.value = false
-        }
+    const userInfo = getUserInfo()
+    if (userInfo && userInfo.id) {
+      try {
+        const likeStatus = await getPostLikeStatus(postId, Number(userInfo.id))
+        liked.value = likeStatus.liked
+      } catch (error) {
+        console.error('获取点赞状态失败:', error)
+        liked.value = false
       }
     }
     
@@ -61,11 +59,8 @@ const fetchComments = async (postId: number) => {
 
 // 获取用户对所有评论的点赞状态
 const fetchCommentLikeStatuses = async () => {
-  const userInfoStr = localStorage.getItem('userInfo')
-  if (!userInfoStr) return
-  
-  const userInfo = JSON.parse(userInfoStr)
-  if (!userInfo.id) return
+  const userInfo = getUserInfo()
+  if (!userInfo || !userInfo.id) return
   
   const userId = Number(userInfo.id)
   
@@ -99,13 +94,11 @@ const fetchCommentLikeStatuses = async () => {
 const handleLike = async () => {
   if (!post.value) return
 
-  const userInfoStr = localStorage.getItem('userInfo')
-  if (!userInfoStr) {
+  const userInfo = getUserInfo()
+  if (!userInfo) {
     ElMessage.warning('请先登录')
     return
   }
-
-  const userInfo = JSON.parse(userInfoStr)
 
   if (!userInfo.id) {
     ElMessage.error('用户信息异常，请重新登录')
@@ -142,13 +135,11 @@ const handleSubmitComment = async () => {
   if (!post.value) return
 
   // 从 localStorage 获取当前登录用户信息
-  const userInfoStr = localStorage.getItem('userInfo')
-  if (!userInfoStr) {
+  const userInfo = getUserInfo()
+  if (!userInfo) {
     ElMessage.warning('请先登录')
     return
   }
-
-  const userInfo = JSON.parse(userInfoStr)
 
   try {
     await createComment({
@@ -174,13 +165,11 @@ const handleReply = (comment: ForumCommentItem) => {
 
 const handleLikeComment = async (commentId: number) => {
   // 从 localStorage 获取当前登录用户信息
-  const userInfoStr = localStorage.getItem('userInfo')
-  if (!userInfoStr) {
+  const userInfo = getUserInfo()
+  if (!userInfo) {
     ElMessage.warning('请先登录')
     return
   }
-
-  const userInfo = JSON.parse(userInfoStr)
 
   try {
     // 根据当前点赞状态决定是点赞还是取消点赞
@@ -220,16 +209,13 @@ const findCommentById = (comments: ForumCommentItem[], id: number): ForumComment
 }
 
 const handleDeleteComment = async (commentId: number) => {
-  const userInfoStr = localStorage.getItem('userInfo')
-  if (!userInfoStr) {
+  const userInfo = getUserInfo()
+  if (!userInfo) {
     ElMessage.warning('请先登录')
     return
   }
 
-  const userInfo = JSON.parse(userInfoStr)
   const currentUserId = Number(userInfo.id)
-  
-  // 帖子所有者ID
   const postOwnerId = post.value?.userId || 0
 
   try {
@@ -261,10 +247,9 @@ const handleDeleteComment = async (commentId: number) => {
 
 // 检查是否有权限删除评论
 const canDeleteComment = (comment: ForumCommentItem): boolean => {
-  const userInfoStr = localStorage.getItem('userInfo')
-  if (!userInfoStr) return false
+  const userInfo = getUserInfo()
+  if (!userInfo) return false
   
-  const userInfo = JSON.parse(userInfoStr)
   const currentUserId = Number(userInfo.id)
   const postOwnerId = post.value?.userId || 0
   

@@ -19,6 +19,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import Menu from "@/components/Menu/menu.vue";
 import Footer from "@/components/Footer/footer.vue";
+import { isAdmin } from '@/utils/session'
 
 const route = useRoute()
 
@@ -27,11 +28,11 @@ const isAdminLogin = ref(false)
 const isLoginPage = computed(() => route.path === '/Users')
 
 const checkAdminStatus = () => {
-  const storedUserInfo = localStorage.getItem('userInfo')
-  if (storedUserInfo) {
-    const userInfo = JSON.parse(storedUserInfo)
-    isAdminLogin.value = userInfo.level === 'admin'
-  } else {
+  try {
+    isAdminLogin.value = isAdmin()
+  } catch (error) {
+    console.error('检查管理员状态失败:', error)
+    // 发生错误时,默认显示普通用户界面(包含菜单和footer)
     isAdminLogin.value = false
   }
 }
@@ -43,7 +44,10 @@ const handleStorageChange = (e: StorageEvent) => {
 }
 
 onMounted(() => {
-  checkAdminStatus()
+  // 延迟执行,确保 DOM 完全加载
+  setTimeout(() => {
+    checkAdminStatus()
+  }, 0)
 
   window.addEventListener('storage', handleStorageChange)
 

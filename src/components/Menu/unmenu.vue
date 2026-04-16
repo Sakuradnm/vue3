@@ -2,6 +2,7 @@
 import { defineProps, watch, onBeforeUnmount, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
+import { getUserInfo } from '@/utils/session'
 
 const router = useRouter()
 
@@ -11,9 +12,9 @@ const userInfo = ref<any>(null)
 
 // 检查登录状态
 const checkLoginStatus = () => {
-  const storedUserInfo = localStorage.getItem('userInfo')
+  const storedUserInfo = getUserInfo()
   if (storedUserInfo) {
-    userInfo.value = JSON.parse(storedUserInfo)
+    userInfo.value = storedUserInfo
     isLoggedIn.value = true
   } else {
     isLoggedIn.value = false
@@ -30,7 +31,7 @@ const isAdmin = computed(() => {
 checkLoginStatus()
 
 // 监听 localStorage 变化（处理其他标签页登录/登出）
-watch(() => localStorage.getItem('userInfo'), () => {
+watch(() => getUserInfo(), () => {
   checkLoginStatus()
 })
 

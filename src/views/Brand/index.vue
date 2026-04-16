@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref, reactive, computed } from 'vue';
+import { getUserInfo } from '@/utils/session';
 
 const rootRef = ref(null);
 const mouseX = ref(0);
@@ -12,8 +13,8 @@ const counts = reactive({ resources: 0, users: 0, topics: 0, rating: 0 });
 
 // 检查用户登录状态
 const isLoggedIn = computed(() => {
-  const userInfoStr = localStorage.getItem('userInfo')
-  return !!userInfoStr
+  const userInfo = getUserInfo()
+  return !!userInfo
 })
 
 let rafId = null;
