@@ -1,44 +1,78 @@
 /**
  * 会话存储管理工具
- * 使用 localStorage + 时间戳实现智能会话管理
- * - 关闭页面标签后重新打开：保留登录状态（24小时内有效）
- * - 关闭浏览器后重新打开：如果超过24小时则需重新登录
+ * 使用 localStorage + 会话标识实现智能会话管理
+ * - 关闭页面标签后重新打开：保留登录状态（同一浏览器会话内）
+ * - 关闭浏览器后重新打开：自动清除所有会话数据，需要重新登录
  * - 主动退出登录：立即清除所有会话数据
  */
 
 const USER_INFO_KEY = 'userInfo'
-const SESSION_TIMESTAMP_KEY = 'sessionTimestamp'
+const SESSION_ID_KEY = 'sessionId'
 const REMEMBERED_USERNAME_KEY = 'rememberedUsername'
 const USER_NOTICES_KEY = 'userNotices'
 
-// 会话有效期：24小时（单位：毫秒）
-const SESSION_EXPIRY_TIME = 24 * 60 * 60 * 1000
+// 生成唯一会话ID
+function generateSessionId(): string {
+  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+// 获取或创建会话ID
+function getOrCreateSessionId(): string {
+  let sessionId = sessionStorage.getItem(SESSION_ID_KEY)
+  if (!sessionId) {
+    // 如果是新标签页，检查是否有活跃的浏览器会话
+    const activeSessionId = localStorage.getItem('activeSessionId')
+    const sessionTimestamp = localStorage.getItem('sessionTimestamp')
+    
+    // 如果存在活跃会话且时间在5分钟内，认为是同一浏览器会话
+    if (activeSessionId && sessionTimestamp) {
+      const now = Date.now()
+      const timestamp = parseInt(sessionTimestamp, 10)
+      if (now - timestamp < 5 * 60 * 1000) { // 5分钟窗口期
+        sessionId = activeSessionId
+      }
+    }
+    
+    // 如果没有有效会话，创建新的
+    if (!sessionId) {
+      sessionId = generateSessionId()
+    }
+    
+    // 保存到 sessionStorage（当前标签页）和 localStorage（浏览器会话）
+    sessionStorage.setItem(SESSION_ID_KEY, sessionId)
+    localStorage.setItem('activeSessionId', sessionId)
+    localStorage.setItem('sessionTimestamp', Date.now().toString())
+  }
+  return sessionId
+}
 
 /**
  * 获取用户信息
- * 会检查会话是否过期，如果过期则自动清除
+ * 从 localStorage 中读取用户信息，并验证会话有效性
  */
 export function getUserInfo() {
   try {
     const stored = localStorage.getItem(USER_INFO_KEY)
-    const timestamp = localStorage.getItem(SESSION_TIMESTAMP_KEY)
+    const sessionId = localStorage.getItem('activeSessionId')
+    const sessionTimestamp = localStorage.getItem('sessionTimestamp')
     
-    if (!stored || !timestamp) {
+    if (!stored || !sessionId || !sessionTimestamp) {
       return null
     }
     
-    // 检查会话是否过期
+    // 检查会话是否过期（超过2小时无活动视为浏览器已关闭）
     const now = Date.now()
-    const sessionTime = parseInt(timestamp, 10)
+    const timestamp = parseInt(sessionTimestamp, 10)
+    const SESSION_TIMEOUT = 2 * 60 * 60 * 1000 // 2小时
     
-    if (now - sessionTime > SESSION_EXPIRY_TIME) {
+    if (now - timestamp > SESSION_TIMEOUT) {
       // 会话已过期，清除数据
-      console.log('会话已过期，自动清除')
+      console.log('浏览器会话已过期，自动清除')
       clearUserInfo()
       return null
     }
     
-    // 更新最后活动时间
+    // 更新会话时间戳
     updateSessionTimestamp()
     
     return JSON.parse(stored)
@@ -51,10 +85,12 @@ export function getUserInfo() {
 
 /**
  * 设置用户信息
- * 同时记录会话时间戳
+ * 保存到 localStorage，并初始化会话
  */
 export function setUserInfo(userInfo: any) {
   try {
+    // 初始化或获取会话ID
+    getOrCreateSessionId()
     localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo))
     updateSessionTimestamp()
   } catch (error) {
@@ -66,7 +102,7 @@ export function setUserInfo(userInfo: any) {
  * 更新会话时间戳
  */
 function updateSessionTimestamp() {
-  localStorage.setItem(SESSION_TIMESTAMP_KEY, Date.now().toString())
+  localStorage.setItem('sessionTimestamp', Date.now().toString())
 }
 
 /**
@@ -74,7 +110,9 @@ function updateSessionTimestamp() {
  */
 export function clearUserInfo() {
   localStorage.removeItem(USER_INFO_KEY)
-  localStorage.removeItem(SESSION_TIMESTAMP_KEY)
+  localStorage.removeItem('activeSessionId')
+  localStorage.removeItem('sessionTimestamp')
+  sessionStorage.removeItem(SESSION_ID_KEY)
 }
 
 /**

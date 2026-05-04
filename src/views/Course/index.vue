@@ -426,8 +426,6 @@ interface Course {
   description: string
   instructor: string
   duration: string
-  level: string
-  levelColor: string
   students: number
   rating: number
   lessons: number
@@ -435,6 +433,7 @@ interface Course {
   tag: string
   new?: boolean
   hot?: boolean
+  status?: number  // 0-上架, 1-下架
 }
 
 interface SubCategory {
@@ -455,7 +454,6 @@ interface Category {
 }
 
 const glyphs = ['◈', '◉', '⬡', '◎', '◈', '⬟']
-const levelColors = ['#06d6a0', '#f59e0b', '#ef4444']
 const accents = ['#4f6ef7', '#0ea5e9', '#a855f7', '#ef4444', '#f97316', '#84cc16', '#06d6a0']
 
 const generateMockCourse = (name: string, cIndex: number): Course => ({
@@ -464,8 +462,6 @@ const generateMockCourse = (name: string, cIndex: number): Course => ({
   description: '系统化课程讲解，涵盖核心知识点与实战应用',
   instructor: '名师主讲',
   duration: '24 课时',
-  level: ['初级', '中级', '高级'][Math.floor(Math.random() * 3)],
-  levelColor: levelColors[Math.floor(Math.random() * levelColors.length)],
   students: Math.floor(Math.random() * 5000) + 500,
   rating: parseFloat((4.5 + Math.random() * 0.5).toFixed(1)),
   lessons: Math.floor(Math.random() * 30) + 20,
@@ -477,7 +473,7 @@ const generateMockCourse = (name: string, cIndex: number): Course => ({
 
 const loadCategories = async () => {
   try {
-    // 一次性获取完整的课程树结构
+    // 一次性获取完整的课程树结构（包含统计字段）
     const courseTreeData = await getFullCourseTree()
     
     // 转换数据格式以适配前端展示
@@ -498,16 +494,15 @@ const loadCategories = async () => {
           title: course.name,
           description: course.description || '系统化课程讲解，涵盖核心知识点与实战应用',
           instructor: '名师主讲',
-          duration: '24 课时',
-          level: ['初级', '中级', '高级'][Math.floor(Math.random() * 3)],
-          levelColor: levelColors[Math.floor(Math.random() * levelColors.length)],
-          students: Math.floor(Math.random() * 5000) + 500,
-          rating: parseFloat((4.5 + Math.random() * 0.5).toFixed(1)),
-          lessons: Math.floor(Math.random() * 30) + 20,
+          duration: `${course.totalSections || 0} 课时`,  // 使用后端返回的课时数
+          students: course.studentsCount || 0,  // 使用后端返回的学习人数
+          rating: course.ratingAvg || 0.0,  // 使用后端返回的平均评分
+          lessons: course.videoCount || 0,  // 使用后端返回的视频节数
           accent: accents[cIndex % accents.length],
           tag: '核心课程',
           new: Math.random() > 0.7,
-          hot: Math.random() > 0.8
+          hot: Math.random() > 0.8,
+          status: course.status ?? 0  // 从后端获取status，默认为0（上架）
         }))
       }))
     }))
@@ -533,7 +528,7 @@ const loadCategories = async () => {
   }
 }
 
-// ─── 当前大类的子分类列表 ───────────────────────────────────
+// ── 当前大类的子分类列表 ───────────────────────────────────
 const currentSubCategories = computed(() => {
   if (!categories.value || !categories.value[selectedCategory.value]) return []
   return categories.value[selectedCategory.value]?.subCategories || []
@@ -697,6 +692,13 @@ const allStats = computed(() => {
 })
 
 const goToCourse = (courseId: number) => {
+  // 检查课程状态，如果已下架则不允许进入
+  const course = allCoursesFlat.value.find(c => c.id === courseId)
+  if (course && course.status === 1) {
+    ElMessage.warning('该课程已下架，暂时无法访问')
+    return
+  }
+  
   router.push(`/course/${courseId}`)
 }
 
@@ -1138,10 +1140,16 @@ onUnmounted(() => {
                       v-for="course in paginatedCourses"
                       :key="course.id"
                       class="course-card"
+                      :class="{ 'unpublished': course.status === 1 }"
                       @click="goToCourse(course.id)"
                       @mouseenter="hoveredCard = course.id"
                       @mouseleave="hoveredCard = null"
                   >
+                    <!-- 下架遮罩 -->
+                    <div v-if="course.status === 1" class="unpublished-overlay">
+                      <div class="unpublished-badge">已下架</div>
+                    </div>
+                    
                     <div class="card-thumb" :style="{ background: `linear-gradient(135deg, ${course.accent}28, ${course.accent}0a)` }">
                       <div class="thumb-glyph" :style="{ color: course.accent + '55' }">
                         {{ categories[selectedCategory]?.glyph || '◈' }}
@@ -1155,9 +1163,6 @@ onUnmounted(() => {
                         </button>
                       </div>
                       <div class="badge-group">
-                        <span class="level-badge" :style="{ background: course.levelColor + '22', color: course.levelColor, borderColor: course.levelColor + '44' }">
-                          {{ course.level }}
-                        </span>
                         <span v-if="course.hot" class="hot-badge">🔥 热门</span>
                         <span v-if="course.new" class="new-badge">✦ 新上</span>
                       </div>
@@ -1200,7 +1205,12 @@ onUnmounted(() => {
                       <div class="card-footer">
                         <div class="footer-left">
                           <div class="rating-row">
-                            <span class="stars" :style="{ color: '#f59e0b' }">★★★★★</span>
+                            <span class="stars-display">
+                              <span v-for="i in 5" :key="i" 
+                                    class="star-icon"
+                                    :class="{ filled: i <= Math.floor(course.rating) }"
+                                    :style="i <= Math.floor(course.rating) ? { color: '#ffd93d' } : { color: '#e0e0e0' }">★</span>
+                            </span>
                             <span class="rating-num">{{ course.rating }}</span>
                           </div>
                           <span class="students-count">{{ course.students.toLocaleString() }} 人</span>
@@ -2022,6 +2032,54 @@ onUnmounted(() => {
   /* 开启 GPU 合成层，隔离卡片动画对父级布局的影响 */
   will-change: transform;
 }
+
+/* 下架状态样式 */
+.course-card.unpublished {
+  opacity: 0.6;
+  filter: grayscale(50%);
+}
+
+.course-card.unpublished:hover {
+  transform: none !important;
+  border-color: #e9ecef !important;
+  box-shadow: none !important;
+}
+
+/* 下架遮罩 */
+.unpublished-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.unpublished-badge {
+  padding: 12px 32px;
+  background: rgba(239, 68, 68, 0.95);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: 8px;
+  letter-spacing: 0.1em;
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+  }
+  50% { 
+    transform: scale(1.05);
+    box-shadow: 0 6px 30px rgba(239, 68, 68, 0.6);
+  }
+}
 .course-card::before {
   content: '';
   position: absolute;
@@ -2241,6 +2299,18 @@ onUnmounted(() => {
 .footer-left { display: flex; flex-direction: column; gap: 2px; }
 .rating-row { display: flex; align-items: center; gap: 6px; }
 .stars { font-size: 0.78rem; }
+.stars-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.star-icon {
+  font-size: 0.78rem;
+  transition: color 0.2s;
+}
+.star-icon.filled {
+  filter: drop-shadow(0 0 2px rgba(255, 217, 61, 0.3));
+}
 .rating-num {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.88rem;

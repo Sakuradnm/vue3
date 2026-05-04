@@ -168,8 +168,10 @@ export interface ResourceItem {
     id: number
     resourceType: string
     title: string
+    // fileName字段已从数据库中删除
     resourceUrl: string
     duration: number
+    // fileSize字段已从数据库中删除
     sortOrder: number
 }
 
@@ -186,14 +188,14 @@ export interface VideoUploadItem {
     title: string
     duration: string
     resourceUrl: string
-    fileName?: string
+    // fileName字段已从数据库中删除
 }
 
 export interface FileUploadItem {
     title: string
-    fileName: string
+    // fileName字段已从数据库中删除
     resourceUrl: string
-    fileSize?: number
+    // fileSize字段已从数据库中删除
 }
 
 export interface ChapterUploadItem {
@@ -209,12 +211,17 @@ export interface CourseUploadData {
     subCategoryId: number
     categoryId: number
     detailIntro?: string
+    introduction?: string
+    learningObjectives?: string
+    mainContent?: string
+    targetAudience?: string
+    teachingFeatures?: string
     teacher?: string
     chapters: ChapterUploadItem[]
 }
 
 /**
- * 上传课程
+ * 上传课程（提交审核，等待管理员审批）
  */
 export const uploadCourse = (data: CourseUploadData) => {
     return request<{ code: number; message: string; data: number }>({
@@ -231,5 +238,109 @@ export const getAllSubCategories = () => {
     return request<SubCategoryItem[]>({
         url: '/api/sub-categories',
         method: 'get'
+    })
+}
+
+/**
+ * 上传文件（视频或文档）
+ */
+export interface UploadFileResponse {
+    url: string
+    fileName: string
+    fileSize: number
+    contentType: string
+}
+
+export const uploadFile = (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    return request<UploadFileResponse>({
+        url: '/api/upload/file',
+        method: 'post',
+        data: formData,
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    })
+}
+
+/**
+ * 用户报名学习课程（立即学习）
+ */
+export interface EnrollCourseRequest {
+    userId: number
+}
+
+export interface EnrollCourseResponse {
+    alreadyEnrolled: boolean
+    message: string
+}
+
+export const enrollCourse = (courseId: number, data: EnrollCourseRequest) => {
+    return request<EnrollCourseResponse>({
+        url: `/api/courses/${courseId}/enroll`,
+        method: 'post',
+        data
+    })
+}
+
+/**
+ * 检查用户是否已学习某门课程
+ */
+export interface CheckEnrollmentResponse {
+    isEnrolled: boolean
+}
+
+export const checkEnrollment = (courseId: number, userId: number) => {
+    return request<CheckEnrollmentResponse>({
+        url: `/api/courses/${courseId}/check-enrollment`,
+        method: 'get',
+        params: { userId }
+    })
+}
+
+/**
+ * 获取课程的学习人数
+ */
+export interface StudentsCountResponse {
+    studentsCount: number
+}
+
+export const getStudentsCount = (courseId: number) => {
+    return request<StudentsCountResponse>({
+        url: `/api/courses/${courseId}/students-count`,
+        method: 'get'
+    })
+}
+
+/**
+ * 批量获取多个课程的学习人数
+ */
+export const getBatchStudentsCount = (courseIds: number[]) => {
+    return request<Record<number, number>>({
+        url: '/api/courses/batch-students-count',
+        method: 'post',
+        data: courseIds
+    })
+}
+
+/**
+ * 获取用户的学习记录列表
+ */
+export interface UserStudyRecord {
+    id: number
+    courseId: number
+    courseName: string
+    enrolledAt: string
+    lastLearnedAt: string
+    progressPercent: number
+}
+
+export const getUserStudyRecords = (userId: number) => {
+    return request<UserStudyRecord[]>({
+        url: '/api/courses/user-study-records',
+        method: 'get',
+        params: { userId }
     })
 }

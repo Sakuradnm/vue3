@@ -1,25 +1,126 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { getUserStudyRecords, getCourseDetail } from '@/api/course'
+import { isLoggedIn, getUserInfo } from '@/utils/session'
 
 const router = useRouter()
 const activeTab = ref('all')
 const searchQuery = ref('')
 const userCourses = ref<any[]>([])
+const loading = ref(true)
 
 onMounted(() => {
   loadUserCourses()
 })
 
-const loadUserCourses = () => {
-  const stored = localStorage.getItem('userCourses')
-  userCourses.value = stored ? JSON.parse(stored) : [
-    { id: 1, title: '小米 SU7 Ultra 技术详解', instructor: '张工', thumbnail: '/brand/ultra.png', progress: 75, totalLessons: 24, completedLessons: 18, category: '电动车', lastLearned: Date.now() - 3600000, rating: 4.8, accent: '#4f6ef7' },
-    { id: 2, title: 'TOYOTA GR SUPRA 性能解析', instructor: '李明', thumbnail: '/brand/supra.png', progress: 45, totalLessons: 20, completedLessons: 9, category: '经典车型', lastLearned: Date.now() - 86400000, rating: 4.6, accent: '#f59e0b' },
-    { id: 3, title: 'SUBARU BRZ 改装教程', instructor: '王师傅', thumbnail: '/brand/brz.png', progress: 100, totalLessons: 16, completedLessons: 16, category: '改装', lastLearned: Date.now() - 172800000, rating: 4.9, accent: '#06d6a0' },
-    { id: 4, title: 'NISSAN GT-R 赛道驾驶技巧', instructor: '陈教练', thumbnail: '/brand/gtr.png', progress: 30, totalLessons: 18, completedLessons: 5, category: '驾驶技巧', lastLearned: Date.now() - 259200000, rating: 4.7, accent: '#ef4444' },
-    { id: 5, title: 'DODGE CHALLENGER 维护与保养', instructor: '刘技师', thumbnail: '/brand/hellcat.png', progress: 0, totalLessons: 12, completedLessons: 0, category: '保养维修', lastLearned: 0, rating: 4.5, accent: '#a855f7' },
-  ]
+const loadUserCourses = async () => {
+  // 检查是否登录
+  if (!isLoggedIn()) {
+    ElMessage.warning('请先登录后查看学习记录')
+    router.push('/Users')
+    return
+  }
+  
+  const userInfo = getUserInfo()
+  if (!userInfo || !userInfo.id) {
+    ElMessage.error('无法获取用户信息，请重新登录')
+    router.push('/Users')
+    return
+  }
+  
+  try {
+    loading.value = true
+    
+    // 1. 从后端获取学习记录
+    const studyRecords = await getUserStudyRecords(userInfo.id)
+    
+    if (!studyRecords || studyRecords.length === 0) {
+      userCourses.value = []
+      return
+    }
+    
+    // 2. 获取每门课程的详细信息
+    const courseDetailsPromises = studyRecords.map(async (record) => {
+      try {
+        const detail = await getCourseDetail(record.courseId)
+        return {
+          id: record.courseId,
+          title: detail.courseName || record.courseName,
+          instructor: detail.instructor || '待定讲师',
+          thumbnail: `/brand/${getThumbnailByCourseId(record.courseId)}.png`,
+          progress: record.progressPercent || 0,
+          totalLessons: 0, // 需要从outline获取
+          completedLessons: 0,
+          category: getCategoryByCourseId(record.courseId),
+          lastLearned: record.lastLearnedAt ? new Date(record.lastLearnedAt).getTime() : 0,
+          rating: 0, // 需要从ratings获取
+          accent: getAccentByCourseId(record.courseId),
+        }
+      } catch (error) {
+        console.error(`获取课程${record.courseId}详情失败:`, error)
+        return {
+          id: record.courseId,
+          title: record.courseName || `课程${record.courseId}`,
+          instructor: '待定讲师',
+          thumbnail: '/brand/default.png',
+          progress: record.progressPercent || 0,
+          totalLessons: 0,
+          completedLessons: 0,
+          category: '其他',
+          lastLearned: record.lastLearnedAt ? new Date(record.lastLearnedAt).getTime() : 0,
+          rating: 0,
+          accent: '#4f6ef7',
+        }
+      }
+    })
+    
+    const courses = await Promise.all(courseDetailsPromises)
+    userCourses.value = courses.filter(c => c !== null)
+    
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载学习记录失败')
+    userCourses.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+// 辅助函数：根据课程ID获取缩略图
+const getThumbnailByCourseId = (courseId: number): string => {
+  const thumbnails: Record<number, string> = {
+    1: 'ultra',
+    2: 'supra',
+    3: 'brz',
+    4: 'gtr',
+    5: 'hellcat',
+  }
+  return thumbnails[courseId] || 'default'
+}
+
+// 辅助函数：根据课程ID获取分类
+const getCategoryByCourseId = (courseId: number): string => {
+  const categories: Record<number, string> = {
+    1: '电动车',
+    2: '经典车型',
+    3: '改装',
+    4: '驾驶技巧',
+    5: '保养维修',
+  }
+  return categories[courseId] || '其他'
+}
+
+// 辅助函数：根据课程ID获取主题色
+const getAccentByCourseId = (courseId: number): string => {
+  const accents: Record<number, string> = {
+    1: '#4f6ef7',
+    2: '#f59e0b',
+    3: '#06d6a0',
+    4: '#ef4444',
+    5: '#a855f7',
+  }
+  return accents[courseId] || '#4f6ef7'
 }
 
 const filteredCourses = computed(() => {
@@ -155,7 +256,13 @@ const clearSearch = () => { searchQuery.value = '' }
 
       <!-- ── Course Grid ── -->
       <div class="courses-grid">
-        <TransitionGroup name="course">
+        <!-- Loading -->
+        <div v-if="loading" class="loading-state">
+          <div class="loading-spinner"></div>
+          <p class="loading-text">正在加载学习记录...</p>
+        </div>
+        
+        <TransitionGroup v-else name="course">
           <div
               v-for="course in filteredCourses"
               :key="course.id"
@@ -482,6 +589,30 @@ const clearSearch = () => { searchQuery.value = '' }
   font-family: 'DM Sans', sans-serif; font-size: .9rem; transition: all .25s;
 }
 .empty-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,102,255,0.3); }
+
+/* ─── Loading ─── */
+.loading-state {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 100px 20px;
+}
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 20px;
+  border: 4px solid #e9ecef;
+  border-top-color: #0066FF;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.loading-text {
+  font-size: 0.95rem;
+  color: #6c757d;
+  margin: 0;
+}
 
 /* ─── Transitions ─── */
 .course-enter-active { transition: all .3s ease; }

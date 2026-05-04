@@ -2,8 +2,10 @@
 import { ref, computed, onMounted, onUnmounted, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCourseDetail, getCourseRatings, getCourseOutline, addCourseRating, likeRating, deleteCourseRating, type OutlineItem, type SectionItem } from '@/api/course'
+import { getCourseDetail, getCourseRatings, getCourseOutline, addCourseRating, likeRating, deleteCourseRating, enrollCourse, checkEnrollment, type OutlineItem, type SectionItem } from '@/api/course'
 import { isLoggedIn, getUserInfo } from '@/utils/session'
+import VideoPlayer from '@/components/VideoPlayer/index.vue'
+import DocumentPreview from '@/components/DocumentPreview/index.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,6 +20,18 @@ const mouseX = ref(0)
 const mouseY = ref(0)
 let particleRafId: number | null = null
 let observers: IntersectionObserver[] = []
+
+// 视频播放器状态
+const showVideoPlayer = ref(false)
+const currentVideoUrl = ref('')
+const currentVideoTitle = ref('')
+
+// 文档预览器状态
+const showDocumentPreview = ref(false)
+const currentDocumentUrl = ref('')
+const currentDocumentTitle = ref('')
+const currentDocumentType = ref('')
+const currentDocumentSize = ref<number | undefined>(undefined)
 
 interface Video {
   id: number
@@ -102,10 +116,28 @@ const course = computed(() => {
 
   const detail = courseDetail.value
   const ratings = courseRatings.value
+  const outlines = courseOutline.value
 
   const avgRating = ratings.length > 0
     ? (ratings.reduce((sum, r) => sum + Number(r.rating), 0) / ratings.length).toFixed(1)
     : '0.0'
+
+  // 计算章节数（主章节数量）
+  const chapterCount = outlines ? outlines.length : 0
+  
+  // 计算视频节数（course_chapters3中resourceType为video的数量）
+  const videoCount = outlines ? outlines.reduce((sum, chapter) => {
+    const chapterVideos = (chapter.sections || []).reduce((vSum, section) => {
+      const sectionVideos = (section.resources || []).filter(r => r.resourceType === 'video').length
+      return vSum + sectionVideos
+    }, 0)
+    return sum + chapterVideos
+  }, 0) : 0
+  
+  // 计算总课时数（所有小节数量）
+  const totalSections = outlines ? outlines.reduce((sum, chapter) => {
+    return sum + (chapter.sections || []).length
+  }, 0) : 0
 
   return {
     id: detail.courseId,
@@ -122,9 +154,9 @@ const course = computed(() => {
     instructorTitle: '资深教育专家',
     instructorBio: '拥有丰富的教学经验和行业实践经验，致力于为学生提供优质的学习体验。',
     instructorInitial: (detail.instructor || '讲')[0],
-    duration: '24 课时',
-    level: '中级',
-    levelColor: '#00ff9d',
+    chapterCount: chapterCount,
+    videoCount: videoCount,
+    duration: `${totalSections} 课时`,
     students: Math.floor(Math.random() * 5000) + 500,
     rating: Number(avgRating),
     reviews: ratings.length,
@@ -148,38 +180,14 @@ const course = computed(() => {
   }
 })
 
-const totalVideos = computed(() =>
-  course.value?.modules.reduce((s: number, m: Module) => s + m.videos.length, 0) || 0
-)
+const totalVideos = computed(() => course.value?.videoCount || 0)
 
 const outlineTree = computed(() => {
   let outlines = courseOutline.value
 
+  // 如果后端返回了空数组或null，直接返回空数组，不再使用mockModules
   if (!outlines || outlines.length === 0) {
-    return mockModules.map((module, idx) => ({
-      id: module.id,
-      courseId: courseId.value,
-      parentId: 0,
-      title: module.title,
-      sortOrder: module.id,
-      chapterNumber: idx + 1,
-      sections: module.videos.map((video, vIdx) => ({
-        id: video.id,
-        courseId: courseId.value,
-        parentId: module.id,
-        title: video.title,
-        sortOrder: vIdx + 1,
-        videoNumber: vIdx + 1,
-        resources: [{
-          id: video.id,
-          resourceType: 'video',
-          title: video.title,
-          resourceUrl: '',
-          duration: parseInt(video.duration.split(':')[0]) * 60 + parseInt(video.duration.split(':')[1]),
-          sortOrder: 1
-        }]
-      }))
-    }))
+    return []
   }
 
   // 新结构：后端直接返回章节和小节的嵌套结构
@@ -397,24 +405,109 @@ const enroll = async () => {
           type: 'warning'
         }
       )
-      // 用户点击“是”，跳转到登录页
+      // 用户点击"是"，跳转到登录页
       router.push('/Users')
     } catch {
-      // 用户点击“否”或关闭弹窗，不做任何操作
+      // 用户点击"否"或关闭弹窗，不做任何操作
     }
     return
   }
   
-  isEnrolled.value = true
-  ElMessage.success('报名成功！开始学习吧~')
+  // 获取用户信息
+  const userInfo = getUserInfo()
+  if (!userInfo || !userInfo.id) {
+    ElMessage.error('无法获取用户信息，请重新登录')
+    router.push('/Users')
+    return
+  }
+  
+  // 如果已经学习过，直接滚动到课程简介
+  if (isEnrolled.value) {
+    ElMessage.info('继续学习！')
+    scrollToOverview()
+    return
+  }
+  
+  try {
+    // 调用后端接口报名学习
+    const result = await enrollCourse(courseId.value, { userId: userInfo.id })
+    
+    if (result.alreadyEnrolled) {
+      ElMessage.info(result.message || '您已经在 learning 这门课程')
+      // 如果已经学习，滚动到课程简介
+      scrollToOverview()
+    } else {
+      ElMessage.success(result.message || '报名成功！开始学习吧~')
+    }
+    
+    // 更新本地状态
+    isEnrolled.value = true
+  } catch (error: any) {
+    ElMessage.error(error.message || '报名失败，请稍后重试')
+  }
+}
+
+// 滚动到课程简介区域
+const scrollToOverview = () => {
+  setTimeout(() => {
+    const overviewElement = document.querySelector('.cd-overview')
+    if (overviewElement) {
+      overviewElement.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      })
+    }
+  }, 300)
 }
 
 const openResource = (resource: any) => {
   if (resource.resourceType === 'video') {
-    window.open(resource.resourceUrl, '_blank')
+    // 检查URL是否有效
+    if (!resource.resourceUrl || resource.resourceUrl.trim() === '') {
+      ElMessage.warning('该视频资源暂无可用链接')
+      return
+    }
+    
+    // 打开视频播放器
+    currentVideoUrl.value = resource.resourceUrl
+    currentVideoTitle.value = resource.title
+    showVideoPlayer.value = true
+  } else if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md'].includes(resource.resourceType)) {
+    // 文档类型：打开预览
+    if (!resource.resourceUrl || resource.resourceUrl.trim() === '') {
+      ElMessage.warning('该文档资源暂无可用链接')
+      return
+    }
+    
+    // 打开文档预览组件
+    currentDocumentUrl.value = resource.resourceUrl
+    currentDocumentTitle.value = resource.title || '文档预览'
+    currentDocumentType.value = resource.resourceType
+    // fileSize字段已从数据库中删除，不再设置
+    currentDocumentSize.value = undefined
+    showDocumentPreview.value = true
   } else {
+    // 其他文件资源直接下载/打开
+    if (!resource.resourceUrl || resource.resourceUrl.trim() === '') {
+      ElMessage.warning('该资源暂无可用链接')
+      return
+    }
     window.open(resource.resourceUrl, '_blank')
   }
+}
+
+const closeVideoPlayer = () => {
+  showVideoPlayer.value = false
+  currentVideoUrl.value = ''
+  currentVideoTitle.value = ''
+}
+
+const closeDocumentPreview = () => {
+  showDocumentPreview.value = false
+  currentDocumentUrl.value = ''
+  currentDocumentTitle.value = ''
+  currentDocumentType.value = ''
+  currentDocumentSize.value = undefined
 }
 
 const goBack = () => router.back()
@@ -467,6 +560,17 @@ async function loadCourseDetail() {
 
     const outline = await getCourseOutline(id)
     courseOutline.value = outline
+    
+    // 检查用户是否已学习该课程
+    if (userId) {
+      try {
+        const enrollmentStatus = await checkEnrollment(id, userId)
+        isEnrolled.value = enrollmentStatus.isEnrolled
+      } catch (error) {
+        console.error('检查学习状态失败:', error)
+        isEnrolled.value = false
+      }
+    }
   } catch (error) {
     ElMessage.error('加载课程详情失败，请稍后重试')
   } finally {
@@ -600,9 +704,6 @@ onUnmounted(() => {
             </div>
 
             <div class="hero-badges">
-              <span class="level-tag" :style="`color:${course.levelColor};border-color:${course.levelColor}44;background:${course.levelColor}10`">
-                {{ course.level }}
-              </span>
               <span class="students-tag">◆ {{ course.students.toLocaleString() }} 名学员</span>
             </div>
 
@@ -611,7 +712,10 @@ onUnmounted(() => {
 
             <div class="rating-row">
               <span class="stars-display">
-                <span v-for="i in 5" :key="i" :style="{ color: i <= Math.floor(course.rating) ? '#ffd93d' : 'rgba(255,255,255,.15)' }">★</span>
+                <span v-for="i in 5" :key="i" 
+                      class="star-icon"
+                      :class="{ filled: i <= Math.floor(course.rating) }"
+                      :style="i <= Math.floor(course.rating) ? { color: '#ffd93d' } : {}">★</span>
               </span>
               <span class="rating-val">{{ course.rating }}</span>
               <span class="review-count">({{ course.reviews }} 条评价)</span>
@@ -630,9 +734,8 @@ onUnmounted(() => {
             <div class="meta-chips">
               <div class="chip" v-for="c in [
                 { icon: '◎', text: course.duration },
-                { icon: '▷', text: totalVideos + ' 节视频' },
-                { icon: '◆', text: course.level + '难度' },
-                { icon: '◈', text: '结课证书' },
+                { icon: '▷', text: course.videoCount + ' 节视频' },
+                { icon: '◈', text: course.chapterCount + ' 个章节' },
               ]" :key="c.text">
                 <span class="chip-icon">{{ c.icon }}</span>
                 <span>{{ c.text }}</span>
@@ -794,15 +897,28 @@ onUnmounted(() => {
                           <template v-if="section.resources && section.resources.length">
                             <div v-for="res in section.resources" :key="res.id" class="resource-inline-item">
                               <div class="res-icon-small" :class="res.resourceType">
+                                <!-- 视频图标 -->
                                 <svg v-if="res.resourceType === 'video'" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                <!-- PDF图标 -->
+                                <svg v-else-if="res.resourceType === 'pdf'" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+                                <!-- Word图标 -->
+                                <svg v-else-if="['doc', 'docx'].includes(res.resourceType)" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h2v5H8zm4 0h2v5h-2zm4 0h2v5h-2z"/></svg>
+                                <!-- Excel图标 -->
+                                <svg v-else-if="['xls', 'xlsx'].includes(res.resourceType)" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM9 12l3 4 3-4h-2l-1 1.5L11 12H9z"/></svg>
+                                <!-- PowerPoint图标 -->
+                                <svg v-else-if="['ppt', 'pptx'].includes(res.resourceType)" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h4a2 2 0 0 1 0 4H8zm0 4h5a2 2 0 0 1 0 4H8z"/></svg>
+                                <!-- 文本文件图标 -->
+                                <svg v-else-if="['txt', 'md'].includes(res.resourceType)" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h8v2H8zm0 3h8v2H8z"/></svg>
+                                <!-- 默认文件图标 -->
                                 <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                               </div>
                               <span class="res-title-inline">{{ res.title }}</span>
                               <div class="res-meta-inline">
-                                <span v-if="res.duration" class="res-duration">{{ formatDuration(res.duration) }}</span>
+                                <span v-if="res.duration && res.resourceType === 'video'" class="res-duration">{{ formatDuration(res.duration) }}</span>
+                                <span v-else-if="res.resourceType !== 'video'" class="res-type-tag">{{ res.resourceType.toUpperCase() }}</span>
                               </div>
                               <button class="res-btn-small" @click="openResource(res)">
-                                {{ res.resourceType === 'video' ? '播放' : '下载' }}
+                                {{ res.resourceType === 'video' ? '播放' : '预览' }}
                               </button>
                             </div>
                           </template>
@@ -962,10 +1078,9 @@ onUnmounted(() => {
               <h3 class="sc-title">课程概览</h3>
               <div class="overview-grid">
                 <div class="ov-item" v-for="s in [
-                  { val: course.modules.length, lbl: '章节数', icon: '◈' },
-                  { val: totalVideos, lbl: '视频节数', icon: '▷' },
-                  { val: course.duration, lbl: '总时长', icon: '◎' },
-                  { val: course.level, lbl: '难度', icon: '◉' },
+                  { val: course.chapterCount, lbl: '章节数', icon: '◈' },
+                  { val: course.videoCount, lbl: '视频节数', icon: '▷' },
+                  { val: course.duration, lbl: '总课时', icon: '◎' },
                 ]" :key="s.lbl">
                   <span class="ov-icon">{{ s.icon }}</span>
                   <span class="ov-val">{{ s.val }}</span>
@@ -1008,6 +1123,24 @@ onUnmounted(() => {
       <p>课程不存在或加载失败</p>
       <button @click="goBack" class="back-btn">返回列表</button>
     </div>
+
+    <!-- 视频播放器组件 -->
+    <VideoPlayer
+      :visible="showVideoPlayer"
+      :video-url="currentVideoUrl"
+      :title="currentVideoTitle"
+      @close="closeVideoPlayer"
+    />
+
+    <!-- 文档预览组件 -->
+    <DocumentPreview
+      :visible="showDocumentPreview"
+      :file-url="currentDocumentUrl"
+      :file-name="currentDocumentTitle || '文档'"
+      :file-type="currentDocumentType"
+      :file-size="currentDocumentSize"
+      @close="closeDocumentPreview"
+    />
   </div>
 </template>
 
@@ -1148,6 +1281,15 @@ onUnmounted(() => {
 
 .rating-row { display: flex; align-items: center; gap: 10px; }
 .stars-display { display: flex; gap: 2px; font-size: 1rem; }
+.star-icon {
+  color: rgba(255,255,255,.15);
+  -webkit-text-stroke: 1px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+}
+.star-icon.filled {
+  color: #ffd93d;
+  -webkit-text-stroke: 0;
+}
 .rating-val { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 700; color: #f59e0b; filter: drop-shadow(0 0 6px rgba(245,158,11,0.3)); }
 .review-count { font-size: 0.8rem; color: rgba(26,26,26,0.5); }
 

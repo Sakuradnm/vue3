@@ -1,11 +1,27 @@
 import request from '@/utils/request'
 
+export interface ForumMainCategory {
+    id: number
+    name: string
+    description?: string
+    icon?: string
+    sortOrder: number
+}
+
+export const getForumMainCategories = () => {
+    return request<ForumMainCategory[]>({
+        url: '/api/forum-main-categories',
+        method: 'get'
+    })
+}
+
 export interface ForumCategory {
     id: number
     categoryId: string
-    label: string
+    name: string
     color: string
     sortOrder: number
+    mainCategoryId: number | null
 }
 
 export const getForumCategories = () => {
@@ -46,8 +62,6 @@ export interface ForumPostItem {
     tags: string[]
     pinned: boolean
     solved: boolean
-    hot: boolean
-    score: number
     timeAgo: string
 }
 
@@ -60,6 +74,7 @@ export interface ForumPostDetailItem {
     subtitle?: string
     preview: string
     content: string
+    attachments?: string // 附件信息JSON数组
     author: string
     avatar: string | null
     createdAt: string
@@ -69,8 +84,6 @@ export interface ForumPostDetailItem {
     tags: string[]
     pinned: boolean
     solved: boolean
-    hot: boolean
-    score: number
 }
 
 export const getForumPosts = (params?: {
@@ -123,6 +136,7 @@ export interface CreatePostData {
     subtitle?: string
     preview: string
     content: string
+    attachments?: any[] // 附件信息数组
     tags?: string[]
 }
 
@@ -190,5 +204,13 @@ export const deleteComment = (id: number, currentUserId: number, postOwnerId: nu
         url: `/api/comments/${id}`,
         method: 'delete',
         data: { currentUserId, postOwnerId }
+    })
+}
+
+// 根据ID获取评论信息
+export const getCommentById = (commentId: number) => {
+    return request<ForumCommentItem>({
+        url: `/api/comments/${commentId}`,
+        method: 'get'
     })
 }

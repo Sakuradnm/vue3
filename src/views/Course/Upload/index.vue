@@ -54,15 +54,6 @@
               <div class="char-count">{{ form.title.length }}/50</div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">难度等级</label>
-              <div class="level-selector">
-                <button v-for="level in levels" :key="level" class="level-btn"
-                        :class="{ active: form.level === level }"
-                        @click="form.level = level">{{ level }}</button>
-              </div>
-            </div>
-
             <div class="form-row">
               <div class="form-group half">
                 <label class="form-label">一级分类 <span class="required">*</span></label>
@@ -87,6 +78,39 @@
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label">课程描述 <span class="required">*</span></label>
               <textarea v-model="form.description" rows="5" placeholder="详细介绍课程内容、学习目标及适合人群……" class="form-textarea"></textarea>
+            </div>
+          </div>
+
+          <!-- 详细信息 -->
+          <div class="content-block fade-up">
+            <div class="block-header">
+              <div class="bh-tag">[ DETAIL INFO ]</div>
+              <h3 class="bh-title">详细信息</h3>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">课程简介</label>
+              <textarea v-model="form.introduction" rows="4" placeholder="简要介绍课程的背景、价值和核心内容……" class="form-textarea"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">学习目标</label>
+              <textarea v-model="form.learningObjectives" rows="4" placeholder="学习本课程后能掌握什么技能或知识（每行一条）……" class="form-textarea"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">主要内容</label>
+              <textarea v-model="form.mainContent" rows="4" placeholder="课程涵盖的主要知识点和内容模块（每行一条）……" class="form-textarea"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">适用人群</label>
+              <textarea v-model="form.targetAudience" rows="4" placeholder="适合哪些人群学习本课程（每行一条）……" class="form-textarea"></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">教学特色</label>
+              <textarea v-model="form.teachingFeatures" rows="4" placeholder="本课程的教学特点、优势和亮点（每行一条）……" class="form-textarea"></textarea>
             </div>
           </div>
 
@@ -133,10 +157,10 @@
                   </div>
                   <div class="vi-right">
                     <input type="text" v-model="video.duration" placeholder="mm:ss" class="video-duration-input">
-                    <label class="upload-file-trigger" :class="{ uploaded: video.fileName }" :title="video.fileName || '上传视频文件'">
+                    <label class="upload-file-trigger" :class="{ uploaded: video.file }" :title="video.file?.name || '上传视频文件'">
                       <input type="file" accept="video/*" @change="(e) => handleVideoFileChange(e, cIdx, vIdx)" style="display:none">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      <span class="ufm-label">{{ video.fileName ? shortFileName(video.fileName) : '上传' }}</span>
+                      <span class="ufm-label">{{ video.file ? shortFileName(video.file.name) : '上传' }}</span>
                     </label>
                     <button class="remove-video" @click="removeVideo(cIdx, vIdx)" v-if="chapter.videos.length > 1" title="删除">✕</button>
                   </div>
@@ -153,7 +177,7 @@
                     <input type="text" v-model="file.title" placeholder="文件标题" class="video-title-input">
                   </div>
                   <div class="fi-right">
-                    <span class="file-name-tag">{{ shortFileName(file.fileName) }}</span>
+                    <span class="file-name-tag">{{ file.file ? shortFileName(file.file.name) : '' }}</span>
                     <button class="remove-video" @click="removeFile(cIdx, fIdx)" title="删除">✕</button>
                   </div>
                 </div>
@@ -282,10 +306,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, h } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { uploadCourse, getFullCourseTree, type CourseTreeItem, type SubCategoryWithCourses } from '@/api/course.ts'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { uploadCourse, getFullCourseTree, type CourseTreeItem, type SubCategoryWithCourses, uploadFile } from '@/api/course.ts'
+import { checkDuplicateCourse } from '@/api/courseReview'
+import { getUserInfo } from '@/utils/session'
 
 const router = useRouter()
 const mouseX = ref(0)
@@ -293,7 +319,6 @@ const mouseY = ref(0)
 let particleRafId: number | null = null
 let observers: IntersectionObserver[] = []
 
-const levels = ['初级', '中级', '高级']
 const categories = ref<CourseTreeItem[]>([])
 const filteredSubCategories = ref<SubCategoryWithCourses[]>([])
 const loading = ref(false)
@@ -301,17 +326,17 @@ const loading = ref(false)
 interface VideoItem {
   title: string
   duration: string
-  fileName?: string
+  // fileName字段已从数据库中删除
   file?: File
   resourceUrl?: string
 }
 
 interface FileItem {
   title: string
-  fileName: string
+  // fileName字段已从数据库中删除
   file: File
   resourceUrl?: string
-  fileSize?: number
+  // fileSize字段已从数据库中删除
 }
 
 interface Chapter {
@@ -322,24 +347,32 @@ interface Chapter {
 
 const form = ref<{
   title: string
-  level: string
   description: string
   subCategoryId: number
   categoryId: number
   detailIntro: string
+  introduction: string
+  learningObjectives: string
+  mainContent: string
+  targetAudience: string
+  teachingFeatures: string
   chapters: Chapter[]
 }>({
   title: '',
-  level: '初级',
   description: '',
   subCategoryId: 0,
   categoryId: 0,
   detailIntro: '',
+  introduction: '',
+  learningObjectives: '',
+  mainContent: '',
+  targetAudience: '',
+  teachingFeatures: '',
   chapters: [
     {
       title: '第一章：课程导论',
       videos: [
-        { title: '课程介绍与学习目标', duration: '15:30' },
+        { title: '课程介绍与学习目标', duration: 'xx:xx' },
       ],
       files: []
     }
@@ -394,7 +427,7 @@ function removeFile(chapterIdx: number, fileIdx: number) {
 }
 
 // ─── 文件上传处理 ───
-function handleVideoFileChange(e: Event, chapterIdx: number, videoIdx: number) {
+async function handleVideoFileChange(e: Event, chapterIdx: number, videoIdx: number) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
@@ -405,41 +438,85 @@ function handleVideoFileChange(e: Event, chapterIdx: number, videoIdx: number) {
   }
 
   const video = form.value.chapters[chapterIdx].videos[videoIdx]
-  video.fileName = file.name
+  // fileName字段已从数据库中删除，不再设置
   video.file = file
 
-  const url = URL.createObjectURL(file)
-  const vid = document.createElement('video')
-  vid.preload = 'metadata'
-  vid.onloadedmetadata = () => {
-    const sec = Math.floor(vid.duration)
-    video.duration = `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, '0')}`
-    URL.revokeObjectURL(url)
+  // 显示上传中提示
+  const loadingMsg = ElMessage({
+    message: '正在上传视频...',
+    type: 'info',
+    duration: 0
+  })
+
+  try {
+    // 上传文件到服务器
+    const result = await uploadFile(file)
+    
+    // 保存URL
+    video.resourceUrl = result.url
+    
+    loadingMsg.close()
+    ElMessage.success('视频上传成功')
+
+    // 读取视频时长
+    const url = URL.createObjectURL(file)
+    const vid = document.createElement('video')
+    vid.preload = 'metadata'
+    vid.onloadedmetadata = () => {
+      const sec = Math.floor(vid.duration)
+      video.duration = `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, '0')}`
+      URL.revokeObjectURL(url)
+    }
+    vid.src = url
+  } catch (error: any) {
+    loadingMsg.close()
+    ElMessage.error(error.message || '视频上传失败')
   }
-  vid.src = url
+  
   input.value = ''
 }
 
-function handlePdfFileChange(e: Event, chapterIdx: number) {
+async function handlePdfFileChange(e: Event, chapterIdx: number) {
   const input = e.target as HTMLInputElement
   const files = input.files
   if (!files || !files.length) return
 
   if (!form.value.chapters[chapterIdx].files) form.value.chapters[chapterIdx].files = []
 
-  Array.from(files).forEach(file => {
-    if (file.type !== 'application/pdf') {
-      ElMessage.warning(`${file.name} 不是PDF文件，已跳过`)
-      return
+  // 显示上传中提示
+  const loadingMsg = ElMessage({
+    message: `正在上传 ${files.length} 个文件...`,
+    type: 'info',
+    duration: 0
+  })
+
+  try {
+    for (const file of Array.from(files)) {
+      if (file.type !== 'application/pdf') {
+        ElMessage.warning(`${file.name} 不是PDF文件，已跳过`)
+        continue
+      }
+
+      // 上传文件到服务器
+      const result = await uploadFile(file)
+
+      // 添加到文件列表
+      form.value.chapters[chapterIdx].files.push({
+        title: file.name.replace(/\.pdf$/i, ''),
+        // fileName字段已从数据库中删除，不再设置
+        file,
+        resourceUrl: result.url,
+        // fileSize字段已从数据库中删除，不再设置
+      })
     }
 
-    form.value.chapters[chapterIdx].files.push({
-      title: file.name.replace(/\.pdf$/i, ''),
-      fileName: file.name,
-      file,
-      fileSize: file.size
-    })
-  })
+    loadingMsg.close()
+    ElMessage.success('文件上传成功')
+  } catch (error: any) {
+    loadingMsg.close()
+    ElMessage.error(error.message || '文件上传失败')
+  }
+  
   input.value = ''
 }
 
@@ -472,11 +549,15 @@ async function saveDraft() {
   try {
     const draftData = {
       title: form.value.title,
-      level: form.value.level,
       description: form.value.description,
       subCategoryId: form.value.subCategoryId,
       categoryId: form.value.categoryId,
       detailIntro: form.value.detailIntro,
+      introduction: form.value.introduction,
+      learningObjectives: form.value.learningObjectives,
+      mainContent: form.value.mainContent,
+      targetAudience: form.value.targetAudience,
+      teachingFeatures: form.value.teachingFeatures,
       chapters: form.value.chapters,
       savedAt: new Date().toISOString()
     }
@@ -498,11 +579,15 @@ function loadDraft() {
       const draftData = JSON.parse(draft)
 
       form.value.title = draftData.title || ''
-      form.value.level = draftData.level || '初级'
       form.value.description = draftData.description || ''
       form.value.subCategoryId = draftData.subCategoryId || 0
       form.value.categoryId = draftData.categoryId || 0
       form.value.detailIntro = draftData.detailIntro || ''
+      form.value.introduction = draftData.introduction || ''
+      form.value.learningObjectives = draftData.learningObjectives || ''
+      form.value.mainContent = draftData.mainContent || ''
+      form.value.targetAudience = draftData.targetAudience || ''
+      form.value.teachingFeatures = draftData.teachingFeatures || ''
       form.value.chapters = draftData.chapters || [{
         title: '第一章：课程导论',
         videos: [{ title: '课程介绍与学习目标', duration: '15:30' }],
@@ -541,75 +626,193 @@ async function publish() {
     return
   }
 
+  // 先检查课程名称是否重复
   loading.value = true
-
   try {
-    const userInfoStr = localStorage.getItem('userInfo')
+    const userInfo = getUserInfo()
+    let teacherName = '匿名教师'
+    if (userInfo) {
+      if (userInfo.nickname || userInfo.username) {
+        teacherName = userInfo.nickname || userInfo.username
+      }
+    }
+    
+    const duplicateResult = await checkDuplicateCourse(form.value.title, form.value.subCategoryId, teacherName)
+    
+    // duplicateResult是字符串"PASS"或者拦截器已经抛出错误
+    // 如果能走到这里说明查重通过
+  } catch (error: any) {
+    // 查重失败，拦截器已经显示了错误信息
+    console.error('检查课程重复失败:', error)
+    loading.value = false
+    return
+  }
+
+  // 查重通过后，立即显示倒计时弹窗
+  loading.value = false
+  
+  // 创建自定义倒计时浮动框
+  const countdownDiv = document.createElement('div')
+  countdownDiv.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 30px 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    z-index: 9999;
+    text-align: center;
+    min-width: 400px;
+  `
+  
+  countdownDiv.innerHTML = `
+    <div style="font-size: 20px; font-weight: bold; color: #67C23A; margin-bottom: 15px;">
+      ✓ 提交中...
+    </div>
+    <div style="font-size: 16px; color: #606266; margin-bottom: 20px;">
+      课程已提交审核，请等待管理员审批
+    </div>
+    <div style="font-size: 32px; font-weight: bold; color: #409EFF; margin-bottom: 10px;">
+      <span id="countdown-number">3</span>秒后自动跳转
+    </div>
+    <div style="font-size: 12px; color: #909399;">
+      正在提交数据...
+    </div>
+  `
+  
+  document.body.appendChild(countdownDiv)
+  
+  // 倒计时逻辑
+  let countdown = 3
+  let hasError = false
+  const timer = setInterval(() => {
+    countdown--
+    const numberEl = document.getElementById('countdown-number')
+    if (numberEl) {
+      numberEl.textContent = countdown.toString()
+    }
+    
+    if (countdown <= 0) {
+      clearInterval(timer)
+      // 如果没有错误，则跳转
+      if (!hasError && document.body.contains(countdownDiv)) {
+        document.body.removeChild(countdownDiv)
+        router.push('/Course')
+      }
+    }
+  }, 1000)
+
+  // 同时异步提交数据
+  try {
+    const userInfo = getUserInfo()
     let teacherName = '匿名教师'
 
-    if (userInfoStr) {
-      try {
-        const userInfo = JSON.parse(userInfoStr)
-        if (userInfo.nickname || userInfo.username) {
-          teacherName = userInfo.nickname || userInfo.username
-        }
-      } catch (e) {
-        console.error('解析用户信息失败', e)
+    if (userInfo) {
+      if (userInfo.nickname || userInfo.username) {
+        teacherName = userInfo.nickname || userInfo.username
       }
     }
 
     const uploadData = {
       title: form.value.title,
-      level: form.value.level,
       description: form.value.description,
-      teacher: teacherName,
+      instructor: teacherName,
       subCategoryId: form.value.subCategoryId,
       categoryId: form.value.categoryId,
-      detailIntro: form.value.detailIntro,
+      introduction: form.value.introduction,
+      learningObjectives: form.value.learningObjectives,
+      mainContent: form.value.mainContent,
+      targetAudience: form.value.targetAudience,
+      teachingFeatures: form.value.teachingFeatures,
       chapters: form.value.chapters.map(chapter => ({
         title: chapter.title,
         videos: chapter.videos.map(video => ({
           title: video.title,
           duration: video.duration,
-          resourceUrl: video.resourceUrl || '',
-          fileName: video.fileName || ''
+          resourceUrl: video.resourceUrl || ''
+          // fileName字段已从数据库中删除，不再发送
         })),
         files: chapter.files.map(file => ({
           title: file.title,
-          fileName: file.fileName,
-          resourceUrl: file.resourceUrl || '',
-          fileSize: file.fileSize || 0
+          resourceUrl: file.resourceUrl || ''
+          // fileName和fileSize字段已从数据库中删除，不再发送
         }))
       }))
     }
 
     const result = await uploadCourse(uploadData)
 
-    if (result && result.code === 200) {
-      const courseId = result.data
-
-      if (!courseId) {
-        ElMessage.error('发布成功但未返回课程ID')
-        return
+    // result是reviewId（数字），拦截器已经处理了code检查
+    // 如果能走到这里说明上传成功
+    if (result) {
+      // 更新弹窗内容为成功
+      const titleEl = countdownDiv.querySelector('div:first-child')
+      if (titleEl) {
+        titleEl.innerHTML = '✓ 提交成功'
       }
-
-      ElMessage.success(`课程发布成功！`)
-
-      localStorage.removeItem('course_draft')
-
-      // 设置刷新标志，通知课程页面需要重新加载数据
-      sessionStorage.setItem('courseNeedRefresh', 'true')
-
-      setTimeout(() => {
-        router.push('/Course')
-      }, 1500)
+      
+      const statusEl = countdownDiv.querySelector('div:nth-child(4)')
+      if (statusEl) {
+        statusEl.textContent = '数据提交成功'
+      }
+      
+      const reviewId = result
+      if (reviewId) {
+        // 清除草稿
+        localStorage.removeItem('course_draft')
+        // 设置刷新标志
+        sessionStorage.setItem('courseNeedRefresh', 'true')
+      }
     } else {
-      ElMessage.error(result?.message || '发布失败')
+      // 理论上不会走到这里，因为拦截器会处理错误
+      hasError = true
+      const titleEl = countdownDiv.querySelector('div:first-child')
+      if (titleEl) {
+        titleEl.innerHTML = '✗ 提交失败'
+        titleEl.style.color = '#F56C6C'
+      }
+      const messageEl = countdownDiv.querySelector('div:nth-child(2)')
+      if (messageEl) {
+        messageEl.textContent = '发布失败'
+      }
+      const statusEl = countdownDiv.querySelector('div:nth-child(4)')
+      if (statusEl) {
+        statusEl.textContent = '请修改后重新提交'
+      }
+      clearInterval(timer)
+      setTimeout(() => {
+        if (document.body.contains(countdownDiv)) {
+          document.body.removeChild(countdownDiv)
+        }
+      }, 3000)
     }
   } catch (error: any) {
-    ElMessage.error(error.message || '发布失败，请稍后重试')
-  } finally {
-    loading.value = false
+    // 上传失败，拦截器已经显示了错误信息
+    // 更新弹窗内容为失败
+    hasError = true
+    const titleEl = countdownDiv.querySelector('div:first-child')
+    if (titleEl) {
+      titleEl.innerHTML = '✗ 提交失败'
+      titleEl.style.color = '#F56C6C'
+    }
+    const messageEl = countdownDiv.querySelector('div:nth-child(2)')
+    if (messageEl) {
+      messageEl.textContent = error.message || '发布失败'
+    }
+    const statusEl = countdownDiv.querySelector('div:nth-child(4)')
+    if (statusEl) {
+      statusEl.textContent = '请修改后重新提交'
+    }
+    // 停止倒计时
+    clearInterval(timer)
+    // 3秒后自动关闭错误弹窗
+    setTimeout(() => {
+      if (document.body.contains(countdownDiv)) {
+        document.body.removeChild(countdownDiv)
+      }
+    }, 3000)
   }
 }
 

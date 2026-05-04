@@ -74,6 +74,11 @@ onMounted(() => {
   checkLoginStatus()
   loadUnreadNotices()
   window.addEventListener('storage', handleStorageChange)
+  // 监听页面卸载事件，更新会话时间戳
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  
+  // 启动会话心跳，每5分钟更新一次时间戳
+  startSessionHeartbeat()
 
   router.beforeEach(() => {
     checkLoginStatus()
@@ -83,7 +88,40 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('storage', handleStorageChange)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  stopSessionHeartbeat()
 })
+
+// 会话心跳定时器
+let sessionHeartbeatTimer: number | null = null
+
+// 启动会话心跳
+const startSessionHeartbeat = () => {
+  // 每5分钟更新一次会话时间戳
+  sessionHeartbeatTimer = window.setInterval(() => {
+    const timestamp = localStorage.getItem('sessionTimestamp')
+    if (timestamp) {
+      localStorage.setItem('sessionTimestamp', Date.now().toString())
+    }
+  }, 5 * 60 * 1000)
+}
+
+// 停止会话心跳
+const stopSessionHeartbeat = () => {
+  if (sessionHeartbeatTimer) {
+    clearInterval(sessionHeartbeatTimer)
+    sessionHeartbeatTimer = null
+  }
+}
+
+// 页面关闭前更新会话时间戳
+const handleBeforeUnload = () => {
+  // 更新会话时间戳，表示当前标签页仍在活动
+  const timestamp = localStorage.getItem('sessionTimestamp')
+  if (timestamp) {
+    localStorage.setItem('sessionTimestamp', Date.now().toString())
+  }
+}
 
 const checkLoginStatus = async () => {
   try {
@@ -263,13 +301,10 @@ const goToNotice = () => {
 const markAllNoticesAsRead = () => {
   if (!isLoggedIn.value) return
 
-  const notices = localStorage.getItem('userNotices')
-  if (notices) {
-    const noticeList = JSON.parse(notices)
-    noticeList.forEach((n: any) => n.isRead = true)
-    localStorage.setItem('userNotices', JSON.stringify(noticeList))
-    unreadNoticeCount.value = 0
-  }
+  const noticeList = getUserNotices()
+  noticeList.forEach((n: any) => n.isRead = true)
+  setUserNotices(noticeList)
+  unreadNoticeCount.value = 0
 }
 
 const getUserLevelText = (level: string) => {
@@ -533,7 +568,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   width: 100%;
-  z-index: 9999;
+  z-index: 1000;
   backdrop-filter: blur(10px);
   background-color: rgba(255, 255, 255, 0.95);
   display: flex;

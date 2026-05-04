@@ -1,79 +1,144 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getUserNotifications, markAsRead as markNotificationRead, markAllAsRead as markAllRead } from '@/api/notification'
+import type { UserNotification } from '@/api/notification'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
-const activeTab = ref<'system' | 'personal'>('system')
 const notices = ref<any[]>([])
+const loading = ref(false)
 
-// ─── Toast ────────────────────────────────────────────────────────
-const toast = ref<{ msg: string; type: 'ok' | 'err' } | null>(null)
-const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
-  toast.value = { msg, type }
-  setTimeout(() => (toast.value = null), 2800)
+// 当前登录用户
+const userId = ref<number | null>(null)
+
+// 通知类型映射
+const notificationTypeMap: Record<string, { label: string; icon: string; color: string }> = {
+  comment_reply: { label: '评论回复', icon: '💬', color: '#409eff' },
+  like_comment: { label: '点赞', icon: '', color: '#67c23a' },
+  admin_reply: { label: '管理员回复', icon: '📢', color: '#e6a23c' },
+  lecturer_application: { label: '讲师申请', icon: '🎓', color: '#f56c6c' }
 }
 
-onMounted(() => {
-  loadNotices()
+// 获取通知类型样式
+const getNotificationTypeInfo = (type: string) => {
+  return notificationTypeMap[type] || { label: '通知', icon: '🔔', color: '#909399' }
+}
+
+onMounted(async () => {
+  // 尝试从多个可能的key获取用户信息
+  const userStr = localStorage.getItem('userInfo') || localStorage.getItem('user')
+  const user = userStr ? JSON.parse(userStr) : {}
+  userId.value = user.id
+  console.log('当前用户ID:', userId.value)
+  
+  if (!userId.value) {
+    ElMessage.error('未登录，请先登录')
+    router.push('/Users')
+    return
+  }
+  
+  await loadNotices()
 })
 
-const loadNotices = () => {
-  const systemNoticesStr = localStorage.getItem('systemNotices')
-  const userNoticesStr = localStorage.getItem('userNotices')
-  const systemNotices = systemNoticesStr ? JSON.parse(systemNoticesStr) : []
-  const userNotices = userNoticesStr ? JSON.parse(userNoticesStr) : []
-
-  // Demo data if empty
-  const demoSystem = systemNotices.length ? systemNotices : [
-    { id: 's1', title: '平台维护公告', message: '系统将于本周六凌晨 2:00 ~ 4:00 进行例行维护，期间服务暂停。', timestamp: Date.now() - 3600000, isRead: false },
-    { id: 's2', title: '新功能上线：AI 学习助手', message: '我们全新推出 AI 驱动的学习路径规划功能，立即体验个性化课程推荐。', timestamp: Date.now() - 86400000, isRead: true },
-    { id: 's3', title: '服务条款更新', message: '我们更新了用户服务协议，请在继续使用前查阅最新条款内容。', timestamp: Date.now() - 172800000, isRead: true },
-  ]
-  const demoUser = userNotices.length ? userNotices : [
-    { id: 'u1', title: '您的课程证书已生成', message: '恭喜完成「SUBARU BRZ 改装教程」，您的结课证书已可下载。', timestamp: Date.now() - 7200000, isRead: false },
-    { id: 'u2', title: '学习目标提醒', message: '距本周学习目标还差 2 小时，坚持一下就能达成！', timestamp: Date.now() - 43200000, isRead: false },
-    { id: 'u3', title: '积分到账通知', message: '您通过每日学习获得 +50 积分，当前总积分：4820。', timestamp: Date.now() - 259200000, isRead: true },
-  ]
-
-  notices.value = [
-    ...demoSystem.map((n: any) => ({ ...n, type: 'system' })),
-    ...demoUser.map((n: any) => ({ ...n, type: 'personal' }))
-  ]
+const loadNotices = async () => {
+  loading.value = true
+  try {
+    if (!userId.value) {
+      console.error('用户ID为空，无法加载通知')
+      return
+    }
+    
+    console.log('开始加载用户通知，用户ID:', userId.value)
+    
+    // 从后端获取用户通知（拦截器已经提取了data，直接是数组）
+    const apiNotices = await getUserNotifications(userId.value)
+    console.log('获取到的通知数据:', apiNotices)
+    
+    // 确保apiNotices是数组
+    const noticesArray = Array.isArray(apiNotices) ? apiNotices : []
+    
+    // 直接显示用户通知，添加timestamp和message字段
+    notices.value = noticesArray.map((n: any) => ({
+      ...n,
+      timestamp: new Date(n.createdAt).getTime(),
+      message: n.content
+    }))
+    
+    console.log('通知列表:', notices.value)
+  } catch (error) {
+    console.error('加载通知失败:', error)
+    ElMessage.error('加载通知失败')
+  } finally {
+    loading.value = false
+  }
 }
-
-const filteredNotices = computed(() =>
-    notices.value.filter(n => n.type === activeTab.value)
-)
 
 const unreadCount = computed(() => notices.value.filter(n => !n.isRead).length)
-const unreadSystem = computed(() => notices.value.filter(n => n.type === 'system' && !n.isRead).length)
-const unreadPersonal = computed(() => notices.value.filter(n => n.type === 'personal' && !n.isRead).length)
 
-const markAsRead = (notice: any) => {
-  notice.isRead = true
-  window.dispatchEvent(new Event('storage'))
+const markAllAsRead = async () => {
+  try {
+    // 标记所有通知为已读
+    if (userId.value) {
+      await markAllRead(userId.value)
+    }
+    notices.value.forEach(n => { n.isRead = true })
+    ElMessage.success('已全部标记为已读')
+    // 重新加载
+    await loadNotices()
+  } catch (error) {
+    console.error('全部标记已读失败:', error)
+    ElMessage.error('操作失败')
+  }
 }
 
-const markAllAsRead = () => {
-  filteredNotices.value.forEach(n => { n.isRead = true })
-  window.dispatchEvent(new Event('storage'))
-  showToast('已全部标记为已读')
+// 点击通知跳转
+const handleNoticeClick = async (notice: any) => {
+  // 根据relatedType跳转到对应页面
+  if (notice.relatedType === 'forum_post' && notice.relatedId) {
+    // 评论回复通知:relatedId 是帖子ID
+    // 先标记为已读
+    try {
+      if (userId.value) {
+        await markNotificationRead(notice.id, userId.value)
+      }
+    } catch (error) {
+      console.error('标记已读失败:', error)
+    }
+    // 跳转到帖子详情页,使用路径参数格式
+    router.push(`/forum/${notice.relatedId}`)
+  } else if (notice.relatedType === 'forum_comment' && notice.relatedId) {
+    // 点赞通知:relatedId 是评论ID,需要先查询评论获取帖子ID
+    try {
+      // 先标记为已读
+      if (userId.value) {
+        await markNotificationRead(notice.id, userId.value)
+      }
+      const { getCommentById } = await import('@/api/forum')
+      const comment = await getCommentById(notice.relatedId)
+      if (comment && comment.postId) {
+        router.push(`/forum/${comment.postId}`)
+      } else {
+        ElMessage.warning('无法找到对应的帖子')
+      }
+    } catch (error) {
+      console.error('获取评论信息失败:', error)
+      ElMessage.error('跳转失败')
+    }
+  }
 }
 
-const deleteNotice = (notice: any) => {
-  notices.value = notices.value.filter(n => n.id !== notice.id)
-  showToast('通知已删除')
-}
-
-const getTimeAgo = (timestamp: number) => {
-  const diff = Date.now() - timestamp
+const getTimeAgo = (timestamp: number | string) => {
+  const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp
+  const diff = Date.now() - time
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
+  if (minutes < 1) return '刚刚'
   if (minutes < 60) return `${minutes}分钟前`
   if (hours < 24) return `${hours}小时前`
   if (days < 7) return `${days}天前`
-  const d = new Date(timestamp)
+  const d = new Date(time)
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
@@ -89,17 +154,12 @@ const goBack = () => router.back()
       <div class="bg-grid" />
     </div>
 
-    <!-- Toast -->
-    <Transition name="toast">
-      <div v-if="toast" class="toast" :class="toast.type">
-        <span class="toast-icon">{{ toast.type === 'ok' ? '✓' : '✕' }}</span>
-        {{ toast.msg }}
-      </div>
-    </Transition>
+    <!-- Toast (保留兼容) -->
+    <!-- Toast功能已改为ElMessage -->
 
     <div class="nc-layout">
 
-      <!-- ── Header ── -->
+      <!-- ── Header ─ -->
       <div class="nc-header">
         <button class="back-btn" @click="goBack">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -108,7 +168,7 @@ const goBack = () => router.back()
         </button>
         <div class="header-text">
           <h1 class="page-title">消息通知</h1>
-          <p class="page-sub">管理你的系统与个人通知</p>
+          <p class="page-sub">查看你的所有通知消息</p>
         </div>
         <div class="unread-pill" v-if="unreadCount > 0">
           <span class="unread-dot" />
@@ -116,76 +176,48 @@ const goBack = () => router.back()
         </div>
       </div>
 
-      <!-- ── Tabs + Actions ── -->
+      <!-- ── Actions ── -->
       <div class="toolbar">
-        <div class="tabs">
-          <button
-              v-for="tab in [
-              { key: 'system',   label: '系统通知', count: unreadSystem },
-              { key: 'personal', label: '个人通知', count: unreadPersonal },
-            ]"
-              :key="tab.key"
-              class="tab-btn"
-              :class="{ active: activeTab === tab.key }"
-              @click="activeTab = tab.key as any"
-          >
-            {{ tab.label }}
-            <span v-if="tab.count > 0" class="tab-badge">{{ tab.count }}</span>
-          </button>
-        </div>
         <button class="mark-all-btn" @click="markAllAsRead"
-                v-if="filteredNotices.some(n => !n.isRead)">
+                v-if="notices.some(n => !n.isRead)">
           全部已读
         </button>
       </div>
 
       <!-- ── Notice List ── -->
-      <div class="notice-list">
+      <div class="notice-list" v-loading="loading">
         <TransitionGroup name="notice">
           <div
-              v-for="notice in filteredNotices"
+              v-for="notice in notices"
               :key="notice.id"
               class="notice-card"
               :class="{ unread: !notice.isRead }"
+              @click="handleNoticeClick(notice)"
           >
             <!-- Unread indicator -->
             <div class="unread-bar" v-if="!notice.isRead" />
 
-            <div class="notice-icon-wrap" :class="notice.type">
-              <span v-if="notice.type === 'system'">📢</span>
-              <span v-else>🔔</span>
+            <div class="notice-icon-wrap">
+              <span>{{ getNotificationTypeInfo(notice.notificationType || '').icon }}</span>
             </div>
 
             <div class="notice-body">
               <div class="notice-top">
                 <h3 class="notice-title">{{ notice.title }}</h3>
                 <div class="notice-meta">
-                  <span class="notice-time">{{ getTimeAgo(notice.timestamp) }}</span>
+                  <span class="notice-time">{{ getTimeAgo(notice.timestamp || notice.createdAt) }}</span>
                   <span v-if="!notice.isRead" class="unread-tag">未读</span>
                 </div>
               </div>
-              <p class="notice-msg">{{ notice.message }}</p>
-            </div>
-
-            <div class="notice-actions">
-              <button v-if="!notice.isRead" class="act-btn read" @click="markAsRead(notice)" title="标记已读">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </button>
-              <button class="act-btn del" @click="deleteNotice(notice)" title="删除">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                </svg>
-              </button>
+              <p class="notice-msg">{{ notice.message || notice.content }}</p>
             </div>
           </div>
         </TransitionGroup>
 
         <!-- Empty -->
-        <div v-if="filteredNotices.length === 0" class="empty-state">
+        <div v-if="!loading && notices.length === 0" class="empty-state">
           <div class="empty-icon">◎</div>
-          <p class="empty-title">暂无{{ activeTab === 'system' ? '系统' : '个人' }}通知</p>
+          <p class="empty-title">暂无通知</p>
           <p class="empty-sub">新通知到来时将在此显示</p>
         </div>
       </div>
@@ -368,17 +400,6 @@ const goBack = () => router.back()
   font-size: .85rem; color: #6c757d;
   line-height: 1.6; margin: 0;
 }
-
-.notice-actions { display: flex; flex-direction: column; gap: 7px; flex-shrink: 0; }
-.act-btn {
-  width: 30px; height: 30px; border-radius: 8px; border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all .2s;
-}
-.act-btn.read { background: rgba(6,214,160,0.1); color: #059669; }
-.act-btn.read:hover { background: rgba(6,214,160,0.18); }
-.act-btn.del { background: rgba(239,68,68,0.1); color: #dc2626; }
-.act-btn.del:hover { background: rgba(239,68,68,0.18); }
 
 /* ─── Empty ─── */
 .empty-state {

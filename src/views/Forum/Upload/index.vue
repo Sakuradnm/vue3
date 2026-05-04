@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { createPost, type CreatePostData, getForumCategories, createForumCategory, deleteForumCategory, type ForumCategory } from '@/api/forum'
+import { createPost, type CreatePostData, getForumCategories, getForumMainCategories, createForumCategory, deleteForumCategory, type ForumCategory, type ForumMainCategory } from '@/api/forum'
 import { ElMessage } from 'element-plus'
+import { getUserInfo } from '@/utils/session'
 
 const router = useRouter()
 
 // 表单状态
 const form = reactive({
   title: '',
-  subtitle: '',
   category: '',
-  preface: '',
+  preview: '',
   content: '',
-  references: '',
   tags: ''
 })
 
@@ -27,6 +26,39 @@ const uploadedFiles = ref<Array<{
 
 // 分类列表（从后端加载）
 const categories = ref<ForumCategory[]>([])
+const mainCategoriesList = ref<ForumMainCategory[]>([])
+
+// 计算属性：主分类列表（从 forum_main_categories 表加载，并去重）
+const mainCategories = computed(() => {
+  // 去重：根据 name 字段去重，保留第一个出现的
+  const uniqueCategories = []
+  const seenNames = new Set()
+  
+  for (const cat of mainCategoriesList.value) {
+    if (!seenNames.has(cat.name)) {
+      seenNames.add(cat.name)
+      uniqueCategories.push(cat)
+    }
+  }
+  
+  // 按 sort_order 排序
+  uniqueCategories.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+  
+  return uniqueCategories
+})
+
+// 当前选中的主分类
+const selectedMainCategory = ref<number | null>(null)
+
+// 计算属性：根据选中的主分类筛选副分类
+const subCategories = computed(() => {
+  if (!selectedMainCategory.value) return []
+  
+  const filtered = categories.value.filter(cat => cat.mainCategoryId === selectedMainCategory.value)
+  
+  // 按 sort_order 排序
+  return filtered.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+})
 
 // 显示添加分类输入框
 const showAddCategory = ref(false)
@@ -43,27 +75,209 @@ const currentUser = ref<any>(null)
 const mouseX = ref(0)
 const mouseY = ref(0)
 
-// 计算属性：总文件大小
+// 过滤 HTML 标签，防止 XSS 攻击
+const sanitizeHTML = (text: string): string => {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+// 过滤标题和预览：只允许中文、英文、数字和基本标点符号（不含空白符，包含破折号——）
+const sanitizeTextInput = (text: string): string => {
+  // 允许的字符：中文、英文、数字、基本标点（，。！？；：""''（）【】《》、·…——）
+  return text.replace(/[^\u4e00-\u9fa5a-zA-Z0-9，。！？；：""''（）【】《》、·…——]/g, '')
+}
+
+// 过滤标签：只允许中文、英文、数字（不允许任何符号）
+const sanitizeTagInput = (text: string): string => {
+  return text.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '')
+}
+
+// 标签列表（最多5个）
+const tagInputs = ref<string[]>([''])
+const MAX_TAGS = 5
+
+// 富文本编辑器相关
+const editorRef = ref<HTMLDivElement | null>(null)
+const isBold = ref(false)
+const savedRange = ref<Range | null>(null) // 保存光标位置
+
+// 保存当前光标位置
+function saveSelection() {
+  const selection = window.getSelection()
+  if (selection && selection.rangeCount > 0) {
+    savedRange.value = selection.getRangeAt(0).cloneRange()
+  }
+}
+
+// 恢复光标位置
+function restoreSelection() {
+  if (savedRange.value && editorRef.value) {
+    const selection = window.getSelection()
+    if (selection) {
+      selection.removeAllRanges()
+      selection.addRange(savedRange.value)
+    }
+  }
+}
+
+// 添加标签输入框
+function addTagInput() {
+  if (tagInputs.value.length < MAX_TAGS) {
+    tagInputs.value.push('')
+  }
+}
+
+// 删除标签输入框
+function removeTagInput(index: number) {
+  if (tagInputs.value.length > 1) {
+    tagInputs.value.splice(index, 1)
+  } else {
+    tagInputs.value[0] = ''
+  }
+}
+
+// 更新标签列表到 form.tags
+function updateTagsFromInputs() {
+  form.tags = tagInputs.value.filter(t => t.trim()).join(' ')
+}
+
+// 富文本编辑器功能
+
+// 切换粗体（点击切换加粗状态，影响后续输入）
+function toggleBold() {
+  if (!editorRef.value) return
+  
+  // 切换加粗状态
+  const newBoldState = !isBold.value
+  
+  if (newBoldState) {
+    // 开启加粗
+    document.execCommand('bold', false)
+    isBold.value = true
+  } else {
+    // 取消加粗：再次执行 bold 命令取消
+    document.execCommand('bold', false)
+    isBold.value = false
+  }
+  
+  // 清除选区，恢复到默认状态
+  setTimeout(() => {
+    window.getSelection()?.removeAllRanges()
+    isBold.value = false
+  }, 100)
+  
+  updateContentFromEditor()
+}
+
+// 插入图片到正文
+function insertImageToContent(event: Event) {
+  const target = event.target as HTMLInputElement
+  const files = target.files
+  if (!files || files.length === 0) return
+  
+  // 恢复光标位置
+  restoreSelection()
+  
+  // 确保编辑器有焦点
+  if (editorRef.value) {
+    editorRef.value.focus()
+  }
+  
+  Array.from(files).forEach(file => {
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const imgHtml = `<p><img src="${e.target?.result}" style="max-width:100%;height:auto;margin:10px 0;border-radius:8px;display:block;" /></p>`
+        document.execCommand('insertHTML', false, imgHtml)
+        updateContentFromEditor()
+      }
+      reader.readAsDataURL(file)
+    }
+  })
+  
+  target.value = ''
+}
+
+// 插入视频到正文
+function insertVideoToContent(event: Event) {
+  const target = event.target as HTMLInputElement
+  const files = target.files
+  if (!files || files.length === 0) return
+  
+  // 恢复光标位置
+  restoreSelection()
+  
+  // 确保编辑器有焦点
+  if (editorRef.value) {
+    editorRef.value.focus()
+  }
+  
+  Array.from(files).forEach(file => {
+    if (file.type.startsWith('video/')) {
+      const url = URL.createObjectURL(file)
+      const videoHtml = `<p><video controls style="max-width:100%;height:auto;margin:10px 0;border-radius:8px;display:block;"><source src="${url}" type="video/mp4">您的浏览器不支持视频播放</video></p>`
+      document.execCommand('insertHTML', false, videoHtml)
+      updateContentFromEditor()
+    }
+  })
+  
+  target.value = ''
+}
+
+// 处理编辑器输入
+function handleEditorInput() {
+  updateContentFromEditor()
+}
+
+// 处理键盘事件
+function handleEditorKeydown(event: KeyboardEvent) {
+  // Ctrl+B 切换粗体
+  if (event.ctrlKey && event.key === 'b') {
+    event.preventDefault()
+    toggleBold()
+  }
+}
+
+// 点击编辑器时保存光标位置
+function handleEditorClick() {
+  saveSelection()
+}
+
+// 从编辑器更新 form.content
+function updateContentFromEditor() {
+  if (editorRef.value) {
+    form.content = editorRef.value.innerHTML
+  }
+}
 const totalFileSize = computed(() => {
   return uploadedFiles.value.reduce((sum, file) => sum + file.size, 0)
 })
 
 // 初始化用户信息和加载分类
 onMounted(async () => {
-  const userInfoStr = localStorage.getItem('userInfo')
-  if (!userInfoStr) {
+  const userInfo = getUserInfo()
+  if (!userInfo) {
     ElMessage.warning('请先登录')
     router.push('/Users')
     return
   }
   
-  currentUser.value = JSON.parse(userInfoStr)
+  currentUser.value = userInfo
   
   // 监听鼠标移动
   window.addEventListener('mousemove', handleMouseMove)
   
   // 加载分类列表
   await loadCategories()
+  
+  // 初始化富文本编辑器
+  if (editorRef.value) {
+    editorRef.value.focus()
+  }
   
   // 初始化 fade-up 动画
   setTimeout(() => {
@@ -76,11 +290,25 @@ onMounted(async () => {
 // 加载分类列表
 async function loadCategories() {
   try {
-    const res = await getForumCategories()
-    categories.value = res
+    // 并行加载主分类和副分类
+    const [mainCatsRes, subCatsRes] = await Promise.all([
+      getForumMainCategories(),
+      getForumCategories()
+    ])
+    
+    mainCategoriesList.value = mainCatsRes
+    categories.value = subCatsRes
+    
   } catch (error) {
-    // 静默处理错误
+    console.error('加载分类失败:', error)
   }
+}
+
+// 选择主分类
+function selectMainCategory(mainCatId: number) {
+  selectedMainCategory.value = mainCatId
+  // 重置副分类选择
+  form.category = ''
 }
 
 // 组件卸载时清理事件监听
@@ -97,9 +325,9 @@ function handleCategoryInput() {
   }
   
   const keyword = newCategoryName.value.trim().toLowerCase()
-  // 模糊搜索：查找 label 包含关键字的分类
+  // 模糊搜索：查找 name 包含关键字的分类
   searchResults.value = categories.value.filter(cat => 
-    cat.label.toLowerCase().includes(keyword)
+    cat.name.toLowerCase().includes(keyword)
   )
   
   showSearchDropdown.value = searchResults.value.length > 0
@@ -111,7 +339,7 @@ function selectCategory(category: ForumCategory) {
   newCategoryName.value = ''
   showSearchDropdown.value = false
   showAddCategory.value = false
-  ElMessage.success(`已选择分类：${category.label}`)
+  ElMessage.success(`已选择分类：${category.name}`)
 }
 
 // 添加新分类（仅当没有匹配结果时）
@@ -124,7 +352,7 @@ async function addCategory() {
   const label = newCategoryName.value.trim()
   
   // 检查是否已存在完全匹配的分类
-  const existingCategory = categories.value.find(c => c.label === label)
+  const existingCategory = categories.value.find(c => c.name === label)
   if (existingCategory) {
     // 如果已存在，直接选中
     form.category = existingCategory.categoryId
@@ -145,9 +373,9 @@ async function addCategory() {
     
     await createForumCategory({
       categoryId,
-      label,
-      icon: '', // 已移除 icon 字段，传空字符串
-      color
+      name: label,
+      color,
+      mainCategoryId: selectedMainCategory.value || null // 关联到当前选中的主分类
     })
     
     // 重新加载分类列表
@@ -251,12 +479,18 @@ function handleDocumentUpload(event: Event) {
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'text/plain',
+    'application/zip',
+    'application/x-rar-compressed',
+    'application/x-7z-compressed',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   ]
   
+  const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.zip', '.rar', '.7z', '.xls', '.xlsx']
+  
   Array.from(files).forEach(file => {
-    if (allowedTypes.includes(file.type)) {
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+    if (allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension || '')) {
       uploadedFiles.value.push({
         name: file.name,
         type: 'document',
@@ -283,14 +517,24 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
 }
 
-// 获取文件图标
-function getFileIcon(type: string): string {
-  switch (type) {
-    case 'image': return '🖼️'
-    case 'video': return '🎥'
-    case 'document': return '📄'
-    default: return '📁'
+// 获取文件图标（根据文件扩展名）
+function getFileIcon(type: string, fileName?: string): string {
+  if (fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase()
+    switch (ext) {
+      case 'pdf': return '📕'
+      case 'doc':
+      case 'docx': return '📘'
+      case 'xls':
+      case 'xlsx': return '📗'
+      case 'txt': return '📄'
+      case 'zip':
+      case 'rar':
+      case '7z': return '📦'
+      default: return '📄'
+    }
   }
+  return '📄'
 }
 
 // 提交帖子
@@ -300,7 +544,51 @@ async function submitPost() {
     ElMessage.warning('请输入帖子标题')
     return
   }
-  if (!form.content.trim()) {
+  // 验证标题长度
+  if (form.title.trim().length > 30) {
+    ElMessage.warning('标题不能超过30个字')
+    return
+  }
+  
+  // 验证预览摘要长度
+  if (form.preview.trim().length > 50) {
+    ElMessage.warning('预览摘要不能超过50个字')
+    return
+  }
+  
+  // 检测危险的 HTML 标签（只针对标题和预览，正文允许富文本格式）
+  const htmlTagRegex = /<[a-zA-Z][^>]*>|&[a-zA-Z]+;/
+  if (htmlTagRegex.test(form.title) || htmlTagRegex.test(form.preview)) {
+    ElMessage.warning('存在不符合的符号，请勿输入 HTML 格式内容')
+    return
+  }
+  
+  // 过滤并验证输入内容
+  const sanitizedTitle = sanitizeTextInput(form.title.trim())
+  const sanitizedPreview = sanitizeTextInput(form.preview.trim())
+  
+  if (!sanitizedTitle) {
+    ElMessage.warning('标题只能包含中文、英文、数字和基本标点符号')
+    return
+  }
+  
+  if (!sanitizedPreview) {
+    ElMessage.warning('预览摘要只能包含中文、英文、数字和基本标点符号')
+    return
+  }
+  
+  if (!form.category) {
+    ElMessage.warning('请选择帖子分类')
+    return
+  }
+  if (!form.preview.trim()) {
+    ElMessage.warning('请输入预览摘要')
+    return
+  }
+  
+  // 验证正文内容（获取编辑器的纯文本内容）
+  const editorText = editorRef.value ? editorRef.value.innerText.trim() : form.content.replace(/<[^>]*>/g, '').trim()
+  if (!editorText) {
     ElMessage.warning('请输入正文内容')
     return
   }
@@ -309,70 +597,31 @@ async function submitPost() {
     return
   }
 
-  // 构建完整内容（包含前言、正文、参考资料和附件）
-  let fullContent = ''
+  // 构建完整内容（直接存储用户输入的正文内容，并过滤 HTML）
+  // 注意：富文本编辑器已经包含 HTML 标签，需要特殊处理
+  let fullContent = form.content.trim()
   
-  if (form.subtitle) {
-    fullContent += `<h2>${form.subtitle}</h2>\n`
+  // 如果内容为空，使用编辑器的内容
+  if (!fullContent && editorRef.value) {
+    fullContent = editorRef.value.innerHTML.trim()
   }
   
-  if (form.preface) {
-    // 将换行符转换为段落
-    const paragraphs = form.preface.split('\n\n').filter(p => p.trim())
-    fullContent += `<h3>前言</h3>\n`
-    paragraphs.forEach(para => {
-      const lines = para.split('\n').map(line => line.trim()).filter(line => line)
-      lines.forEach(line => {
-        fullContent += `<p>${line}</p>\n`
-      })
-    })
-  }
+  // 移除空的 style 属性和 class 属性（清理格式）
+  fullContent = fullContent.replace(/ style=""/g, '').replace(/ class=""/g, '')
   
-  if (form.content) {
-    // 将换行符转换为 <br>，并包裹在 <p> 标签中
-    const paragraphs = form.content.split('\n\n').filter(p => p.trim())
-    fullContent += `<h3>正文</h3>\n`
-    paragraphs.forEach(para => {
-      const lines = para.split('\n').map(line => line.trim()).filter(line => line)
-      lines.forEach(line => {
-        fullContent += `<p>${line}</p>\n`
-      })
-    })
-  }
-  
-  // 添加附件信息
-  if (uploadedFiles.value.length > 0) {
-    fullContent += `<h3>附件</h3>\n`
-    uploadedFiles.value.forEach(file => {
-      if (file.type === 'image') {
-        // 图片直接嵌入
-        fullContent += `<img src="${file.url}" alt="${file.name}" />\n`
-      } else if (file.type === 'video') {
-        // 视频嵌入播放器
-        fullContent += `<video controls><source src="${file.url}" type="video/mp4">您的浏览器不支持视频播放</video>\n`
-      } else if (file.type === 'document') {
-        // 文档显示为链接
-        fullContent += `<p><a href="${file.url}" target="_blank" download="${file.name}">📄 ${file.name} (${formatFileSize(file.size)})</a></p>\n`
-      }
-    })
-  }
-  
-  if (form.references) {
-    // 将换行符转换为列表项
-    const refs = form.references.split('\n').filter(r => r.trim())
-    fullContent += `<h3>参考资料</h3>\n<ul>\n`
-    refs.forEach(ref => {
-      fullContent += `<li>${ref.trim()}</li>\n`
-    })
-    fullContent += `</ul>\n`
-  }
+  // 过滤危险的 HTML 标签，但保留基本的格式标签
+  const safeContent = fullContent
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')  // 移除 script 标签
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')  // 移除 iframe 标签
+    .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')  // 移除 object 标签
+    .replace(/<embed[^>]*>[\s\S]*?<\/embed>/gi, '')    // 移除 embed 标签
+    .replace(/on\w+="[^"]*"/gi, '')                     // 移除事件处理器
 
-  // 生成预览（取内容前100字符）
-  const preview = form.content.substring(0, 100) + (form.content.length > 100 ? '...' : '')
-
-  // 处理标签
+  // 处理标签（过滤后的标签可能没有分隔符，需要按原有逻辑处理）
   const tagsArray = form.tags.trim()
     .split(/[,，\s]+/)
+    .filter(t => t.length > 0)
+    .map(t => sanitizeTagInput(t)) // 再次确保标签合法
     .filter(t => t.length > 0)
     .slice(0, 5)
 
@@ -380,12 +629,17 @@ async function submitPost() {
 
   const postData: CreatePostData = {
     userId: currentUser.value.id,
-    category: form.category,
-    categoryLabel: selectedCat?.label || '其他',
-    title: form.title.trim(),
-    subtitle: form.subtitle.trim() || undefined,
-    preview: preview,
-    content: fullContent,
+    category: selectedCat?.categoryId || form.category,
+    categoryLabel: selectedCat?.name || '其他',
+    title: sanitizeHTML(sanitizedTitle),
+    preview: sanitizeHTML(sanitizedPreview),
+    content: fullContent, // 使用富文本内容
+    attachments: uploadedFiles.value.map(file => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      url: file.url
+    })), // 保存附件信息
     tags: tagsArray
   }
 
@@ -402,18 +656,21 @@ async function submitPost() {
   }
 }
 
-// 保存草稿（优化：不保存文件内容，只保存元数据）
+// 保存草稿
 function saveDraft() {
   try {
+    // 确保获取最新的编辑器内容
+    if (editorRef.value) {
+      form.content = editorRef.value.innerHTML
+    }
+    
     const draft = {
       title: form.title,
-      subtitle: form.subtitle,
       category: form.category,
-      preface: form.preface,
+      preview: form.preview,
       content: form.content,
-      references: form.references,
-      tags: form.tags,
-      fileCount: uploadedFiles.value.length, // 只保存文件数量
+      tags: tagInputs.value.filter(t => t.trim()), // 保存标签数组
+      fileCount: uploadedFiles.value.length,
       savedAt: new Date().toISOString()
     }
     
@@ -437,12 +694,22 @@ function loadDraft() {
       
       // 恢复表单数据
       form.title = draft.title || ''
-      form.subtitle = draft.subtitle || ''
       form.category = draft.category || ''
-      form.preface = draft.preface || ''
+      form.preview = draft.preview || ''
       form.content = draft.content || ''
-      form.references = draft.references || ''
-      form.tags = draft.tags || ''
+      
+      // 恢复标签列表
+      if (draft.tags && Array.isArray(draft.tags)) {
+        tagInputs.value = draft.tags.length > 0 ? draft.tags : ['']
+      } else {
+        tagInputs.value = ['']
+      }
+      updateTagsFromInputs()
+      
+      // 恢复富文本编辑器内容
+      if (editorRef.value && draft.content) {
+        editorRef.value.innerHTML = draft.content
+      }
       
       // 注意：不再恢复文件列表，因为文件内容太大
       if (draft.fileCount > 0) {
@@ -516,42 +783,66 @@ function goBack() {
               <label class="form-label">标题 <span class="required">*</span></label>
               <input 
                 v-model="form.title" 
+                @input="form.title = sanitizeTextInput(form.title)"
                 class="form-input" 
-                placeholder="输入帖子标题..." 
-                maxlength="100"
+                placeholder="输入帖子标题（最多30字）..." 
+                maxlength="30"
               />
-              <div class="char-count">{{ form.title.length }}/100</div>
+              <div class="char-count">{{ form.title.length }}/30</div>
             </div>
 
             <div class="form-group">
-              <label class="form-label">副标题</label>
-              <input 
-                v-model="form.subtitle" 
-                class="form-input" 
-                placeholder="输入副标题（可选）..." 
-                maxlength="150"
-              />
+              <label class="form-label">预览摘要 <span class="required">*</span></label>
+              <textarea 
+                v-model="form.preview" 
+                @input="form.preview = sanitizeTextInput(form.preview)"
+                class="form-textarea" 
+                placeholder="输入帖子预览内容（最多50字）..."
+                rows="3"
+                maxlength="50"
+              ></textarea>
+              <div class="char-count">{{ form.preview.length }}/50</div>
             </div>
 
             <div class="form-group">
               <label class="form-label">分类</label>
-              
-              <!-- 已添加的分类标签列表 -->
-              <div v-if="categories.length > 0" class="category-tags">
-                <div 
-                  v-for="cat in categories" 
-                  :key="cat.id"
-                  class="category-tag"
-                  :class="{ active: form.category === cat.categoryId }"
-                  :style="`--cc:${cat.color}`"
-                  @click="form.category = cat.categoryId"
-                >
-                  <span class="tag-label">{{ cat.label }}</span>
+                          
+              <!-- 主分类选择 -->
+              <div class="category-section">
+                <div class="category-tags">
+                  <div 
+                    v-for="cat in mainCategories" 
+                    :key="cat.id"
+                    class="category-tag main-cat-tag"
+                    :class="{ active: selectedMainCategory === cat.id }"
+                    :style="`--cc:${cat.color}`"
+                    @click="selectMainCategory(cat.id)"
+                  >
+                    <span class="tag-label">{{ cat.name }}</span>
+                  </div>
+                </div>
+              </div>
+                          
+              <!-- 副分类选择（仅当选中主分类且该主分类有副分类时显示） -->
+              <div v-if="selectedMainCategory && subCategories.length > 0" class="category-section">
+                <div class="category-label-small">副分类</div>
+                <div class="category-tags">
+                  <div 
+                    v-for="cat in subCategories" 
+                    :key="cat.id"
+                    class="category-tag sub-cat-tag"
+                    :class="{ active: form.category === cat.categoryId }"
+                    :style="`--cc:${cat.color}`"
+                    @click="form.category = cat.categoryId"
+                  >
+                    <span class="tag-label">{{ cat.name }}</span>
+                  </div>
                 </div>
               </div>
               
-              <!-- 添加分类按钮 -->
+              <!-- 添加分类按钮（仅当选中主分类后显示） -->
               <button 
+                v-if="selectedMainCategory"
                 class="add-category-simple-btn"
                 @click="showAddCategory = !showAddCategory"
               >
@@ -559,9 +850,9 @@ function goBack() {
                   <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                {{ showAddCategory ? '取消' : '添加分类' }}
+                {{ showAddCategory ? '取消' : (subCategories.length > 0 ? '添加副分类' : '添加分类') }}
               </button>
-              
+
               <!-- 添加分类表单（带模糊搜索） -->
               <div v-if="showAddCategory" class="add-category-simple-form">
                 <div class="search-input-wrapper">
@@ -583,7 +874,7 @@ function goBack() {
                       class="search-item"
                       @mousedown="selectCategory(cat)"
                     >
-                      <span class="search-item-label">{{ cat.label }}</span>
+                      <span class="search-item-label">{{ cat.name }}</span>
                       <span class="search-item-hint">点击选择</span>
                     </div>
                   </div>
@@ -593,20 +884,56 @@ function goBack() {
                   {{ searchResults.length > 0 ? '创建新分类' : '确认添加' }}
                 </button>
               </div>
-              
-              <div class="category-hint">
-                点击分类可选，输入关键字可搜索已有分类或创建新分类
-              </div>
+
             </div>
             
             <div class="form-group">
               <label class="form-label">标签</label>
-              <input 
-                v-model="form.tags" 
-                class="form-input" 
-                placeholder="用空格或逗号分隔，最多5个标签..."
-              />
-              <div class="tag-hint">示例: Vue3 TypeScript 前端</div>
+              <div class="tags-input-container">
+                <!-- 标签输入框列表 -->
+                <div class="tags-input-row">
+                  <div 
+                    v-for="(tag, index) in tagInputs" 
+                    :key="index" 
+                    class="tag-input-wrapper"
+                  >
+                    <input 
+                      v-model="tagInputs[index]" 
+                      @input="tagInputs[index] = sanitizeTagInput(tagInputs[index]); updateTagsFromInputs()"
+                      class="tag-input" 
+                      :placeholder="index === 0 ? '输入标签...' : ''"
+                      maxlength="10"
+                    />
+                    <!-- 删除按钮（只有当有多个标签时显示） -->
+                    <button 
+                      v-if="tagInputs.length > 1" 
+                      class="tag-remove-btn"
+                      @click="removeTagInput(index)"
+                      type="button"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  <!-- 添加标签按钮（最多5个时隐藏） -->
+                  <button 
+                    v-if="tagInputs.length < MAX_TAGS"
+                    class="add-tag-btn"
+                    @click="addTagInput"
+                    type="button"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19"/>
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    添加标签
+                  </button>
+                </div>
+              </div>
+              <div class="tag-hint">示例: Vue3 TypeScript 前端（最多5个标签，只能输入中文/英文/数字）</div>
             </div>
           </div>
 
@@ -614,38 +941,76 @@ function goBack() {
           <div class="content-block fade-up">
             <div class="block-header">
               <div class="bh-tag">[ CONTENT ]</div>
-              <h3 class="bh-title">内容编辑</h3>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">前言</label>
-              <textarea 
-                v-model="form.preface" 
-                class="form-textarea" 
-                placeholder="简要介绍帖子背景和目的..."
-                rows="4"
-              ></textarea>
+              <h3 class="bh-title">正文内容</h3>
             </div>
 
             <div class="form-group">
               <label class="form-label">正文 <span class="required">*</span></label>
-              <textarea 
-                v-model="form.content" 
-                class="form-textarea large" 
-                placeholder="分享你的知识、问题或资源...\n\n支持换行和基本格式"
-                rows="12"
-              ></textarea>
+              
+              <!-- 富文本编辑器工具栏 -->
+              <div class="rich-editor-toolbar">
+                <!-- 字体粗细 -->
+                <div class="toolbar-group">
+                  <button @click="toggleBold" :class="{ active: isBold }" class="toolbar-btn" title="加粗">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <path d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z"/>
+                      <path d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- 分隔线 -->
+                <div class="toolbar-divider"></div>
+
+                <!-- 插入图片 -->
+                <div class="toolbar-group">
+                  <label class="toolbar-btn" title="插入图片">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      @change="insertImageToContent" 
+                      style="display:none"
+                    />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                  </label>
+                </div>
+
+                <!-- 插入视频 -->
+                <div class="toolbar-group">
+                  <label class="toolbar-btn" title="插入视频">
+                    <input 
+                      type="file" 
+                      accept="video/*" 
+                      @change="insertVideoToContent" 
+                      style="display:none"
+                    />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="23 7 16 12 23 17 23 7"/>
+                      <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 富文本编辑区域 -->
+              <div 
+                ref="editorRef"
+                class="rich-editor"
+                contenteditable="true"
+                @input="handleEditorInput"
+                @keydown="handleEditorKeydown"
+                @click="handleEditorClick"
+                @mouseup="saveSelection"
+                @keyup="saveSelection"
+                placeholder="分享你的知识、问题或资源..."
+              ></div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">参考资料</label>
-              <textarea 
-                v-model="form.references" 
-                class="form-textarea" 
-                placeholder="列出参考文献、链接或相关资源..."
-                rows="4"
-              ></textarea>
-            </div>
+
           </div>
 
           <!-- 附件上传块 -->
@@ -657,41 +1022,10 @@ function goBack() {
 
             <div class="upload-area">
               <div class="upload-buttons">
-                <label class="upload-trigger image">
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    @change="handleImageUpload" 
-                    style="display:none" 
-                    multiple
-                  />
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21 15 16 10 5 21"/>
-                  </svg>
-                  上传图片
-                </label>
-                
-                <label class="upload-trigger video">
-                  <input 
-                    type="file" 
-                    accept="video/*" 
-                    @change="handleVideoUpload" 
-                    style="display:none" 
-                    multiple
-                  />
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="23 7 16 12 23 17 23 7"/>
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                  </svg>
-                  上传视频
-                </label>
-                
                 <label class="upload-trigger document">
                   <input 
                     type="file" 
-                    accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+                    accept=".pdf,.doc,.docx,.txt,.zip,.rar,.7z,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,application/zip,application/x-rar-compressed,application/x-7z-compressed,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
                     @change="handleDocumentUpload" 
                     style="display:none" 
                     multiple
@@ -700,31 +1034,40 @@ function goBack() {
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
                   </svg>
-                  上传文档
+                  上传附件
                 </label>
               </div>
 
-              <!-- 已上传文件列表 -->
+              <!-- 已上传附件列表 -->
               <div v-if="uploadedFiles.length > 0" class="file-list">
                 <div class="file-list-header">
-                  <span>已上传文件 ({{ uploadedFiles.length }})</span>
+                  <span>已上传附件 ({{ uploadedFiles.length }})</span>
                   <span class="total-size">总计: {{ formatFileSize(totalFileSize) }}</span>
                 </div>
                 <div class="file-items">
                   <div v-for="(file, index) in uploadedFiles" :key="index" class="file-item">
                     <div class="file-info">
-                      <span class="file-icon">{{ getFileIcon(file.type) }}</span>
+                      <span class="file-icon">{{ getFileIcon(file.type, file.name) }}</span>
                       <div class="file-details">
                         <span class="file-name">{{ file.name }}</span>
                         <span class="file-size">{{ formatFileSize(file.size) }}</span>
                       </div>
                     </div>
-                    <button class="file-remove" @click="removeFile(index)">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                      </svg>
-                    </button>
+                    <div class="file-actions">
+                      <a :href="file.url" :download="file.name" class="file-download-btn" title="下载">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                          <polyline points="7 10 12 15 17 10"/>
+                          <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                      </a>
+                      <button class="file-remove" @click="removeFile(index)" title="删除">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -747,7 +1090,7 @@ function goBack() {
               </div>
 
               <div class="preview-category">
-                {{ categories.find(c => c.categoryId === form.category)?.label || (form.category || '未选择分类') }}
+                {{ categories.find(c => c.categoryId === form.category)?.name || (form.category || '未选择分类') }}
               </div>
               
               <div v-if="form.preface" class="preview-preface">
@@ -1061,6 +1404,17 @@ function goBack() {
 }
 
 /* ─── 分类标签样式（简化版） ─── */
+.category-section {
+  margin-bottom: 16px;
+}
+
+.category-label-small {
+  font-size: 0.8rem;
+  color: #999;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
 .category-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1088,6 +1442,23 @@ function goBack() {
   background: rgba(0,102,255,0.08);
   color: var(--cc, #0066FF);
   font-weight: 600;
+}
+
+/* 主分类标签样式 */
+.main-cat-tag {
+  font-weight: 600;
+}
+.main-cat-tag.active {
+  box-shadow: 0 2px 8px rgba(0,102,255,0.15);
+}
+
+/* 副分类标签样式 */
+.sub-cat-tag {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+.sub-cat-tag.active {
+  box-shadow: 0 2px 6px rgba(0,102,255,0.12);
 }
 .tag-label {
   user-select: none;
@@ -1197,6 +1568,22 @@ function goBack() {
   margin-top: 8px;
   font-size: 0.75rem;
   color: #999;
+}
+
+/* 未选择主分类时的提示样式 */
+.category-hint.select-main-first {
+  color: #ff6b35;
+  font-weight: 500;
+  padding: 8px 12px;
+  background: rgba(255, 107, 53, 0.05);
+  border-radius: 6px;
+  border-left: 3px solid #ff6b35;
+  animation: pulseHint 2s ease-in-out infinite;
+}
+
+@keyframes pulseHint {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 
 /* ─── 上传区域 ─── */
@@ -1333,6 +1720,31 @@ function goBack() {
   background: rgba(255,68,68,0.2);
 }
 
+/* ─── 文件操作按钮 ─── */
+.file-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.file-download-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(0,102,255,0.1);
+  color: #0066FF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+.file-download-btn:hover {
+  background: rgba(0,102,255,0.2);
+  color: #0052cc;
+}
+
 /* ─── 侧边栏 ─── */
 .sidebar-right {
   display: flex;
@@ -1465,6 +1877,180 @@ function goBack() {
 .load-draft-btn:hover {
   background: rgba(167,139,250,0.1);
   border-color: rgba(167,139,250,0.5);
+}
+
+/* ─── 富文本编辑器 ─── */
+.rich-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  flex-wrap: wrap;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+}
+
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+.toolbar-btn:hover {
+  background: #f0f0f0;
+  border-color: #ccc;
+  color: #1a1a1a;
+}
+.toolbar-btn.active {
+  background: rgba(0,102,255,0.1);
+  border-color: #0066FF;
+  color: #0066FF;
+}
+
+/* 文字按钮（小/中/大） */
+.toolbar-btn-text {
+  width: auto;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: #e0e0e0;
+  margin: 0 4px;
+}
+
+.rich-editor {
+  min-height: 300px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 0 0 8px 8px;
+  font-size: 16px;
+  line-height: 1.8;
+  color: #1a1a1a;
+  outline: none;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.rich-editor:empty:before {
+  content: attr(placeholder);
+  color: #bbb;
+  pointer-events: none;
+}
+.rich-editor:focus {
+  border-color: #0066FF;
+}
+.rich-editor img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+.rich-editor video {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+/* ─── 标签输入容器 ─── */
+.tags-input-container {
+  width: 100%;
+}
+
+.tags-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.tag-input-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tag-input {
+  width: 120px;
+  height: 36px;
+  padding: 0 32px 0 12px;
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: #1a1a1a;
+  outline: none;
+  transition: all 0.2s;
+}
+.tag-input::placeholder {
+  color: #bbb;
+}
+.tag-input:focus {
+  border-color: #0066FF;
+  background: rgba(0,102,255,0.02);
+}
+
+.tag-remove-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s;
+  padding: 0;
+}
+.tag-remove-btn:hover {
+  background: rgba(255,71,87,0.1);
+  color: #ff4757;
+}
+
+.add-tag-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1.5px dashed #ccc;
+  border-radius: 20px;
+  color: #999;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 36px;
+}
+.add-tag-btn:hover {
+  border-color: #0066FF;
+  color: #0066FF;
+  background: rgba(0,102,255,0.03);
 }
 
 /* ─── 提示列表 ─── */

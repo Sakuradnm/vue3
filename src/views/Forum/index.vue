@@ -1,30 +1,67 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { getForumPosts, createPost, likePost, getPostLikeStatus, type CreatePostData, getForumCategories, type ForumCategory } from '@/api/forum';
+import { getForumPosts, createPost, type CreatePostData, getForumCategories, getForumMainCategories, type ForumCategory, type ForumMainCategory } from '@/api/forum';
 import type { ForumPostItem } from '@/api/forum';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { getUserInfo } from '@/utils/session';
+import * as THREE from 'three';
 
 const router = useRouter();
 
-// ── State ────────────────────────────────────────────────
-const activeCategory = ref('all');
+// ─ State ────────────────────────────────────────────────
+const activeCategory = ref('all'); // 当前选中的分类（用于筛选帖子）
+const activeMainCategory = ref(''); // 当前选中的主分类（用于切换副分类显示）
+const expandedMainCategories = ref(new Set()); // 已展开的主分类ID集合
 const searchQuery = ref('');
 const sortBy = ref('new'); // 默认按最新排序
 const sortDirection = ref<'asc' | 'desc'>('desc'); // 排序方向：desc=降序, asc=升序
-const likedPosts = reactive(new Set());
 const bookmarked = reactive(new Set());
 const hoveredPost = ref(-1);
 const mouseX = ref(0);
 const mouseY = ref(0);
 let particleRafId = null;
 let observers = [];
+let threeScene: THREE.Scene | null = null;
+let threeCamera: THREE.PerspectiveCamera | null = null;
+let threeRenderer: THREE.WebGLRenderer | null = null;
+let threeAnimationId: number | null = null;
 
 // ── Data ────────────────────────────────────────────────
-const categories = ref<ForumCategory[]>([
-  { id: 0, categoryId: 'all', label: '全部', icon: '◈', color: '#00ffb4', sortOrder: 0 }
-]);
+const categories = ref<ForumCategory[]>([]);
+const mainCategoriesList = ref<ForumMainCategory[]>([]);
+
+// 计算属性：主分类列表（从 forum_main_categories 表加载，并去重）
+const mainCategories = computed(() => {
+  // 去重：根据 name 字段去重，保留第一个出现的
+  const uniqueCategories = [];
+  const seenNames = new Set();
+  
+  for (const cat of mainCategoriesList.value) {
+    if (!seenNames.has(cat.name)) {
+      seenNames.add(cat.name);
+      uniqueCategories.push({
+        id: cat.id,
+        categoryId: String(cat.id),
+        name: cat.name,
+        color: '#0066FF',
+        sortOrder: cat.sortOrder,
+        icon: cat.icon || ''
+      });
+    }
+  }
+  
+  // 按 sortOrder 排序
+  uniqueCategories.sort((a, b) => a.sortOrder - b.sortOrder);
+  
+  return uniqueCategories;
+});
+
+// 获取指定主分类下的副分类
+function getSubCategoriesForMain(mainCategoryId: string) {
+  const mainCatId = parseInt(mainCategoryId);
+  return categories.value.filter(cat => cat.mainCategoryId === mainCatId);
+}
 
 const allPosts = ref<ForumPostItem[]>([]);
 const loading = ref(false);
@@ -33,20 +70,25 @@ const hasMore = ref(true);
 const pageSize = 10;
 const currentPage = ref(1); // 当前页码
 
-const hotTopics = [
-  { rank: 1, title: 'Vue3 vs React 2024 大比拼', replies: 203, color: '#ff6b35' },
-  { rank: 2, title: '大厂算法面试高频题汇总', replies: 187, color: '#ffd93d' },
-  { rank: 3, title: 'TypeScript 5.0 新特性解析', replies: 134, color: '#a78bfa' },
-  { rank: 4, title: '前端工程化最佳实践 2024', replies: 98, color: '#00c8ff' },
-  { rank: 5, title: 'Docker + K8s 入门到实战', replies: 76, color: '#00ffb4' },
-];
+const hotTopics = computed(() => {
+  // 根据 views 排序，取前10个作为热门话题
+  const sorted = [...allPosts.value].sort((a, b) => b.views - a.views);
+  return sorted.slice(0, 10).map((post, index) => ({
+    rank: index + 1,
+    id: post.id,
+    title: post.title,
+    views: post.views,
+    color: ['#ff6b35', '#ffd93d', '#a78bfa', '#00c8ff', '#00ffb4', '#ff6b9d', '#c084fc', '#fbbf24', '#34d399', '#60a5fa'][index % 10]
+  }));
+});
 
-const activeUsers = [
-  { name: 'fe_master', avatar: 'FM', color: '#00c8ff', posts: 42, online: true },
-  { name: 'algo_core', avatar: 'AC', color: '#a78bfa', posts: 38, online: true },
-  { name: 'redis_pro', avatar: 'RP', color: '#ff6b35', posts: 29, online: false },
-  { name: 'ux_craft', avatar: 'UC', color: '#ffd93d', posts: 24, online: true },
-];
+
+
+// 计算热门帖子ID集合（前10个）
+const hotPostIds = computed(() => {
+  const sorted = [...allPosts.value].sort((a, b) => b.views - a.views);
+  return new Set(sorted.slice(0, 10).map(post => post.id));
+});
 
 // ── Computed ─────────────────────────────────────────────
 // 先对所有数据进行过滤和排序
@@ -74,7 +116,6 @@ const sortedAndFilteredPosts = computed(() => {
   list = [...list].sort((a, b) => {
     if (sortBy.value === 'new') {
       // 最新：按创建时间排序（不需要箭头，固定降序）
-      // 时间越接近当前时间，应该排在越前面
       const timeA = new Date(a.createdAt).getTime();
       const timeB = new Date(b.createdAt).getTime();
       return timeB - timeA; // 降序：新->旧（不受方向控制）
@@ -91,7 +132,6 @@ const sortedAndFilteredPosts = computed(() => {
     }
 
     // 根据方向调整排序
-    // desc=降序（大->小），asc=升序（小->大）
     return sortDirection.value === 'desc' ? -result : result;
   });
 
@@ -114,6 +154,7 @@ const activeCatData = computed(() =>
 // ── Actions ───────────────────────────────────────────────
 let searchTimer: number | null = null;
 const forumHeroRef = ref<HTMLElement | null>(null);
+const threeContainerRef = ref<HTMLElement | null>(null);
 const sidebarTopOffset = ref(62); // 侧边栏动态top值
 
 function debounceSearch() {
@@ -181,36 +222,6 @@ function updateCategoryCounts() {
   });
 }
 
-async function toggleLike(postId: number) {
-  const userInfo = getUserInfo()
-  if (!userInfo) {
-    ElMessage.warning('请先登录后再点赞')
-    return
-  }
-
-  if (!userInfo.id) {
-    ElMessage.error('用户信息异常，请重新登录')
-    return
-  }
-
-  try {
-    const action = likedPosts.has(postId) ? 'unlike' : 'like'
-    const result = await likePost(postId, userInfo.id, action)
-    const post = allPosts.value.find(p => p.id === postId)
-
-    if (result.liked) {
-      if (post) post.likes++
-      likedPosts.add(postId)
-      ElMessage.success('点赞成功')
-    } else {
-      if (post) post.likes = Math.max(0, post.likes - 1)
-      likedPosts.delete(postId)
-      ElMessage.info('已取消点赞')
-    }
-  } catch (error: any) {
-    ElMessage.error(error?.response?.data?.error || error?.message || '操作失败')
-  }
-}
 
 function toggleBookmark(id) {
   if (bookmarked.has(id)) bookmarked.delete(id);
@@ -240,6 +251,36 @@ function goToUpload() {
     return;
   }
   router.push('/Forum/Upload');
+}
+
+// 选择主分类（展开/收起）
+function toggleMainCategory(categoryId: string) {
+  if (expandedMainCategories.value.has(categoryId)) {
+    // 如果已展开，则收起
+    expandedMainCategories.value.delete(categoryId);
+  } else {
+    // 如果未展开，则展开
+    expandedMainCategories.value.add(categoryId);
+  }
+  // 同时设置为活动主分类
+  activeMainCategory.value = categoryId;
+}
+
+// 选择副分类
+function selectSubCategory(categoryId: string) {
+  activeCategory.value = categoryId;
+}
+
+// 重置筛选（显示全部数据）
+function resetFilter() {
+  activeCategory.value = 'all';
+  activeMainCategory.value = '';
+  expandedMainCategories.value.clear();
+  searchQuery.value = '';
+  sortBy.value = 'new';
+  sortDirection.value = 'desc';
+  currentPage.value = 1;
+  fetchPosts();
 }
 
 function fmtNum(n) {
@@ -292,6 +333,420 @@ function updateSidebarTopOffset() {
   } else {
     sidebarTopOffset.value = heroBottom;
   }
+}
+
+// ─ Three.js 3D 场景初始化 - 知识分享主题 ───────────────────────────────
+function initThreeScene() {
+  if (!threeContainerRef.value) return;
+  
+  const container = threeContainerRef.value;
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  
+  // 创建场景
+  threeScene = new THREE.Scene();
+  
+  // 创建相机
+  threeCamera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+  threeCamera.position.set(0, 1, 9);
+  threeCamera.lookAt(0, 0, 0);
+  
+  // 创建渲染器
+  threeRenderer = new THREE.WebGLRenderer({ 
+    alpha: true, 
+    antialias: true 
+  });
+  threeRenderer.setSize(width, height);
+  threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(threeRenderer.domElement);
+  
+  // ══ 知识分享主题效果 ══
+  
+  // 1. 创建书本几何体
+  function createBook(width, height, depth) {
+    const geometry = new THREE.BoxGeometry(width, height, depth);
+    
+    // 调整顶点以模拟打开的书本
+    const positions = geometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i];
+      const y = positions[i + 1];
+      const z = positions[i + 2];
+      
+      // 书页弯曲效果
+      if (x > 0) {
+        positions[i + 2] = z + Math.abs(x) * 0.3;
+      } else {
+        positions[i + 2] = z - Math.abs(x) * 0.3;
+      }
+    }
+    
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+  
+  // 2. 创建多本 floating books
+  const books = [];
+  const bookColors = [0x0066FF, 0x00ffb4, 0xffd93d, 0xa78bfa, 0x00c8ff];
+  const bookCount = 15;
+  
+  for (let i = 0; i < bookCount; i++) {
+    const bookWidth = 0.6 + Math.random() * 0.4;
+    const bookHeight = 0.8 + Math.random() * 0.3;
+    const bookDepth = 0.15 + Math.random() * 0.1;
+    
+    const bookGeometry = createBook(bookWidth, bookHeight, bookDepth);
+    const bookMaterial = new THREE.MeshPhongMaterial({
+      color: bookColors[i % bookColors.length],
+      emissive: bookColors[i % bookColors.length],
+      emissiveIntensity: 0.2,
+      shininess: 80,
+      transparent: true,
+      opacity: 0.85
+    });
+    
+    const book = new THREE.Mesh(bookGeometry, bookMaterial);
+    
+    // 随机位置
+    book.position.set(
+      (Math.random() - 0.5) * 14,
+      (Math.random() - 0.5) * 7,
+      (Math.random() - 0.5) * 6 - 2
+    );
+    
+    // 随机旋转
+    book.rotation.set(
+      Math.random() * Math.PI,
+      Math.random() * Math.PI,
+      Math.random() * Math.PI
+    );
+    
+    // 存储动画参数
+    book.userData = {
+      rotationSpeed: {
+        x: (Math.random() - 0.5) * 0.01,
+        y: (Math.random() - 0.5) * 0.015,
+        z: (Math.random() - 0.5) * 0.008
+      },
+      floatSpeed: 0.5 + Math.random() * 0.5,
+      floatAmplitude: 0.5 + Math.random() * 0.8,
+      floatOffset: Math.random() * Math.PI * 2,
+      baseY: book.position.y
+    };
+    
+    threeScene.add(book);
+    books.push(book);
+  }
+  
+  // 3. 创建知识节点（球体）
+  const knowledgeNodes = [];
+  const nodeCount = 30;
+  
+  for (let i = 0; i < nodeCount; i++) {
+    const nodeGeometry = new THREE.SphereGeometry(0.12, 16, 16);
+    const nodeMaterial = new THREE.MeshPhongMaterial({
+      color: i % 2 === 0 ? 0x0066FF : 0x00ffb4,
+      emissive: i % 2 === 0 ? 0x003366 : 0x006655,
+      emissiveIntensity: 0.4,
+      transparent: true,
+      opacity: 0.9
+    });
+    
+    const node = new THREE.Mesh(nodeGeometry, nodeMaterial);
+    node.position.set(
+      (Math.random() - 0.5) * 16,
+      (Math.random() - 0.5) * 9,
+      (Math.random() - 0.5) * 8 - 2
+    );
+    
+    node.userData = {
+      pulseSpeed: 1 + Math.random() * 2,
+      pulsePhase: Math.random() * Math.PI * 2,
+      connectionDistance: 3
+    };
+    
+    threeScene.add(node);
+    knowledgeNodes.push(node);
+  }
+  
+  // 4. 创建连接线（知识网络）
+  const lineMaterial = new THREE.LineBasicMaterial({
+    color: 0x0066FF,
+    transparent: true,
+    opacity: 0.15,
+    blending: THREE.AdditiveBlending
+  });
+  
+  const lines = [];
+  
+  // 5. 创建数据流粒子（知识传递）
+  const dataStreams = [];
+  const streamCount = 40;
+  
+  for (let i = 0; i < streamCount; i++) {
+    const particleGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(15 * 3); // 15个点组成轨迹
+    
+    const startX = (Math.random() - 0.5) * 16;
+    const startY = (Math.random() - 0.5) * 9;
+    const startZ = (Math.random() - 0.5) * 8 - 2;
+    
+    for (let j = 0; j < 15; j++) {
+      positions[j * 3] = startX + (Math.random() - 0.5) * 0.2;
+      positions[j * 3 + 1] = startY + (Math.random() - 0.5) * 0.2;
+      positions[j * 3 + 2] = startZ + (Math.random() - 0.5) * 0.2;
+    }
+    
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    
+    const particleMaterial = new THREE.PointsMaterial({
+      size: 0.06,
+      color: Math.random() > 0.5 ? 0x00ffb4 : 0xffd93d,
+      transparent: true,
+      opacity: 0.7,
+      blending: THREE.AdditiveBlending
+    });
+    
+    const stream = new THREE.Points(particleGeometry, particleMaterial);
+    stream.userData = {
+      velocity: new THREE.Vector3(
+        (Math.random() - 0.5) * 0.02,
+        (Math.random() - 0.5) * 0.02,
+        (Math.random() - 0.5) * 0.015
+      ),
+      life: Math.random() * 100,
+      maxLife: 150 + Math.random() * 50
+    };
+    
+    threeScene.add(stream);
+    dataStreams.push(stream);
+  }
+  
+  // 6. 创建引号符号装饰（知识引用）
+  const quoteMarks = [];
+  const quotePositions = [
+    { x: -6, y: 3, z: -3 },
+    { x: 6, y: -2, z: -2 },
+    { x: -4, y: -3, z: -1 },
+    { x: 5, y: 3, z: -4 }
+  ];
+  
+  quotePositions.forEach((pos, index) => {
+    // 使用简单的几何体组合成引号形状
+    const group = new THREE.Group();
+    
+    const bar1 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.15, 0.6, 0.1),
+      new THREE.MeshBasicMaterial({
+        color: 0x0066FF,
+        transparent: true,
+        opacity: 0.3
+      })
+    );
+    bar1.position.x = -0.15;
+    
+    const bar2 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.15, 0.6, 0.1),
+      new THREE.MeshBasicMaterial({
+        color: 0x0066FF,
+        transparent: true,
+        opacity: 0.3
+      })
+    );
+    bar2.position.x = 0.15;
+    
+    group.add(bar1, bar2);
+    group.position.set(pos.x, pos.y, pos.z);
+    group.rotation.z = Math.PI / 6;
+    
+    group.userData = {
+      rotationSpeed: 0.2 + index * 0.1,
+      floatSpeed: 0.8 + index * 0.2,
+      floatPhase: index * Math.PI / 2
+    };
+    
+    threeScene.add(group);
+    quoteMarks.push(group);
+  });
+  
+  // 7. 添加光照
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  threeScene.add(ambientLight);
+  
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+  directionalLight.position.set(5, 10, 7);
+  threeScene.add(directionalLight);
+  
+  const pointLight1 = new THREE.PointLight(0x0066FF, 0.6, 20);
+  pointLight1.position.set(-6, 4, 5);
+  threeScene.add(pointLight1);
+  
+  const pointLight2 = new THREE.PointLight(0x00ffb4, 0.5, 20);
+  pointLight2.position.set(6, -3, 4);
+  threeScene.add(pointLight2);
+  
+  // 动画循环
+  function animate() {
+    threeAnimationId = requestAnimationFrame(animate);
+    
+    const time = Date.now() * 0.001;
+    
+    // 更新书本
+    books.forEach(book => {
+      const data = book.userData;
+      
+      // 缓慢旋转
+      book.rotation.x += data.rotationSpeed.x;
+      book.rotation.y += data.rotationSpeed.y;
+      book.rotation.z += data.rotationSpeed.z;
+      
+      // 上下浮动
+      book.position.y = data.baseY + Math.sin(time * data.floatSpeed + data.floatOffset) * data.floatAmplitude;
+    });
+    
+    // 更新知识节点
+    knowledgeNodes.forEach((node, i) => {
+      const data = node.userData;
+      
+      // 脉冲效果
+      const scale = 1 + Math.sin(time * data.pulseSpeed + data.pulsePhase) * 0.3;
+      node.scale.set(scale, scale, scale);
+      node.material.emissiveIntensity = 0.3 + Math.sin(time * data.pulseSpeed + data.pulsePhase) * 0.2;
+      
+      // 缓慢移动
+      node.position.x += Math.sin(time * 0.3 + i) * 0.003;
+      node.position.y += Math.cos(time * 0.25 + i) * 0.003;
+    });
+    
+    // 动态创建和更新连接线
+    // 清除旧线
+    lines.forEach(line => threeScene.remove(line));
+    lines.length = 0;
+    
+    // 创建新线（距离近的节点之间）
+    for (let i = 0; i < knowledgeNodes.length; i++) {
+      for (let j = i + 1; j < knowledgeNodes.length; j++) {
+        const nodeA = knowledgeNodes[i];
+        const nodeB = knowledgeNodes[j];
+        const distance = nodeA.position.distanceTo(nodeB.position);
+        
+        if (distance < 3.5) {
+          const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+            nodeA.position,
+            nodeB.position
+          ]);
+          
+          const lineMat = lineMaterial.clone();
+          lineMat.opacity = 0.15 * (1 - distance / 3.5);
+          
+          const line = new THREE.Line(lineGeometry, lineMat);
+          threeScene.add(line);
+          lines.push(line);
+        }
+      }
+    }
+    
+    // 更新数据流
+    dataStreams.forEach(stream => {
+      const positions = stream.geometry.attributes.position.array;
+      const vel = stream.userData.velocity;
+      
+      // 移动所有点
+      for (let i = 0; i < positions.length / 3; i++) {
+        positions[i * 3] += vel.x;
+        positions[i * 3 + 1] += vel.y;
+        positions[i * 3 + 2] += vel.z;
+        
+        // 边界检测
+        if (Math.abs(positions[i * 3]) > 9 || Math.abs(positions[i * 3 + 1]) > 5) {
+          positions[i * 3] = (Math.random() - 0.5) * 16;
+          positions[i * 3 + 1] = (Math.random() - 0.5) * 9;
+          positions[i * 3 + 2] = (Math.random() - 0.5) * 8 - 2;
+        }
+      }
+      
+      stream.geometry.attributes.position.needsUpdate = true;
+      stream.userData.life++;
+      
+      // 生命周期管理
+      const lifeRatio = stream.userData.life / stream.userData.maxLife;
+      stream.material.opacity = 0.7 * (1 - lifeRatio);
+      
+      if (stream.userData.life >= stream.userData.maxLife) {
+        stream.userData.life = 0;
+        stream.material.opacity = 0.7;
+      }
+    });
+    
+    // 更新引号装饰
+    quoteMarks.forEach((quote, i) => {
+      const data = quote.userData;
+      quote.rotation.z = Math.PI / 6 + Math.sin(time * data.rotationSpeed) * 0.1;
+      quote.position.y += Math.sin(time * data.floatSpeed + data.floatPhase) * 0.005;
+    });
+    
+    // 光源移动
+    pointLight1.position.x = Math.sin(time * 0.3) * 7;
+    pointLight1.position.y = 4 + Math.cos(time * 0.25) * 2;
+    
+    pointLight2.position.x = Math.cos(time * 0.35) * 6;
+    pointLight2.position.z = 4 + Math.sin(time * 0.28) * 2;
+    
+    // 相机缓慢移动
+    threeCamera.position.x = Math.sin(time * 0.08) * 1.2;
+    threeCamera.position.y = 1 + Math.cos(time * 0.06) * 0.6;
+    threeCamera.lookAt(0, 0, 0);
+    
+    threeRenderer.render(threeScene, threeCamera);
+  }
+  
+  animate();
+  
+  // 响应窗口大小变化
+  window.addEventListener('resize', onWindowResize);
+}
+
+function onWindowResize() {
+  if (!threeContainerRef.value || !threeCamera || !threeRenderer) return;
+  
+  const width = threeContainerRef.value.clientWidth;
+  const height = threeContainerRef.value.clientHeight;
+  
+  threeCamera.aspect = width / height;
+  threeCamera.updateProjectionMatrix();
+  threeRenderer.setSize(width, height);
+}
+
+function cleanupThreeScene() {
+  if (threeAnimationId) {
+    cancelAnimationFrame(threeAnimationId);
+    threeAnimationId = null;
+  }
+  
+  if (threeRenderer) {
+    threeRenderer.dispose();
+    if (threeContainerRef.value && threeRenderer.domElement) {
+      threeContainerRef.value.removeChild(threeRenderer.domElement);
+    }
+    threeRenderer = null;
+  }
+  
+  if (threeScene) {
+    threeScene.traverse((object) => {
+      if (object.geometry) object.geometry.dispose();
+      if (object.material) {
+        if (Array.isArray(object.material)) {
+          object.material.forEach(m => m.dispose());
+        } else {
+          object.material.dispose();
+        }
+      }
+    });
+    threeScene = null;
+  }
+  
+  threeCamera = null;
+  window.removeEventListener('resize', onWindowResize);
 }
 
 // ── Particles ─────────────────────────────────────────────
@@ -398,7 +853,7 @@ async function submitPost() {
   const postData: CreatePostData = {
     userId: userInfo.id,
     category: composeForm.category,
-    categoryLabel: selectedCat?.label || '其他',
+    categoryLabel: selectedCat?.name || '其他',
     title: composeForm.title.trim(),
     preview: preview,
     content: composeForm.content.trim(),
@@ -437,6 +892,9 @@ onMounted(() => {
   window.addEventListener('resize', updateSidebarTopOffset);
   updateSidebarTopOffset();
   
+  // 初始化 Three.js 3D 场景
+  initThreeScene();
+  
   // 加载分类列表
   loadCategories();
   
@@ -447,18 +905,20 @@ onMounted(() => {
 // 加载分类列表
 async function loadCategories() {
   try {
-    const res = await getForumCategories()
-    // 在开头添加“全部”选项
-    categories.value = [
-      { id: 0, categoryId: 'all', label: '全部', icon: '◈', color: '#00ffb4', sortOrder: 0 },
-      ...res
-    ]
+    // 并行加载主分类和副分类
+    const [mainCatsRes, subCatsRes] = await Promise.all([
+      getForumMainCategories(),
+      getForumCategories()
+    ])
+    
+    mainCategoriesList.value = mainCatsRes
+    categories.value = subCatsRes
   } catch (error) {
     // 静默处理错误
   }
 }
 
-watch([activeCategory, sortBy, sortDirection], () => {
+watch([activeCategory, activeMainCategory, sortBy, sortDirection], () => {
   currentPage.value = 1; // 重置页码
   fetchPosts();
 });
@@ -469,6 +929,9 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', onMouseMove);
   window.removeEventListener('scroll', handleScroll);
   window.removeEventListener('resize', updateSidebarTopOffset);
+  
+  // 清理 Three.js 场景
+  cleanupThreeScene();
 });
 </script>
 
@@ -506,11 +969,6 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="nav-right">
-        <div class="nav-stat">
-          <span class="ns-dot online"></span>
-          <span class="ns-val">{{ activeUsers.filter(u=>u.online).length }}</span>
-          <span class="ns-label">在线</span>
-        </div>
         <button class="compose-btn" @click="goToUpload">
           <span class="cb-sweep"></span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -521,7 +979,7 @@ onUnmounted(() => {
       </div>
     </nav>
 
-    <!-- ══ FORUM HERO ══════════════════════════════════════ -->
+    <!-- ══ FORUM HERO ═════════════════════════════════════ -->
     <header class="forum-hero fade-up" ref="forumHeroRef">
       <div class="fh-bg-grid"></div>
       <div class="fh-inner">
@@ -544,6 +1002,10 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+          
+      <!-- 右侧 Three.js 3D 装饰 -->
+      <div class="fh-deco-right" ref="threeContainerRef"></div>
+          
       <div class="fh-rings">
         <div class="fhr fhr-1"></div>
         <div class="fhr fhr-2"></div>
@@ -556,46 +1018,43 @@ onUnmounted(() => {
       <!-- ── SIDEBAR LEFT ─────────────────────────────── -->
       <aside class="sidebar-left fade-up">
         <div class="sl-section">
-          <div class="sl-title">[ CATEGORIES ]</div>
+          <div class="sl-title">[ 全部分类 ]</div>
           <div class="cat-list">
-            <button v-for="cat in categories" :key="cat.id"
-                    class="cat-item"
-                    :class="{ active: activeCategory === cat.categoryId }"
-                    :style="`--cc:${cat.color}`"
-                    @click="activeCategory = cat.categoryId">
-              <span class="ci-icon">{{ cat.icon }}</span>
-              <span class="ci-label">{{ cat.label }}</span>
+            <!-- 全部按钮（重置筛选） -->
+            <button class="cat-item main-cat-item"
+                    :class="{ active: activeCategory === 'all' }"
+                    style="--cc:#0066FF"
+                    @click="resetFilter">
+              <span class="ci-icon">◈</span>
+              <span class="ci-label">全部</span>
               <div class="ci-bar"></div>
             </button>
-          </div>
-        </div>
-
-        <div class="sl-section">
-          <div class="sl-title">[ HOT TOPICS ]</div>
-          <div class="hot-list">
-            <div v-for="t in hotTopics" :key="t.rank" class="hot-item">
-              <span class="hi-rank" :style="`color:${t.color}`">{{ String(t.rank).padStart(2,'0') }}</span>
-              <div class="hi-content">
-                <span class="hi-title">{{ t.title }}</span>
-                <span class="hi-replies">{{ t.replies }} 回复</span>
+            
+            <!-- 遍历每个主分类 -->
+            <template v-for="mainCat in mainCategories" :key="mainCat.id">
+              <!-- 主分类按钮 -->
+              <button class="cat-item main-cat-item"
+                      :class="{ active: activeMainCategory === mainCat.categoryId, expanded: expandedMainCategories.has(mainCat.categoryId) }"
+                      :style="`--cc:${mainCat.color}`"
+                      @click="toggleMainCategory(mainCat.categoryId)">
+                <span class="ci-icon">{{ expandedMainCategories.has(mainCat.categoryId) ? '▼' : '▶' }}</span>
+                <span class="ci-label">{{ mainCat.name }}</span>
+                <div class="ci-bar"></div>
+              </button>
+              
+              <!-- 副分类列表（仅当该主分类展开时显示） -->
+              <div v-if="expandedMainCategories.has(mainCat.categoryId) && getSubCategoriesForMain(mainCat.categoryId).length > 0"
+                   class="sub-categories-wrapper">
+                <button v-for="subCat in getSubCategoriesForMain(mainCat.categoryId)" :key="subCat.id"
+                        class="cat-item sub-cat-item"
+                        :class="{ active: activeCategory === subCat.categoryId }"
+                        :style="`--cc:${subCat.color}`"
+                        @click="selectSubCategory(subCat.categoryId)">
+                  <span class="ci-label">{{ subCat.name }}</span>
+                  <div class="ci-bar"></div>
+                </button>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="sl-section">
-          <div class="sl-title">[ ACTIVE USERS ]</div>
-          <div class="user-list">
-            <div v-for="u in activeUsers" :key="u.name" class="user-item">
-              <div class="ui-avatar" :style="`border-color:${u.color}44`">
-                <span :style="`color:${u.color}`">{{ u.avatar }}</span>
-                <div v-if="u.online" class="ui-online"></div>
-              </div>
-              <div class="ui-info">
-                <span class="ui-name">{{ u.name }}</span>
-                <span class="ui-posts">{{ u.posts }} 篇帖子</span>
-              </div>
-            </div>
+            </template>
           </div>
         </div>
       </aside>
@@ -631,7 +1090,7 @@ onUnmounted(() => {
             </div>
             <span v-if="activeCategory !== 'all'" class="tb-active-cat"
                   :style="`color:${activeCatData.color};border-color:${activeCatData.color}33;background:${activeCatData.color}0d`">
-              {{ activeCatData.icon }} {{ activeCatData.label }}
+              {{ activeCatData.icon }} {{ activeCatData.name }}
               <span @click="activeCategory='all'" style="cursor:pointer;margin-left:0.4rem;opacity:0.6">✕</span>
             </span>
           </div>
@@ -681,16 +1140,15 @@ onUnmounted(() => {
                    @mouseleave="hoveredPost = -1">
 
             <div class="pc-layout">
-              <!-- Left: vote -->
+              <!-- Left: stats -->
               <div class="pc-vote">
-                <button class="vote-btn" :class="{ liked: likedPosts.has(post.id) }"
-                        @click.stop="toggleLike(post.id)">
+                <div class="vote-display">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3z"/>
                     <path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
                   </svg>
                   <span>{{ fmtNum(post.likes) }}</span>
-                </button>
+                </div>
                 <div class="vote-sep"></div>
                 <div class="pc-comments-n">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -711,7 +1169,7 @@ onUnmounted(() => {
                   `">
                     {{ post.categoryLabel }}
                   </span>
-                  <span v-if="post.hot" class="pc-hot">🔥 HOT</span>
+                  <span v-if="hotPostIds.has(post.id)" class="pc-hot">🔥 HOT</span>
                   <span v-if="post.solved" class="pc-solved">✓ SOLVED</span>
                 </div>
 
@@ -794,21 +1252,6 @@ onUnmounted(() => {
       <!-- ── SIDEBAR RIGHT ─────────────────────────────── -->
       <aside class="sidebar-right fade-up">
         <div class="sr-section">
-          <div class="sr-title">[ SYSTEM STATUS ]</div>
-          <div class="sys-status">
-            <div v-for="s in [
-              { label: '服务器', status: 'online', latency: '12ms' },
-              { label: '搜索引擎', status: 'online', latency: '8ms' },
-              { label: '文件存储', status: 'online', latency: '45ms' },
-            ]" :key="s.label" class="sys-item">
-              <div class="ssi-dot" :class="s.status"></div>
-              <span class="ssi-label">{{ s.label }}</span>
-              <span class="ssi-latency">{{ s.latency }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="sr-section">
           <div class="sr-title">[ TODAY'S ACTIVITY ]</div>
           <div class="activity-chart">
             <div v-for="(h, i) in [3,7,5,9,6,12,8,14,10,7,11,9,6,4,8,11,7,5,9,13,10,8,6,4]"
@@ -843,30 +1286,17 @@ onUnmounted(() => {
           </div>
         </div>
 
+
         <div class="sr-section">
-          <div class="sr-title">[ QUICK ACTIONS ]</div>
-          <div class="quick-actions">
-            <a href="#" class="qa-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              上传学习资料
-            </a>
-            <a href="#" class="qa-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              搜索资源库
-            </a>
-            <a href="#" class="qa-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
-              </svg>
-              浏览社区成员
-            </a>
+          <div class="sr-title">[ HOT TOPICS ]</div>
+          <div class="hot-list">
+            <div v-for="t in hotTopics" :key="t.rank" class="hot-item" @click="goToDetail(t.id)" style="cursor: pointer;">
+              <span class="hi-rank" :style="`color:${t.color}`">{{ String(t.rank).padStart(2,'0') }}</span>
+              <div class="hi-content">
+                <span class="hi-title">{{ t.title }}</span>
+                <span class="hi-replies">{{ fmtNum(t.views) }} 浏览</span>
+              </div>
+            </div>
           </div>
         </div>
       </aside>
@@ -982,15 +1412,6 @@ onUnmounted(() => {
 .s-clear:hover { color: #00ffb4; }
 
 .nav-right { display: flex; align-items: center; gap: 1.2rem; }
-.nav-stat {
-  display: flex; align-items: center; gap: 0.45rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
-}
-.ns-dot { width: 6px; height: 6px; border-radius: 50%; }
-.ns-dot.online { background: #00ffb4; box-shadow: 0 0 8px #00ffb4; animation: blink 1.4s infinite; }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
-.ns-val { color: #00ffb4; font-weight: 600; }
-.ns-label { color: rgba(150,210,180,0.35); }
 
 .compose-btn {
   display: flex; align-items: center; gap: 0.55rem;
@@ -1208,6 +1629,35 @@ onUnmounted(() => {
   to   { transform: translate(-50%,-50%) rotate(360deg); }
 }
 
+/* 右侧 Three.js 3D 装饰区域 */
+.fh-deco-right {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 960px;
+  height: 500px;
+  pointer-events: none;
+  z-index: 2;
+  background: radial-gradient(ellipse at center, rgba(0, 102, 255, 0.02) 0%, transparent 70%);
+  overflow: hidden;
+}
+
+.fh-deco-right::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 30% 40%, rgba(0, 102, 255, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 70% 60%, rgba(0, 255, 180, 0.02) 0%, transparent 50%);
+  animation: knowledgeGlow 10s ease-in-out infinite;
+}
+
+@keyframes knowledgeGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
 /* ─── LAYOUT ─────────────────────────────────────────── */
 .forum-layout {
   position: relative; z-index: 2;
@@ -1257,7 +1707,7 @@ onUnmounted(() => {
   background: none; border: none; cursor: pointer;
   padding: 0.6rem 0.75rem;
   position: relative; overflow: hidden;
-  transition: color 0.25s;
+  transition: color 0.25s, background 0.25s;
   text-align: left; width: 100%;
   --cc: #0066FF;
 }
@@ -1274,7 +1724,16 @@ onUnmounted(() => {
   background: rgba(0,102,255,0.04);
 }
 .cat-item.active::before { transform: scaleX(1); background: rgba(0,102,255,0.04); }
-.ci-icon { font-size: 0.7rem; color: var(--cc); opacity: 0.7; flex-shrink: 0; }
+.ci-icon { 
+  font-size: 0.6rem; 
+  color: var(--cc); 
+  opacity: 0.7; 
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+.cat-item.expanded .ci-icon {
+  transform: rotate(0deg);
+}
 .ci-label { flex: 1; }
 .ci-bar {
   position: absolute; left: 0; top: 20%; bottom: 20%;
@@ -1283,6 +1742,66 @@ onUnmounted(() => {
   opacity: 0; transition: opacity 0.25s;
 }
 .cat-item.active .ci-bar { opacity: 1; }
+
+/* 主分类特殊样式 */
+.main-cat-item {
+  font-weight: 500;
+  background: rgba(0,102,255,0.02);
+  border-left: 2px solid transparent;
+}
+.main-cat-item:hover {
+  background: rgba(0,102,255,0.05);
+  border-left-color: var(--cc);
+}
+.main-cat-item.active {
+  background: rgba(0,102,255,0.06);
+  border-left-color: var(--cc);
+}
+
+/* 副分类包装器 */
+.sub-categories-wrapper {
+  margin-left: 1.2rem;
+  border-left: 1px solid rgba(0,102,255,0.1);
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+    transform: translateY(0);
+  }
+}
+
+/* 副分类项 */
+.sub-cat-item {
+  font-size: 0.8rem;
+  padding: 0.5rem 0.75rem;
+  color: #6c757d;
+}
+.sub-cat-item:hover {
+  color: var(--cc);
+  background: rgba(0,102,255,0.03);
+}
+.sub-cat-item.active {
+  color: var(--cc);
+  background: rgba(0,102,255,0.05);
+}
+.cat-item.active .ci-bar { opacity: 1; }
+
+/* 副分类项样式 */
+.sub-cat-item {
+  padding-left: 1.5rem;
+  font-size: 0.8rem;
+}
+.sub-cat-item::before {
+  background: rgba(0,102,255,0.03);
+}
 
 /* Hot topics */
 .hot-list { display: flex; flex-direction: column; gap: 0.65rem; }
@@ -1301,32 +1820,6 @@ onUnmounted(() => {
 .hi-replies {
   font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
   color: #6c757d; letter-spacing: 0.06em;
-}
-
-/* Active users */
-.user-list { display: flex; flex-direction: column; gap: 0.75rem; }
-.user-item { display: flex; align-items: center; gap: 0.65rem; }
-.ui-avatar {
-  width: 30px; height: 30px; border-radius: 50%;
-  border: 1px solid; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  position: relative;
-}
-.ui-avatar span {
-  font-family: 'Orbitron', sans-serif; font-size: 0.6rem;
-  font-weight: 700; letter-spacing: 0.06em;
-}
-.ui-online {
-  position: absolute; bottom: -1px; right: -1px;
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #28a745; border: 1px solid #ffffff;
-  box-shadow: 0 0 6px #28a745;
-}
-.ui-info { flex: 1; min-width: 0; }
-.ui-name { font-size: 0.8rem; color: #1a1a1a; display: block; }
-.ui-posts {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
-  color: #6c757d;
 }
 
 /* ─── MAIN ────────────────────────────────────────────── */
@@ -1475,7 +1968,7 @@ onUnmounted(() => {
   display: flex; gap: 0;
 }
 
-/* Vote column */
+/* Vote column - display only */
 .pc-vote {
   flex-shrink: 0; width: 64px;
   display: flex; flex-direction: column;
@@ -1484,16 +1977,12 @@ onUnmounted(() => {
   padding: 1.4rem 0.5rem;
   border-right: 1px solid #e9ecef;
 }
-.vote-btn {
+.vote-display {
   display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
-  background: none; border: none; cursor: pointer;
   color: #6c757d;
   font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
-  transition: color 0.25s, filter 0.25s;
 }
-.vote-btn svg { width: 18px; height: 18px; }
-.vote-btn:hover { color: #0066FF; }
-.vote-btn.liked { color: #0066FF; filter: drop-shadow(0 0 6px rgba(0,102,255,0.3)); }
+.vote-display svg { width: 18px; height: 18px; }
 
 .vote-sep {
   width: 24px; height: 1px;
@@ -1725,22 +2214,7 @@ onUnmounted(() => {
 }
 .tc-tag:hover { color: #00ffb4; text-shadow: 0 0 12px #00ffb4; }
 
-/* Quick actions */
-.quick-actions { display: flex; flex-direction: column; gap: 2px; }
-.qa-item {
-  display: flex; align-items: center; gap: 0.65rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
-  letter-spacing: 0.1em; color: rgba(150,210,180,0.35);
-  text-decoration: none;
-  padding: 0.6rem 0.5rem;
-  border: 1px solid transparent;
-  transition: color 0.25s, background 0.25s, border-color 0.25s;
-}
-.qa-item svg { width: 14px; height: 14px; flex-shrink: 0; }
-.qa-item:hover {
-  color: #00ffb4; background: rgba(0,255,180,0.04);
-  border-color: rgba(0,255,180,0.1);
-}
+
 
 /* ─── RESPONSIVE ─────────────────────────────────────── */
 @media(max-width:1200px){
@@ -1762,6 +2236,7 @@ onUnmounted(() => {
   .top-nav{ flex-wrap: wrap; height: auto; padding: 0.75rem 1rem; gap: 0.75rem; }
   .nav-search{ max-width: 100%; order: 3; width: 100%; margin: 0; }
   .fh-rings{ display: none; }
+  .fh-deco-right { display: none; }
 }
 @media(max-width:600px){
   .pc-vote{ width: 52px; }

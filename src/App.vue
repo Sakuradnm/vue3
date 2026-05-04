@@ -50,6 +50,8 @@ onMounted(() => {
   }, 0)
 
   window.addEventListener('storage', handleStorageChange)
+  // 监听页面卸载事件，更新会话时间戳
+  window.addEventListener('beforeunload', handleBeforeUnload)
 
   const checkInterval = setInterval(checkAdminStatus, 500)
 
@@ -58,11 +60,20 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('storage', handleStorageChange)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 
   if ((window as any).__adminCheckInterval) {
     clearInterval((window as any).__adminCheckInterval)
   }
 })
+
+// 页面关闭前更新会话时间戳
+const handleBeforeUnload = () => {
+  const timestamp = localStorage.getItem('sessionTimestamp')
+  if (timestamp) {
+    localStorage.setItem('sessionTimestamp', Date.now().toString())
+  }
+}
 
 </script>
 <style>

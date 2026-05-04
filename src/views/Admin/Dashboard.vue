@@ -24,11 +24,16 @@ import {
   Refresh,
   Search,
   Plus,
-  SwitchButton
+  SwitchButton,
+  View
 } from '@element-plus/icons-vue'
-import { getUserInfo } from '@/utils/session'
+import { getUserInfo, clearSession } from '@/utils/session'
 import UserManagement from './user/user.vue'
 import CourseManagement from './course/course.vue'
+import CourseReviewManagement from './CourseReview/index.vue'
+import { getAllNotices, markNoticeAsRead, markAllNoticesAsRead, getNoticeStats } from '@/api/adminNotice'
+import type { AdminNoticeItem, NoticeStats } from '@/api/adminNotice'
+import { getPendingReviews } from '@/api/courseReview'
 
 const router = useRouter()
 
@@ -161,52 +166,216 @@ const filteredUsers = computed(() => {
 })
 
 // 通知数据
-interface Notification {
-  id: number
-  type: string
-  title: string
-  content: string
-  time: string
-  read: boolean
+const notifications = ref<AdminNoticeItem[]>([])
+
+// 加载通知列表
+const loadNotifications = async () => {
+  try {
+    const res = await getAllNotices()
+    // res直接是数组数据，拦截器已经处理了code检查
+    if (Array.isArray(res)) {
+      notifications.value = res
+    } else {
+      notifications.value = []
+    }
+  } catch (error) {
+    console.error('加载通知列表失败:', error)
+    notifications.value = []
+  }
 }
 
-const notifications = ref<Notification[]>([
-  {
-    id: 1,
-    type: 'course.ts',
-    title: '新课程待审核',
-    content: '张老师提交了新课程"Vue 3 高级实战课程"',
-    time: '5分钟前',
-    read: false
-  },
-  {
-    id: 2,
-    type: 'user',
-    title: '新用户注册',
-    content: '用户"李明"刚刚完成注册',
-    time: '15分钟前',
-    read: false
-  },
-  {
-    id: 3,
-    type: 'system',
-    title: '系统更新',
-    content: '系统将于今晚22:00进行维护更新',
-    time: '1小时前',
-    read: true
-  },
-  {
-    id: 4,
-    type: 'course.ts',
-    title: '课程评价提醒',
-    content: '"Python 基础教程"收到新的用户评价',
-    time: '2小时前',
-    read: true
+// 标记单个通知为已读
+const handleMarkNoticeAsRead = async (notification: AdminNoticeItem) => {
+  try {
+    await markNoticeAsRead(notification.id)
+    notification.isRead = 1
+    notification.readAt = new Date().toISOString()
+    ElMessage.success('已标记为已读')
+    await loadNotifications()
+  } catch (error) {
+    console.error('标记已读失败:', error)
+    ElMessage.error('操作失败')
   }
-])
+}
+
+// 通过通知（标记已读并切换到用户管理页面）
+const handleApprove = async (notification: AdminNoticeItem) => {
+  try {
+    // 标记为已读
+    await markNoticeAsRead(notification.id)
+    notification.isRead = 1
+    notification.readAt = new Date().toISOString()
+    
+    ElMessage.success('已通过')
+    
+    // 切换到用户管理页面
+    activeMenu.value = 'users'
+    
+    await loadNotifications()
+  } catch (error) {
+    console.error('操作失败:', error)
+    ElMessage.error('操作失败')
+  }
+}
+
+// 拒绝通知（弹出备注框并发送通知给用户）
+const handleReject = async (notification: AdminNoticeItem) => {
+  try {
+    const { value: comment } = await ElMessageBox.prompt(
+      '请输入拒绝原因（将发送给申请人）',
+      '拒绝通知',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputType: 'textarea',
+        inputPlaceholder: '请输入拒绝原因...',
+        inputValidator: (value) => {
+          if (!value || !value.trim()) {
+            return '请输入拒绝原因'
+          }
+          return true
+        }
+      }
+    )
+    
+    // 调用后端API拒绝通知
+    const { rejectNotice } = await import('@/api/adminNotice')
+    await rejectNotice(notification.id, {
+      comment: comment,
+      adminId: 1 // TODO: 从session获取当前管理员ID
+    })
+    
+    ElMessage.success('已拒绝并发送通知')
+    await loadNotifications()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('操作失败:', error)
+      ElMessage.error('操作失败')
+    }
+  }
+}
+
+// 删除通知
+const deleteNotice = async (notification: AdminNoticeItem) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这条通知吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    const { deleteNotice: deleteNoticeApi } = await import('@/api/adminNotice')
+    await deleteNoticeApi(notification.id)
+    ElMessage.success('删除成功')
+    await loadNotifications()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除通知失败:', error)
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
+// 加载待审核课程数量
+const loadPendingReviewsCount = async () => {
+  try {
+    const res = await getPendingReviews()
+    if (Array.isArray(res)) {
+      stats.pendingReviews = res.length
+    } else {
+      stats.pendingReviews = 0
+    }
+  } catch (error) {
+    console.error('加载待审核数量失败:', error)
+    stats.pendingReviews = 0
+  }
+}
+
+// 加载通知统计
+const loadNoticeStats = async () => {
+  try {
+    const res = await getNoticeStats()
+    if (res && typeof res === 'object') {
+      stats.todayNotifications = res.totalUnread || 0
+    }
+  } catch (error) {
+    console.error('加载通知统计失败:', error)
+    stats.todayNotifications = 0
+  }
+}
+
+// 处理通知点击 - 根据类型跳转到对应页面
+const handleNoticeClick = async (notification: AdminNoticeItem) => {
+  // 先标记为已读
+  try {
+    await markNoticeAsRead(notification.id)
+    notification.isRead = 1
+    notification.readAt = new Date().toISOString()
+  } catch (error) {
+    console.error('标记已读失败:', error)
+  }
+  
+  // 根据通知类型跳转到对应页面
+  if (notification.noticeType === 'course_review' && notification.relatedId) {
+    // 跳转到课程审核页面，并传递审核ID
+    handleMenuClick('courses')
+    // 可以通过sessionStorage传递参数给CourseReview组件
+    sessionStorage.setItem('jumpToReviewId', notification.relatedId.toString())
+    ElMessage.success('已跳转到课程审核页面')
+  } else if (notification.noticeType === 'user_register' && notification.relatedId) {
+    // 跳转到用户管理页面
+    handleMenuClick('users')
+    sessionStorage.setItem('jumpToUserId', notification.relatedId.toString())
+    ElMessage.success('已跳转到用户管理页面')
+  } else if (notification.noticeType === 'teacher_apply' && notification.relatedId) {
+    // 跳转到用户管理页面（讲师申请）
+    handleMenuClick('users')
+    sessionStorage.setItem('jumpToTeacherApplyId', notification.relatedId.toString())
+    ElMessage.success('已跳转到用户管理页面')
+  } else {
+    ElMessage.success('已标记为已读')
+  }
+}
+
+// 相对时间格式化
+const formatRelativeTime = (createdAt: string): string => {
+  if (!createdAt) return '未知时间'
+  
+  const now = new Date()
+  const created = new Date(createdAt)
+  const diffMs = now.getTime() - created.getTime()
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const diffMonths = Math.floor(diffDays / 30)
+  const diffYears = Math.floor(diffDays / 365)
+  
+  if (diffMinutes < 60) {
+    if (diffMinutes <= 0) return '刚刚'
+    return `${diffMinutes}分钟前`
+  } else if (diffHours < 24) {
+    return `${diffHours}小时前`
+  } else if (diffDays < 30) {
+    return `${diffDays}天前`
+  } else if (diffMonths < 12) {
+    return `${diffMonths}个月前`
+  } else {
+    return `${diffYears}年前`
+  }
+}
+
+// 获取通知类型对应的图标
+const getNotificationIcon = (noticeType: string): any => {
+  const iconMap: Record<string, any> = {
+    course_review: VideoCamera,
+    user_register: User,
+    teacher_apply: Bell
+  }
+  return iconMap[noticeType] || Bell
+}
 
 const unreadCount = computed(() =>
-    notifications.value.filter(n => !n.read).length
+  notifications.value.filter(n => n.isRead === 0).length
 )
 
 // 编辑用户对话框
@@ -236,8 +405,7 @@ const goBack = () => {
 }
 
 const handleLogout = () => {
-  localStorage.removeItem('userInfo')
-  localStorage.removeItem('rememberedUsername')
+  clearSession()
   isLoggedIn.value = false
   userInfo.value = null
   unreadNoticeCount.value = 0
@@ -431,13 +599,20 @@ const deleteUser = (user: UserData) => {
   }).catch(() => {})
 }
 
-const markAsRead = (notification: Notification) => {
-  notification.read = true
-}
-
-const markAllAsRead = () => {
-  notifications.value.forEach(n => n.read = true)
-  ElMessage.success('所有通知已标记为已读')
+const markAllAsRead = async () => {
+  try {
+    await markAllNoticesAsRead()
+    notifications.value.forEach(n => {
+      n.isRead = 1
+      n.readAt = new Date().toISOString()
+    })
+    ElMessage.success('所有通知已标记为已读')
+    // 重新加载统计
+    loadNoticeStats()
+  } catch (error) {
+    console.error('批量标记失败:', error)
+    ElMessage.error('批量标记失败，请稍后重试')
+  }
 }
 
 // 动画效果
@@ -460,6 +635,13 @@ onMounted(() => {
   // 加载统计数据
   fetchUserList()
   fetchCourseCount()
+  
+  // 加载通知数据
+  loadNotifications()
+  loadNoticeStats()
+  
+  // 加载待审核课程数量
+  loadPendingReviewsCount()
 })
 
 const checkLoginStatus = () => {
@@ -522,6 +704,15 @@ const checkLoginStatus = () => {
 
         <div
             class="nav-item"
+            :class="{ active: activeMenu === 'courseManagement' }"
+            @click="handleMenuClick('courseManagement')"
+        >
+          <Document class="nav-icon" />
+          <span>课程管理</span>
+        </div>
+
+        <div
+            class="nav-item"
             :class="{ active: activeMenu === 'users' }"
             @click="handleMenuClick('users')"
         >
@@ -556,8 +747,9 @@ const checkLoginStatus = () => {
         <h1 class="page-title">
           {{ activeMenu === 'dashboard' ? '数据概览' :
             activeMenu === 'courses' ? '课程审核' :
-                activeMenu === 'users' ? '用户管理' :
-                    activeMenu === 'notifications' ? '通知中心' : '系统设置' }}
+                activeMenu === 'courseManagement' ? '课程管理' :
+                    activeMenu === 'users' ? '用户管理' :
+                        activeMenu === 'notifications' ? '通知中心' : '系统设置' }}
         </h1>
         <div class="header-actions">
           <span class="welcome-text">欢迎回来，管理员</span>
@@ -610,6 +802,11 @@ const checkLoginStatus = () => {
 
       <!-- 课程审核 -->
       <section v-if="activeMenu === 'courses'" class="courses-section">
+        <CourseReviewManagement />
+      </section>
+
+      <!-- 课程管理 -->
+      <section v-if="activeMenu === 'courseManagement'" class="courses-section">
         <CourseManagement />
       </section>
 
@@ -637,20 +834,34 @@ const checkLoginStatus = () => {
               v-for="notification in notifications"
               :key="notification.id"
               class="notification-item"
-              :class="{ unread: !notification.read }"
-              @click="markAsRead(notification)"
+              :class="{ unread: notification.isRead === 0 }"
           >
-            <div class="notification-icon" :class="`type-${notification.type}`">
-              <VideoCamera v-if="notification.type === 'course.ts'" />
-              <User v-else-if="notification.type === 'user'" />
-              <Bell v-else />
+            <div class="notification-icon" :class="`type-${notification.noticeType}`">
+              <component :is="getNotificationIcon(notification.noticeType)" />
             </div>
             <div class="notification-content">
               <h3 class="notification-title">{{ notification.title }}</h3>
               <p class="notification-text">{{ notification.content }}</p>
-              <span class="notification-time">{{ notification.time }}</span>
+              <span class="notification-time">{{ formatRelativeTime(notification.createdAt) }}</span>
             </div>
-            <div v-if="!notification.read" class="unread-indicator"></div>
+            <div class="notification-actions">
+              <el-button
+                  v-if="notification.isRead === 0"
+                  type="success"
+                  size="small"
+                  @click="handleApprove(notification)"
+                  :icon="Check"
+                  circle
+              />
+              <el-button
+                  v-if="notification.isRead === 0"
+                  type="danger"
+                  size="small"
+                  @click="handleReject(notification)"
+                  :icon="Close"
+                  circle
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -1306,7 +1517,7 @@ const checkLoginStatus = () => {
   padding: 1.5rem;
   display: flex;
   gap: 1rem;
-  cursor: pointer;
+  align-items: center;
   transition: all 0.3s ease;
   position: relative;
   border: 2px solid transparent;
@@ -1367,13 +1578,11 @@ const checkLoginStatus = () => {
   color: #94a3b8;
 }
 
-.unread-indicator {
-  width: 10px;
-  height: 10px;
-  background: #667eea;
-  border-radius: 50%;
+.notification-actions {
+  display: flex;
+  gap: 0.75rem;
   flex-shrink: 0;
-  align-self: center;
+  align-items: center;
 }
 
 /* 系统设置 */
